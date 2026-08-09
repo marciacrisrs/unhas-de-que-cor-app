@@ -27,7 +27,8 @@ class DomainUseCasesTest {
     )
     private val catalog = FakeColorCatalogRepository()
     private val engine = RecommendationEngine()
-    private val clock = Clock { 42L }
+    private val fixedNowMs = 1_700_000_000_042L
+    private val clock = Clock { fixedNowMs }
 
     @Test
     fun `save recommendation persists entry with favorite state and clock`() = runTest {
@@ -48,7 +49,7 @@ class DomainUseCasesTest {
             val saved = awaitItem().single()
             assertThat(saved.colorId).isEqualTo(color.id)
             assertThat(saved.isFavorite).isTrue()
-            assertThat(saved.createdAtEpochMs).isEqualTo(42L)
+            assertThat(saved.createdAtEpochMs).isEqualTo(fixedNowMs)
             assertThat(saved.occasion).isEqualTo(Occasion.FESTA)
             cancelAndIgnoreRemainingEvents()
         }
