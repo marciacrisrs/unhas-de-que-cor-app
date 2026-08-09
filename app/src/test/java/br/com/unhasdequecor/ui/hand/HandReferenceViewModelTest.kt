@@ -56,11 +56,15 @@ class HandReferenceViewModelTest {
     }
 
     @Test
-    fun `use sample hand marks source and sample id`() = runTest {
+    fun `confirm pending sample persists selection`() = runTest {
         every { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         val viewModel = viewModel()
 
-        viewModel.useSampleHand("retinta_vinho")
+        viewModel.openSamplePicker()
+        viewModel.selectPendingSample("retinta_vinho")
+        assertThat(viewModel.uiState.value.pendingSampleId).isEqualTo("retinta_vinho")
+
+        viewModel.confirmPendingSample()
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
@@ -68,6 +72,24 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.message).contains("Pele retinta")
         assertThat(repository.lastSampleId).isEqualTo("retinta_vinho")
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
+        assertThat(viewModel.uiState.value.pendingSampleId).isNull()
+    }
+
+    @Test
+    fun `camera after sample clears sample source`() = runTest {
+        every { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
+        val viewModel = viewModel()
+        viewModel.useSampleHand("morena_nude")
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
+
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.USER)
+        assertThat(viewModel.uiState.value.reference?.sampleId).isNull()
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+        assertThat(repository.lastSampleId).isNull()
     }
 
     @Test
@@ -77,6 +99,7 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.showSamplePicker).isTrue()
         viewModel.dismissSamplePicker()
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
+        assertThat(viewModel.uiState.value.pendingSampleId).isNull()
     }
 
     @Test

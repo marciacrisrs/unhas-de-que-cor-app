@@ -45,7 +45,9 @@ class HandReferenceFileStore @Inject constructor(
 
     fun deleteStoredImage() {
         val directory = File(context.filesDir, DIRECTORY)
-        File(directory, FILE_NAME).delete()
+        if (directory.isDirectory) {
+            directory.listFiles()?.forEach { it.delete() }
+        }
         directory.delete()
     }
 
@@ -117,11 +119,13 @@ class HandReferenceFileStore @Inject constructor(
         sampleId: String?,
     ): HandReferenceSaveOutcome {
         val directory = File(context.filesDir, DIRECTORY).also { it.mkdirs() }
-        val destination = File(directory, FILE_NAME)
+        // Path único a cada save: evita preview/cache preso no hand.jpg antigo.
+        val destination = File(directory, "hand_$capturedAtEpochMs.jpg")
         val compressed = FileOutputStream(destination).use { output ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
         }
         return if (compressed) {
+            purgeOldHandFiles(directory, keep = destination)
             HandReferenceSaveOutcome.Saved(
                 HandReference(
                     localPath = destination.absolutePath,
@@ -131,7 +135,18 @@ class HandReferenceFileStore @Inject constructor(
                 ),
             )
         } else {
+            destination.delete()
             HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
+        }
+    }
+
+    private fun purgeOldHandFiles(directory: File, keep: File) {
+        directory.listFiles()?.forEach { file ->
+            val isHandJpeg = file.name == LEGACY_FILE_NAME ||
+                (file.name.startsWith("hand_") && file.name.endsWith(".jpg"))
+            if (isHandJpeg && file.absolutePath != keep.absolutePath) {
+                file.delete()
+            }
         }
     }
 
@@ -147,7 +162,7 @@ class HandReferenceFileStore @Inject constructor(
 
     companion object {
         const val DIRECTORY = "hand_reference"
-        const val FILE_NAME = "hand.jpg"
+        const val LEGACY_FILE_NAME = "hand.jpg"
         const val CACHE_DIR = "hand_capture"
         const val MIN_DIMENSION = 480
         const val MAX_BYTES = 15L * 1024L * 1024L

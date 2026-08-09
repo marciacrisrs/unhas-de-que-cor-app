@@ -149,8 +149,9 @@ fun HandReferenceScreen(
     if (state.showSamplePicker) {
         HandSamplePickerSheet(
             options = state.sampleOptions,
-            selectedSampleId = state.reference?.sampleId,
-            onSelect = viewModel::useSampleHand,
+            pendingSampleId = state.pendingSampleId,
+            onSelectPending = viewModel::selectPendingSample,
+            onConfirm = viewModel::confirmPendingSample,
             onDismiss = viewModel::dismissSamplePicker,
         )
     }
@@ -280,7 +281,10 @@ private fun HandReferenceContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(20.dp))
-        HandPreview(path = state.reference?.localPath)
+        HandPreview(
+            path = state.reference?.localPath,
+            revision = state.reference?.capturedAtEpochMs ?: 0L,
+        )
         Spacer(modifier = Modifier.height(20.dp))
         HandReferenceActions(
             hasReference = state.reference != null,
@@ -331,8 +335,9 @@ private fun HandReferenceActions(
 @Composable
 private fun HandSamplePickerSheet(
     options: List<HandSampleOption>,
-    selectedSampleId: String?,
-    onSelect: (String) -> Unit,
+    pendingSampleId: String?,
+    onSelectPending: (String) -> Unit,
+    onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -348,7 +353,7 @@ private fun HandSamplePickerSheet(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Combine com o seu tom de pele. Depois você troca pela sua foto.",
+                text = "Toque em uma opção e confirme com OK.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -357,19 +362,28 @@ private fun HandSamplePickerSheet(
                 columns = GridCells.Fixed(2),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 28.dp),
+                contentPadding = PaddingValues(bottom = 8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(420.dp),
+                    .height(360.dp),
             ) {
                 items(options, key = { it.id }) { option ->
                     HandSampleCard(
                         option = option,
-                        selected = option.id == selectedSampleId,
-                        onClick = { onSelect(option.id) },
+                        selected = option.id == pendingSampleId,
+                        onClick = { onSelectPending(option.id) },
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            PrimaryCtaButton(
+                text = "OK, usar esta",
+                onClick = onConfirm,
+                enabled = pendingSampleId != null,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SecondaryCtaButton(text = "Cancelar", onClick = onDismiss)
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
@@ -434,8 +448,12 @@ private fun HandSampleCard(
 }
 
 @Composable
-private fun HandPreview(path: String?) {
-    val bitmap by produceState(initialValue = null as android.graphics.Bitmap?, path) {
+private fun HandPreview(path: String?, revision: Long) {
+    val bitmap by produceState(
+        initialValue = null as android.graphics.Bitmap?,
+        path,
+        revision,
+    ) {
         value = if (path.isNullOrBlank()) {
             null
         } else {

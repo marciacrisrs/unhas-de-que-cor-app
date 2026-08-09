@@ -29,6 +29,7 @@ data class HandReferenceUiState(
     val reference: HandReference? = null,
     val sampleOptions: List<HandSampleOption> = HandSampleCatalog.options,
     val showSamplePicker: Boolean = false,
+    val pendingSampleId: String? = null,
     val isSaving: Boolean = false,
     val message: String? = null,
 )
@@ -57,16 +58,38 @@ class HandReferenceViewModel @Inject constructor(
     fun createCameraCaptureFile(): File = fileStore.createCameraCaptureFile()
 
     fun openSamplePicker() {
-        _uiState.update { it.copy(showSamplePicker = true, message = null) }
+        _uiState.update {
+            it.copy(
+                showSamplePicker = true,
+                pendingSampleId = it.reference?.sampleId,
+                message = null,
+            )
+        }
     }
 
     fun dismissSamplePicker() {
-        _uiState.update { it.copy(showSamplePicker = false) }
+        _uiState.update { it.copy(showSamplePicker = false, pendingSampleId = null) }
+    }
+
+    fun selectPendingSample(sampleId: String) {
+        _uiState.update { it.copy(pendingSampleId = sampleId) }
+    }
+
+    fun confirmPendingSample() {
+        val sampleId = _uiState.value.pendingSampleId ?: return
+        useSampleHand(sampleId)
     }
 
     fun importFromGallery(uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, message = null, showSamplePicker = false) }
+            _uiState.update {
+                it.copy(
+                    isSaving = true,
+                    message = null,
+                    showSamplePicker = false,
+                    pendingSampleId = null,
+                )
+            }
             val prepared = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     fileStore.copyUriStreamToCache(input)
@@ -87,7 +110,14 @@ class HandReferenceViewModel @Inject constructor(
 
     fun importFromCameraCapture(file: File) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, message = null, showSamplePicker = false) }
+            _uiState.update {
+                it.copy(
+                    isSaving = true,
+                    message = null,
+                    showSamplePicker = false,
+                    pendingSampleId = null,
+                )
+            }
             persistUser(file.absolutePath)
         }
     }
@@ -95,7 +125,14 @@ class HandReferenceViewModel @Inject constructor(
     fun useSampleHand(sampleId: String) {
         val option = HandSampleCatalog.findById(sampleId) ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, message = null, showSamplePicker = false) }
+            _uiState.update {
+                it.copy(
+                    isSaving = true,
+                    message = null,
+                    showSamplePicker = false,
+                    pendingSampleId = null,
+                )
+            }
             val prepared = runCatching {
                 fileStore.copySampleAssetToCache(option.assetPath)
             }.getOrNull()
