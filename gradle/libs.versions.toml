@@ -17,6 +17,7 @@ activityCompose = "1.11.0"
 composeBom = "2025.10.01"
 hiltNavigationCompose = "1.2.0"
 detekt = "2.0.0-alpha.6"
+sonar = "7.4.0.8496"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
@@ -79,3 +80,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
+sonar = { id = "org.sonarqube", version.ref = "sonar" }

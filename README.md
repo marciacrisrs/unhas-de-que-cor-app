@@ -69,9 +69,20 @@ Isso executa, em sequência:
 2. **Android Lint** (`:app:lintDebug`)  
 3. **Testes unitários** (`:app:testDebugUnitTest`)  
 4. **Cobertura do domínio** (`:app:jacocoDomainCoverageVerification`) — ≥80% linhas  
-5. **Assemble debug** (`:app:assembleDebug`)
+5. **Assemble debug + release**
 
 Relatório HTML local: `app/build/reports/jacoco/jacocoDomainReport/html/index.html`.
+
+### SonarCloud
+
+Com token configurado:
+
+```bash
+./gradlew sonar
+```
+
+No CI o passo Sonar só roda se o secret `SONAR_TOKEN` existir.  
+Setup completo: [`docs/sonar.md`](docs/sonar.md).
 
 Configurações em `config/detekt/detekt.yml` e `config/lint/lint.xml`.  
 Workflow: `.github/workflows/ci.yml` (roda em qualquer PR e em push para `master`/`main`).
