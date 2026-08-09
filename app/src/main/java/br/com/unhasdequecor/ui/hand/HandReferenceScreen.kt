@@ -623,7 +623,7 @@ private fun HandPreview(
             null
         } else {
             withContext(Dispatchers.IO) {
-                BitmapFactory.decodeFile(path)
+                br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder.decodeFile(path)
             }
         }
     }

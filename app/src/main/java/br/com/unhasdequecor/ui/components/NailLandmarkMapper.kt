@@ -50,8 +50,8 @@ object NailLandmarkMapper {
             // Empurra um pouco além do tip: a unha se estende da ponta do dedo.
             val tipBiasX = tip.x + dx * TIP_OVERSHOOT
             val tipBiasY = tip.y + dy * TIP_OVERSHOOT
-            val centerX = dip.x + (tipBiasX - dip.x) * along
-            val centerY = dip.y + (tipBiasY - dip.y) * along
+            val centerX = (dip.x + (tipBiasX - dip.x) * along).coerceIn(0f, 1f)
+            val centerY = (dip.y + (tipBiasY - dip.y) * along).coerceIn(0f, 1f)
             val rotation = Math.toDegrees(atan2(dx.toDouble(), -dy.toDouble())).toFloat()
             NailOverlayAnchor(
                 centerX = centerX,
@@ -61,9 +61,11 @@ object NailLandmarkMapper {
                 rotationDegrees = rotation,
             )
         }
-        return anchors.takeIf { nails ->
-            nails.all { nail -> nail.centerX in VISIBLE_RANGE && nail.centerY in VISIBLE_RANGE }
+        // Aceita se a maioria das unhas está em região plausível (não descarta a mão inteira).
+        val plausible = anchors.count { nail ->
+            nail.centerX in PLAUSIBLE_RANGE && nail.centerY in PLAUSIBLE_RANGE
         }
+        return anchors.takeIf { plausible >= MIN_PLAUSIBLE_NAILS }
     }
 
     data class NormalizedPoint(val x: Float, val y: Float)
@@ -76,15 +78,16 @@ object NailLandmarkMapper {
         val lengthFactor: Float,
     )
 
-    private val VISIBLE_RANGE = -0.05f..1.05f
+    private val PLAUSIBLE_RANGE = 0.02f..0.98f
 
     const val PREVIEW_ASPECT = 3f / 4f
     private const val MIN_LANDMARKS = 21
+    private const val MIN_PLAUSIBLE_NAILS = 3
     private const val MIN_FINGER_LEN = 0.018f
     private const val SHORT_TIP_DIP = 0.030f
     private const val NAIL_CENTER_ALONG_FINGER = 0.88f
     private const val NAIL_CENTER_FACING_CAMERA = 0.96f
-    private const val TIP_OVERSHOOT = 0.12f
+    private const val TIP_OVERSHOOT = 0.08f
     private const val MIN_NAIL_WIDTH = 0.035f
     private const val MAX_NAIL_WIDTH = 0.13f
     private const val MIN_NAIL_HEIGHT = 0.030f

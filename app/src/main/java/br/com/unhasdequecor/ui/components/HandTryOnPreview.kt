@@ -1,6 +1,5 @@
 package br.com.unhasdequecor.ui.components
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandNailDetector
 import br.com.unhasdequecor.data.vision.MediaPipeHandNailDetector
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
@@ -73,7 +73,8 @@ fun HandTryOnPreview(
         detector,
     ) {
         value = withContext(Dispatchers.Default) {
-            val bitmap = BitmapFactory.decodeFile(imagePath) ?: return@withContext null
+            val bitmap = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 2048)
+                ?: return@withContext null
             resolvePreview(
                 context = context.applicationContext,
                 bitmap = bitmap,
@@ -120,7 +121,7 @@ fun HandTryOnPreview(
                 preview?.mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
                 preview?.mode == TryOnMode.DETECTED -> "Prévia na sua mão"
                 preview?.mode == TryOnMode.APPROXIMATE && sampleId == null ->
-                    "Não detectamos as unhas — tente outra foto"
+                    "Mão não detectada — foto com unhas à mostra e boa luz"
                 else -> "Prévia aproximada"
             },
             style = MaterialTheme.typography.labelMedium,
@@ -144,15 +145,23 @@ private fun resolvePreview(
 ): TryOnPreviewData {
     val isUserPhoto = sampleId == null
     return when {
-        // Foto da usuária: sempre roda MediaPipe nesta foto (a cada load/troca).
+        // Foto da usuária: MediaPipe a cada load; tenta rotações se a foto estiver deitada.
         // Sem detecção: não inventa ovais no lugar errado.
         isUserPhoto -> {
-            val detected = detector.detect(bitmap)
-            TryOnPreviewData(
-                bitmap = bitmap,
-                anchors = detected.orEmpty(),
-                mode = if (detected != null) TryOnMode.DETECTED else TryOnMode.APPROXIMATE,
-            )
+            val detected = detector.detectWithOrientationFallback(bitmap)
+            if (detected != null) {
+                TryOnPreviewData(
+                    bitmap = detected.bitmap,
+                    anchors = detected.anchors,
+                    mode = TryOnMode.DETECTED,
+                )
+            } else {
+                TryOnPreviewData(
+                    bitmap = bitmap,
+                    anchors = emptyList(),
+                    mode = TryOnMode.APPROXIMATE,
+                )
+            }
         }
         // Amostra: máscara calibrada > recolor pelo esmalte da foto > âncoras.
         else -> resolveSamplePreview(

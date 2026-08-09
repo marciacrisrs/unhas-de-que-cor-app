@@ -37,6 +37,41 @@ class NailLandmarkMapperTest {
         ).isNull()
     }
 
+    @Test
+    fun `clamps nail centers near image edges instead of rejecting hand`() {
+        val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }
+        // Dedos com pontas quase na borda superior — antes descartava a mão inteira.
+        landmarks[2] = NailLandmarkMapper.NormalizedPoint(0.28f, 0.12f)
+        landmarks[3] = NailLandmarkMapper.NormalizedPoint(0.26f, 0.08f)
+        landmarks[4] = NailLandmarkMapper.NormalizedPoint(0.24f, 0.02f)
+        landmarks[6] = NailLandmarkMapper.NormalizedPoint(0.40f, 0.10f)
+        landmarks[7] = NailLandmarkMapper.NormalizedPoint(0.40f, 0.06f)
+        landmarks[8] = NailLandmarkMapper.NormalizedPoint(0.40f, 0.01f)
+        landmarks[10] = NailLandmarkMapper.NormalizedPoint(0.52f, 0.10f)
+        landmarks[11] = NailLandmarkMapper.NormalizedPoint(0.52f, 0.06f)
+        landmarks[12] = NailLandmarkMapper.NormalizedPoint(0.52f, 0.01f)
+        landmarks[14] = NailLandmarkMapper.NormalizedPoint(0.64f, 0.11f)
+        landmarks[15] = NailLandmarkMapper.NormalizedPoint(0.64f, 0.07f)
+        landmarks[16] = NailLandmarkMapper.NormalizedPoint(0.64f, 0.02f)
+        landmarks[18] = NailLandmarkMapper.NormalizedPoint(0.74f, 0.14f)
+        landmarks[19] = NailLandmarkMapper.NormalizedPoint(0.76f, 0.10f)
+        landmarks[20] = NailLandmarkMapper.NormalizedPoint(0.78f, 0.04f)
+
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks,
+            imageWidth = 800,
+            imageHeight = 1200,
+        )
+        assertThat(anchors).isNotNull()
+        assertThat(anchors).hasSize(5)
+        anchors!!.forEach { nail ->
+            assertThat(nail.centerX).isAtLeast(0f)
+            assertThat(nail.centerX).isAtMost(1f)
+            assertThat(nail.centerY).isAtLeast(0f)
+            assertThat(nail.centerY).isAtMost(1f)
+        }
+    }
+
     private fun syntheticOpenHand(): List<NailLandmarkMapper.NormalizedPoint> {
         val points = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }
         points[0] = NailLandmarkMapper.NormalizedPoint(0.50f, 0.78f)
