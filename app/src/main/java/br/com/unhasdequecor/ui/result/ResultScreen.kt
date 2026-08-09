@@ -58,6 +58,9 @@ import br.com.unhasdequecor.ui.theme.RecommendationCardShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import android.content.Intent
 
+private const val FAVORITE_BUTTON_WEIGHT = 1.2f
+private const val SHARE_BUTTON_WEIGHT = 1f
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultScreen(
@@ -214,7 +217,7 @@ fun ResultScreen(
                             PrimaryCtaButton(
                                 text = if (state.isFavorite) "Salvo" else "Salvar nos favoritos",
                                 onClick = viewModel::onToggleFavorite,
-                                modifier = Modifier.weight(1.2f),
+                                modifier = Modifier.weight(FAVORITE_BUTTON_WEIGHT),
                             )
                             OutlinedButton(
                                 onClick = {
@@ -228,7 +231,7 @@ fun ResultScreen(
                                     context.startActivity(Intent.createChooser(share, "Compartilhar"))
                                 },
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .weight(SHARE_BUTTON_WEIGHT)
                                     .height(52.dp),
                                 shape = SoftSurfaceShape,
                             ) {

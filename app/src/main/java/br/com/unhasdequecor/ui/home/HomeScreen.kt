@@ -55,6 +55,8 @@ import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.theme.RecommendationCardShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
+private val RecentSwatchOverlap = 10.dp
+
 @Composable
 fun HomeScreen(
     onChooseByContext: () -> Unit,
@@ -162,7 +164,7 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(-RecentSwatchOverlap)) {
                         state.recentColors.forEach { entry ->
                             Box(
                                 modifier = Modifier

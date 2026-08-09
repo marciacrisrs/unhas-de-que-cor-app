@@ -216,28 +216,39 @@ private fun SelectableCard(
     compact: Boolean = false,
 ) {
     val shape = SoftSurfaceShape
+    val background = if (selected) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val accent = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val labelStyle = if (compact) {
+        MaterialTheme.typography.labelSmall
+    } else {
+        MaterialTheme.typography.labelLarge
+    }
+    val labelColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val borderWidth = if (selected) 2.dp else 0.dp
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val contentPadding = if (compact) 12.dp else 18.dp
+    val iconSize = if (compact) 22.dp else 28.dp
+
     Box(
         modifier = modifier
             .heightIn(min = 56.dp)
             .clip(shape)
-            .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.surfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.surface
-                },
-            )
-            .border(
-                width = if (selected) 2.dp else 0.dp,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    Color.Transparent
-                },
-                shape = shape,
-            )
+            .background(background)
+            .border(width = borderWidth, color = borderColor, shape = shape)
             .clickable(onClick = onClick)
-            .padding(if (compact) 12.dp else 18.dp)
+            .padding(contentPadding)
             .semantics {
                 role = Role.RadioButton
                 this.selected = selected
@@ -245,21 +256,7 @@ private fun SelectableCard(
             },
     ) {
         if (selected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(12.dp),
-                )
-            }
+            SelectedCheckBadge(modifier = Modifier.align(Alignment.TopEnd))
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -268,27 +265,29 @@ private fun SelectableCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(if (compact) 22.dp else 28.dp),
+                tint = accent,
+                modifier = Modifier.size(iconSize),
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = label,
-                style = if (compact) {
-                    MaterialTheme.typography.labelSmall
-                } else {
-                    MaterialTheme.typography.labelLarge
-                },
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
+            Text(text = label, style = labelStyle, color = labelColor)
         }
+    }
+}
+
+@Composable
+private fun SelectedCheckBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(12.dp),
+        )
     }
 }
