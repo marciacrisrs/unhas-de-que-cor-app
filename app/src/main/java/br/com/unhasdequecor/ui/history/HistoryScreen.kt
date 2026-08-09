@@ -82,7 +82,7 @@ private fun HistoryHeader() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        NailPolishMark(markSize = 40.dp, decorative = true)
+        NailPolishMark(markSize = 44.dp, decorative = true)
     }
 }
 
