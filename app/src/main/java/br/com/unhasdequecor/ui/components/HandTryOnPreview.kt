@@ -139,43 +139,41 @@ private fun resolvePreview(
     detector: HandNailDetector,
 ): TryOnPreviewData {
     val isUserPhoto = sampleId == null
-
-    // Foto da usuária: sempre roda MediaPipe nesta foto (a cada load/troca).
-    if (isUserPhoto) {
-        val detected = detector.detect(bitmap)
-        if (detected != null) {
-            return TryOnPreviewData(
+    return when {
+        // Foto da usuária: sempre roda MediaPipe nesta foto (a cada load/troca).
+        isUserPhoto -> {
+            val detected = detector.detect(bitmap)
+            TryOnPreviewData(
                 bitmap = bitmap,
-                anchors = detected,
-                mode = TryOnMode.DETECTED,
+                anchors = detected ?: NailOverlayAnchors.DEFAULT,
+                mode = if (detected != null) TryOnMode.DETECTED else TryOnMode.APPROXIMATE,
             )
         }
-        return TryOnPreviewData(
+        // Amostra com máscara calibrada: recoloração pixel a pixel.
+        NailOverlayAnchors.hasMaskAsset(sampleId) -> {
+            val mask = PolishMaskRecolorer.loadMask(context, checkNotNull(sampleId))
+            val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
+            if (recolored != null) {
+                TryOnPreviewData(
+                    bitmap = recolored,
+                    anchors = emptyList(),
+                    mode = TryOnMode.MASK,
+                )
+            } else {
+                TryOnPreviewData(
+                    bitmap = bitmap,
+                    anchors = NailOverlayAnchors.forSample(sampleId),
+                    mode = TryOnMode.APPROXIMATE,
+                )
+            }
+        }
+        // Demais amostras: âncoras calibradas (MediaPipe costuma falhar nessa pose).
+        else -> TryOnPreviewData(
             bitmap = bitmap,
-            anchors = NailOverlayAnchors.DEFAULT,
+            anchors = NailOverlayAnchors.forSample(sampleId),
             mode = TryOnMode.APPROXIMATE,
         )
     }
-
-    // Amostra com máscara calibrada: recoloração pixel a pixel.
-    if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
-        val mask = PolishMaskRecolorer.loadMask(context, checkNotNull(sampleId))
-        val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
-        if (recolored != null) {
-            return TryOnPreviewData(
-                bitmap = recolored,
-                anchors = emptyList(),
-                mode = TryOnMode.MASK,
-            )
-        }
-    }
-
-    // Demais amostras: âncoras calibradas (MediaPipe costuma falhar nessa pose).
-    return TryOnPreviewData(
-        bitmap = bitmap,
-        anchors = NailOverlayAnchors.forSample(sampleId),
-        mode = TryOnMode.APPROXIMATE,
-    )
 }
 
 private fun DrawScope.drawPolishNail(
