@@ -70,42 +70,45 @@ class MediaPipeHandNailDetector @Inject constructor(
     }
 
     private fun detectLandmarksOnBitmap(bitmap: Bitmap): HandLandmarks? {
-        return runCatching {
-            val marker = landmarker() ?: return null
-            val working = prepareForInference(bitmap)
-            val mpImage = BitmapImageBuilder(working).build()
-            val result = marker.detect(mpImage)
-            if (working !== bitmap && !working.isRecycled) {
-                working.recycle()
-            }
-            val landmarks = result.landmarks().firstOrNull() ?: return null
-            if (landmarks.size < HandLandmarks.MIN_POINTS) return null
-            val handedness = result.handednesses()
-                .firstOrNull()
-                ?.firstOrNull()
-                ?.categoryName()
-                ?.let { name ->
-                    when (name.lowercase()) {
-                        "left" -> Handedness.LEFT
-                        "right" -> Handedness.RIGHT
-                        else -> Handedness.UNKNOWN
-                    }
-                } ?: Handedness.UNKNOWN
-            val score = result.handednesses()
-                .firstOrNull()
-                ?.firstOrNull()
-                ?.score()
-                ?: 1f
-            HandLandmarks(
-                points = landmarks.map {
-                    ImageCoordinates.NormPoint(it.x(), it.y())
-                },
-                imageWidth = bitmap.width,
-                imageHeight = bitmap.height,
-                handedness = handedness,
-                presenceScore = score,
-            )
-        }.getOrNull()
+        // HandLandmarker IMAGE não é thread-safe: serializa init + detect.
+        synchronized(this) {
+            return runCatching {
+                val marker = landmarkerUnlocked() ?: return null
+                val working = prepareForInference(bitmap)
+                val mpImage = BitmapImageBuilder(working).build()
+                val result = marker.detect(mpImage)
+                if (working !== bitmap && !working.isRecycled) {
+                    working.recycle()
+                }
+                val landmarks = result.landmarks().firstOrNull() ?: return null
+                if (landmarks.size < HandLandmarks.MIN_POINTS) return null
+                val handedness = result.handednesses()
+                    .firstOrNull()
+                    ?.firstOrNull()
+                    ?.categoryName()
+                    ?.let { name ->
+                        when (name.lowercase()) {
+                            "left" -> Handedness.LEFT
+                            "right" -> Handedness.RIGHT
+                            else -> Handedness.UNKNOWN
+                        }
+                    } ?: Handedness.UNKNOWN
+                val score = result.handednesses()
+                    .firstOrNull()
+                    ?.firstOrNull()
+                    ?.score()
+                    ?: 1f
+                HandLandmarks(
+                    points = landmarks.map {
+                        ImageCoordinates.NormPoint(it.x(), it.y())
+                    },
+                    imageWidth = bitmap.width,
+                    imageHeight = bitmap.height,
+                    handedness = handedness,
+                    presenceScore = score,
+                )
+            }.getOrNull()
+        }
     }
 
     private fun prepareForInference(bitmap: Bitmap): Bitmap {
@@ -128,12 +131,10 @@ class MediaPipeHandNailDetector @Inject constructor(
         return scaled
     }
 
-    private fun landmarker(): HandLandmarker? {
+    /** Chamar apenas sob `synchronized(this)`. */
+    private fun landmarkerUnlocked(): HandLandmarker? {
         landmarker?.let { return it }
-        synchronized(this) {
-            landmarker?.let { return it }
-            return createLandmarker()
-        }
+        return createLandmarker()
     }
 
     private fun createLandmarker(): HandLandmarker? {

@@ -68,6 +68,10 @@ class NailTryOnPipeline @Inject constructor(
         val painted = colorApplier.apply(working, nails, polishColor)
             ?: ellipseFallback(working, landmarks, polishColor)
             ?: working
+        // Se a pintura gerou bitmap nova e `working` era rotação intermediária, libera.
+        if (painted !== working && working !== image && !working.isRecycled) {
+            working.recycle()
+        }
         return NailTryOnResult(
             bitmap = painted,
             nails = nails,

@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.ui.components
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
@@ -43,7 +45,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private data class TryOnPreviewData(
-    val bitmap: android.graphics.Bitmap,
+    val bitmap: Bitmap,
     val anchors: List<NailOverlayAnchor>,
     val mode: TryOnMode,
     val nails: List<DetectedNail> = emptyList(),
@@ -86,15 +88,28 @@ fun HandTryOnPreview(
         pipeline,
     ) {
         value = withContext(Dispatchers.Default) {
-            val bitmap = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 2048)
+            val decoded = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 2048)
                 ?: return@withContext null
-            resolvePreview(
+            val resolved = resolvePreview(
                 context = context.applicationContext,
-                bitmap = bitmap,
+                bitmap = decoded,
                 polishColor = polishColor,
                 sampleId = sampleId,
                 pipeline = pipeline,
             )
+            // decodeFile sempre cria bitmap nova; se o pipeline devolveu outra, libera a fonte.
+            if (resolved.bitmap !== decoded) {
+                recycleQuietly(decoded)
+            }
+            resolved
+        }
+    }
+
+    // Recicla bitmap ao trocar de prévia ou ao sair da composição.
+    DisposableEffect(preview) {
+        val held = preview
+        onDispose {
+            recycleQuietly(held?.bitmap)
         }
     }
 
@@ -112,37 +127,9 @@ fun HandTryOnPreview(
                 contentDescription = "Prévia da cor $colorName na sua mão"
             },
     ) {
-        val data = preview
-        if (data != null) {
-            Image(
-                bitmap = data.bitmap.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (data.mode != TryOnMode.MASK && data.anchors.isNotEmpty()) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    data.anchors.forEach { anchor ->
-                        drawPolishNail(anchor = anchor, polishColor = polishColor)
-                    }
-                }
-            }
-            if (data.showDebug) {
-                NailDebugOverlay(
-                    landmarks = data.landmarks,
-                    nails = data.nails,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
+        TryOnPreviewContent(data = preview, polishColor = polishColor)
         Text(
-            text = when {
-                preview?.mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
-                preview?.mode == TryOnMode.DETECTED -> "Prévia na sua mão"
-                preview?.mode == TryOnMode.APPROXIMATE && sampleId == null ->
-                    "Mão não detectada — unhas à mostra, boa luz, dedos abertos"
-                else -> "Prévia aproximada"
-            },
+            text = previewStatusLabel(mode = preview?.mode, isUserPhoto = sampleId == null),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
@@ -155,41 +142,56 @@ fun HandTryOnPreview(
     }
 }
 
+@Composable
+private fun TryOnPreviewContent(
+    data: TryOnPreviewData?,
+    polishColor: Color,
+) {
+    if (data == null || data.bitmap.isRecycled) return
+    Image(
+        bitmap = data.bitmap.asImageBitmap(),
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = Modifier.fillMaxSize(),
+    )
+    if (data.mode != TryOnMode.MASK && data.anchors.isNotEmpty()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            data.anchors.forEach { anchor ->
+                drawPolishNail(anchor = anchor, polishColor = polishColor)
+            }
+        }
+    }
+    if (data.showDebug) {
+        NailDebugOverlay(
+            landmarks = data.landmarks,
+            nails = data.nails,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+private fun previewStatusLabel(mode: TryOnMode?, isUserPhoto: Boolean): String = when {
+    mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
+    mode == TryOnMode.DETECTED -> "Prévia na sua mão"
+    mode == TryOnMode.APPROXIMATE && isUserPhoto ->
+        "Mão não detectada — unhas à mostra, boa luz, dedos abertos"
+    else -> "Prévia aproximada"
+}
+
 private fun resolvePreview(
     context: android.content.Context,
-    bitmap: android.graphics.Bitmap,
+    bitmap: Bitmap,
     polishColor: Color,
     sampleId: String?,
     pipeline: NailTryOnPipeline,
 ): TryOnPreviewData {
     val isUserPhoto = sampleId == null
     return when {
-        isUserPhoto -> {
-            val result = pipeline.process(
-                image = bitmap,
-                polishColor = polishColor,
-                stabilize = false,
-            )
-            if (result != null && result.nails.isNotEmpty()) {
-                TryOnPreviewData(
-                    bitmap = result.bitmap,
-                    anchors = emptyList(),
-                    mode = TryOnMode.DETECTED,
-                    nails = result.nails,
-                    landmarks = result.landmarks,
-                    showDebug = result.debugEnabled,
-                )
-            } else {
-                TryOnPreviewData(
-                    bitmap = result?.bitmap ?: bitmap,
-                    anchors = emptyList(),
-                    mode = TryOnMode.APPROXIMATE,
-                    nails = result?.nails.orEmpty(),
-                    landmarks = result?.landmarks,
-                    showDebug = result?.debugEnabled == true,
-                )
-            }
-        }
+        isUserPhoto -> resolveUserPreview(
+            bitmap = bitmap,
+            polishColor = polishColor,
+            pipeline = pipeline,
+        )
         else -> resolveSamplePreview(
             context = context,
             bitmap = bitmap,
@@ -199,15 +201,51 @@ private fun resolvePreview(
     }
 }
 
+private fun resolveUserPreview(
+    bitmap: Bitmap,
+    polishColor: Color,
+    pipeline: NailTryOnPipeline,
+): TryOnPreviewData {
+    val result = pipeline.process(
+        image = bitmap,
+        polishColor = polishColor,
+        stabilize = false,
+    )
+    if (result != null && result.nails.isNotEmpty()) {
+        return TryOnPreviewData(
+            bitmap = result.bitmap,
+            anchors = emptyList(),
+            mode = TryOnMode.DETECTED,
+            nails = result.nails,
+            landmarks = result.landmarks,
+            showDebug = result.debugEnabled,
+        )
+    }
+    // Sem detecção confiável: overlay DEFAULT (mão aberta) — melhor que zero pintura.
+    val displayBitmap = result?.bitmap ?: bitmap
+    return TryOnPreviewData(
+        bitmap = displayBitmap,
+        anchors = NailOverlayAnchors.DEFAULT,
+        mode = TryOnMode.APPROXIMATE,
+        nails = result?.nails.orEmpty(),
+        landmarks = result?.landmarks,
+        showDebug = result?.debugEnabled == true,
+    )
+}
+
 private fun resolveSamplePreview(
     context: android.content.Context,
-    bitmap: android.graphics.Bitmap,
+    bitmap: Bitmap,
     polishColor: Color,
     sampleId: String,
 ): TryOnPreviewData {
     if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
         val mask = PolishMaskRecolorer.loadMask(context, sampleId)
         val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
+        if (mask != null && mask !== recolored && !mask.isRecycled) {
+            // loadMask devolve bitmap própria; recolor escala/copia — libera a máscara.
+            recycleQuietly(mask)
+        }
         if (recolored != null) {
             return TryOnPreviewData(
                 bitmap = recolored,
@@ -221,6 +259,12 @@ private fun resolveSamplePreview(
         anchors = NailOverlayAnchors.forSample(sampleId),
         mode = TryOnMode.APPROXIMATE,
     )
+}
+
+private fun recycleQuietly(bitmap: Bitmap?) {
+    if (bitmap != null && !bitmap.isRecycled) {
+        runCatching { bitmap.recycle() }
+    }
 }
 
 private fun DrawScope.drawPolishNail(
