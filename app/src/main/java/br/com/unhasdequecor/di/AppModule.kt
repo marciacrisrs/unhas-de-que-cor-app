@@ -10,9 +10,11 @@ import br.com.unhasdequecor.data.local.db.DatabaseMigrations
 import br.com.unhasdequecor.data.local.db.dao.FavoriteDao
 import br.com.unhasdequecor.data.local.db.dao.HistoryDao
 import br.com.unhasdequecor.data.repository.ColorCatalogRepositoryImpl
+import br.com.unhasdequecor.data.repository.HandReferenceRepositoryImpl
 import br.com.unhasdequecor.data.repository.HistoryRepositoryImpl
 import br.com.unhasdequecor.data.repository.PreferencesRepositoryImpl
 import br.com.unhasdequecor.domain.repository.ColorCatalogRepository
+import br.com.unhasdequecor.domain.repository.HandReferenceRepository
 import br.com.unhasdequecor.domain.repository.HistoryRepository
 import br.com.unhasdequecor.domain.repository.PreferencesRepository
 import br.com.unhasdequecor.domain.time.Clock
@@ -74,4 +76,10 @@ abstract class RepositoryModule {
     abstract fun bindPreferencesRepository(
         impl: PreferencesRepositoryImpl,
     ): PreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHandReferenceRepository(
+        impl: HandReferenceRepositoryImpl,
+    ): HandReferenceRepository
 }

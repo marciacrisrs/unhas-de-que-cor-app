@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Política explícita: histórico, favoritos e preferências locais podem ir no backup.
+  Foto da mão (files/hand_reference/) fica de fora — só entram paths listados.
   Domínios: database (Room) e files/datastore (Preferences DataStore).
 -->
 <full-backup-content>

@@ -29,6 +29,7 @@ import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 @Composable
 fun ProfileScreen(
     onOpenStyle: () -> Unit,
+    onOpenHandReference: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -36,6 +37,13 @@ fun ProfileScreen(
         "Toque para escolher clássico, delicado, ousado e mais"
     } else {
         state.preferredStyles.joinToString(" · ") { it.displayName }
+    }
+    val handLabel = when {
+        state.isSampleHand && state.sampleTitle != null ->
+            "Exemplo: ${state.sampleTitle} · toque para trocar"
+        state.isSampleHand -> "Usando foto de exemplo · toque para trocar pela sua"
+        state.hasHandReference -> "Foto cadastrada neste aparelho · toque para trocar"
+        else -> "Toque para cadastrar a foto da sua mão"
     }
 
     Column(
@@ -66,6 +74,13 @@ fun ProfileScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
         ProfileCard(
+            title = "Minha mão",
+            subtitle = handLabel,
+            onClick = onOpenHandReference,
+            contentDescription = "Cadastrar minha mão",
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ProfileCard(
             title = "Suas cores",
             subtitle = if (state.distinctColorCount == 0) {
                 "Ainda sem recomendações no histórico"
@@ -77,7 +92,7 @@ fun ProfileScreen(
         ProfileCard(
             title = "Sobre o app",
             subtitle = "Unhas de Que Cor? · versão ${state.appVersion}\n" +
-                "Assistente de estilo offline. Em breve: acervo e foto da roupa.",
+                "Assistente de estilo offline. Em breve: try-on e acervo.",
         )
         Spacer(modifier = Modifier.height(88.dp))
     }

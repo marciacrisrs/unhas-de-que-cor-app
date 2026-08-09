@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Foto da mão (files/hand_reference/) não entra — só paths incluídos abaixo. -->
 <data-extraction-rules>
     <cloud-backup>
         <include domain="database" path="unhas_de_que_cor.db" />
