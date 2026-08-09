@@ -49,23 +49,27 @@ class MediaPipeHandNailDetector @Inject constructor(
         landmarker?.let { return it }
         synchronized(this) {
             landmarker?.let { return it }
-            if (!modelAvailable()) {
-                return null
-            }
-            val options = HandLandmarker.HandLandmarkerOptions.builder()
-                .setBaseOptions(
-                    BaseOptions.builder()
-                        .setModelAssetPath(MODEL_ASSET)
-                        .build(),
-                )
-                .setRunningMode(RunningMode.IMAGE)
-                .setNumHands(1)
-                .setMinHandDetectionConfidence(MIN_CONFIDENCE)
-                .setMinHandPresenceConfidence(MIN_CONFIDENCE)
-                .setMinTrackingConfidence(MIN_CONFIDENCE)
-                .build()
-            return HandLandmarker.createFromOptions(context, options).also { landmarker = it }
+            return createLandmarker()
         }
+    }
+
+    private fun createLandmarker(): HandLandmarker? {
+        if (!modelAvailable()) {
+            return null
+        }
+        val options = HandLandmarker.HandLandmarkerOptions.builder()
+            .setBaseOptions(
+                BaseOptions.builder()
+                    .setModelAssetPath(MODEL_ASSET)
+                    .build(),
+            )
+            .setRunningMode(RunningMode.IMAGE)
+            .setNumHands(1)
+            .setMinHandDetectionConfidence(MIN_CONFIDENCE)
+            .setMinHandPresenceConfidence(MIN_CONFIDENCE)
+            .setMinTrackingConfidence(MIN_CONFIDENCE)
+            .build()
+        return HandLandmarker.createFromOptions(context, options).also { landmarker = it }
     }
 
     private fun modelAvailable(): Boolean = runCatching {

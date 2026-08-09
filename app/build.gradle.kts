@@ -104,14 +104,15 @@ detekt {
     ignoredBuildTypes = listOf("release")
 }
 
-val handLandmarkerAsset = layout.projectDirectory.file("src/main/assets/hand_landmarker.task")
 tasks.register("downloadHandLandmarker") {
     group = "setup"
     description = "Baixa o modelo MediaPipe Hand Landmarker para assets."
-    outputs.file(handLandmarkerAsset)
-    onlyIf { !handLandmarkerAsset.asFile.exists() }
+    notCompatibleWithConfigurationCache("Download externo do modelo MediaPipe")
+    val destinationPath = "src/main/assets/hand_landmarker.task"
+    outputs.file(destinationPath)
+    onlyIf { !file(destinationPath).exists() }
     doLast {
-        val destination = handLandmarkerAsset.asFile
+        val destination = file(destinationPath)
         destination.parentFile.mkdirs()
         val url =
             "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
