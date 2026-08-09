@@ -108,7 +108,7 @@ fun HandTryOnPreview(
                 contentScale = ContentScale.FillBounds,
                 modifier = Modifier.fillMaxSize(),
             )
-            if (data.mode != TryOnMode.MASK) {
+            if (data.mode != TryOnMode.MASK && data.anchors.isNotEmpty()) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     data.anchors.forEach { anchor ->
                         drawPolishNail(anchor = anchor, polishColor = polishColor)
@@ -121,7 +121,7 @@ fun HandTryOnPreview(
                 preview?.mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
                 preview?.mode == TryOnMode.DETECTED -> "Prévia na sua mão"
                 preview?.mode == TryOnMode.APPROXIMATE && sampleId == null ->
-                    "Mão não detectada — foto com unhas à mostra e boa luz"
+                    "Mão não detectada — unhas à mostra, boa luz, dedos abertos"
                 else -> "Prévia aproximada"
             },
             style = MaterialTheme.typography.labelMedium,
@@ -145,16 +145,28 @@ private fun resolvePreview(
 ): TryOnPreviewData {
     val isUserPhoto = sampleId == null
     return when {
-        // Foto da usuária: MediaPipe a cada load; tenta rotações se a foto estiver deitada.
-        // Sem detecção: não inventa ovais no lugar errado.
+        // Foto da usuária: MediaPipe → máscara elíptica + recolor (como as amostras).
         isUserPhoto -> {
             val detected = detector.detectWithOrientationFallback(bitmap)
             if (detected != null) {
-                TryOnPreviewData(
-                    bitmap = detected.bitmap,
+                val painted = DetectedNailPolishApplier.apply(
+                    source = detected.bitmap,
                     anchors = detected.anchors,
-                    mode = TryOnMode.DETECTED,
+                    polishColor = polishColor,
                 )
+                if (painted != null) {
+                    TryOnPreviewData(
+                        bitmap = painted,
+                        anchors = emptyList(),
+                        mode = TryOnMode.DETECTED,
+                    )
+                } else {
+                    TryOnPreviewData(
+                        bitmap = detected.bitmap,
+                        anchors = detected.anchors,
+                        mode = TryOnMode.DETECTED,
+                    )
+                }
             } else {
                 TryOnPreviewData(
                     bitmap = bitmap,

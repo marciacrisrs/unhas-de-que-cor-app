@@ -27,6 +27,22 @@ class NailLandmarkMapperTest {
     }
 
     @Test
+    fun `nail center stays between dip and tip on open fingers`() {
+        val landmarks = syntheticOpenHand()
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks,
+            imageWidth = 800,
+            imageHeight = 1200,
+        )
+        requireNotNull(anchors)
+        // Indicador: tip=8 (0.38,0.26), dip=7 (0.40,0.36) — centro mais perto da tip, sem passar.
+        val index = anchors[1]
+        assertThat(index.centerY).isLessThan(0.36f)
+        assertThat(index.centerY).isAtLeast(0.26f)
+        assertThat(index.centerX).isWithin(0.08f).of(0.39f)
+    }
+
+    @Test
     fun `rejects incomplete landmark sets`() {
         assertThat(
             NailLandmarkMapper.fromNormalizedLandmarks(
@@ -40,7 +56,6 @@ class NailLandmarkMapperTest {
     @Test
     fun `clamps nail centers near image edges instead of rejecting hand`() {
         val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }
-        // Dedos com pontas quase na borda superior — antes descartava a mão inteira.
         landmarks[2] = NailLandmarkMapper.NormalizedPoint(0.28f, 0.12f)
         landmarks[3] = NailLandmarkMapper.NormalizedPoint(0.26f, 0.08f)
         landmarks[4] = NailLandmarkMapper.NormalizedPoint(0.24f, 0.02f)
