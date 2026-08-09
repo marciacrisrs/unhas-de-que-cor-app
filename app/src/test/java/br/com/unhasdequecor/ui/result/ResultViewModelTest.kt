@@ -133,10 +133,11 @@ class ResultViewModelTest {
         advanceUntilIdle()
         assertThat(viewModel.uiState.value.hasHandReference).isFalse()
 
+        val capturedAt = 1_700_000_000_000L
         handRepository.emit(
             HandReference(
                 localPath = "/files/hand_reference/hand_1.jpg",
-                capturedAtEpochMs = 42L,
+                capturedAtEpochMs = capturedAt,
                 source = HandReferenceSource.SAMPLE,
                 sampleId = "media_rosa",
             ),
@@ -146,7 +147,7 @@ class ResultViewModelTest {
         assertThat(viewModel.uiState.value.hasHandReference).isTrue()
         assertThat(viewModel.uiState.value.isSampleHand).isTrue()
         assertThat(viewModel.uiState.value.handSampleId).isEqualTo("media_rosa")
-        assertThat(viewModel.uiState.value.handRevision).isEqualTo(42L)
+        assertThat(viewModel.uiState.value.handRevision).isEqualTo(capturedAt)
     }
 
     @Test
