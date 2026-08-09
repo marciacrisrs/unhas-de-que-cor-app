@@ -24,7 +24,8 @@ mockk = "1.14.5"
 truth = "1.4.4"
 turbine = "1.2.1"
 sqliteJdbc = "3.49.1.0"
-mediapipeTasksVision = "0.10.21"
+# 0.10.26+ alinha JNI a 16 KB (exigência Play / Android 15+).
+mediapipeTasksVision = "0.10.35"
 
 
 [libraries]
