@@ -35,7 +35,7 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           # Instala o necessário aqui; evita cache manual do SDK (restore tar flaky).
-          packages: tools platform-tools platforms;android-36 build-tools;36.0.0
+          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses >/dev/null || true
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: |
@@ -61,7 +61,7 @@ jobs:
 
       - name: Upload Detekt reports
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: detekt-reports
           path: |
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload Lint reports
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: lint-reports
           path: app/build/reports/lint-results*
@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload unit test reports
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-reports
           path: app/build/reports/tests/testDebugUnitTest/
