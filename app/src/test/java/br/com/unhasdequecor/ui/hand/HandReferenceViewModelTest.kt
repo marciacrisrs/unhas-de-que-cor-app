@@ -56,16 +56,27 @@ class HandReferenceViewModelTest {
     }
 
     @Test
-    fun `use sample hand marks source as sample`() = runTest {
-        every { fileStore.copySampleAssetToCache() } returns File("/tmp/sample.webp")
+    fun `use sample hand marks source and sample id`() = runTest {
+        every { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         val viewModel = viewModel()
 
-        viewModel.useSampleHand()
+        viewModel.useSampleHand("retinta_vinho")
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
-        assertThat(viewModel.uiState.value.message).contains("exemplo")
-        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(viewModel.uiState.value.reference?.sampleId).isEqualTo("retinta_vinho")
+        assertThat(viewModel.uiState.value.message).contains("Pele retinta")
+        assertThat(repository.lastSampleId).isEqualTo("retinta_vinho")
+        assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
+    }
+
+    @Test
+    fun `open and dismiss sample picker`() = runTest {
+        val viewModel = viewModel()
+        viewModel.openSamplePicker()
+        assertThat(viewModel.uiState.value.showSamplePicker).isTrue()
+        viewModel.dismissSamplePicker()
+        assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
     }
 
     @Test

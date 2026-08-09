@@ -17,6 +17,7 @@ class FakeHandReferenceRepository(
     var nextOutcome: HandReferenceSaveOutcome? = null
     var lastSavedPath: String? = null
     var lastSource: HandReferenceSource? = null
+    var lastSampleId: String? = null
 
     override fun observe(): Flow<HandReference?> = state.asStateFlow()
 
@@ -24,14 +25,17 @@ class FakeHandReferenceRepository(
         sourceAbsolutePath: String,
         capturedAtEpochMs: Long,
         source: HandReferenceSource,
+        sampleId: String?,
     ): HandReferenceSaveOutcome {
         lastSavedPath = sourceAbsolutePath
         lastSource = source
+        lastSampleId = sampleId
         val outcome = nextOutcome ?: HandReferenceSaveOutcome.Saved(
             HandReference(
                 localPath = "/files/hand_reference/hand.jpg",
                 capturedAtEpochMs = capturedAtEpochMs,
                 source = source,
+                sampleId = sampleId,
             ),
         )
         if (outcome is HandReferenceSaveOutcome.Saved) {

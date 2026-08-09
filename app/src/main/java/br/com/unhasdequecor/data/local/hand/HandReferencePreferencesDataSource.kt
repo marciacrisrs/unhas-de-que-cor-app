@@ -29,6 +29,7 @@ class HandReferencePreferencesDataSource @Inject constructor(
                 localPath = path,
                 capturedAtEpochMs = capturedAt,
                 source = source,
+                sampleId = prefs[KEY_SAMPLE_ID],
             )
         }
     }
@@ -38,6 +39,12 @@ class HandReferencePreferencesDataSource @Inject constructor(
             prefs[KEY_LOCAL_PATH] = reference.localPath
             prefs[KEY_CAPTURED_AT] = reference.capturedAtEpochMs
             prefs[KEY_SOURCE] = reference.source.name
+            val sampleId = reference.sampleId
+            if (sampleId.isNullOrBlank()) {
+                prefs.remove(KEY_SAMPLE_ID)
+            } else {
+                prefs[KEY_SAMPLE_ID] = sampleId
+            }
         }
     }
 
@@ -46,6 +53,7 @@ class HandReferencePreferencesDataSource @Inject constructor(
             prefs.remove(KEY_LOCAL_PATH)
             prefs.remove(KEY_CAPTURED_AT)
             prefs.remove(KEY_SOURCE)
+            prefs.remove(KEY_SAMPLE_ID)
         }
     }
 
@@ -53,5 +61,6 @@ class HandReferencePreferencesDataSource @Inject constructor(
         val KEY_LOCAL_PATH = stringPreferencesKey("hand_local_path")
         val KEY_CAPTURED_AT = longPreferencesKey("hand_captured_at")
         val KEY_SOURCE = stringPreferencesKey("hand_source")
+        val KEY_SAMPLE_ID = stringPreferencesKey("hand_sample_id")
     }
 }

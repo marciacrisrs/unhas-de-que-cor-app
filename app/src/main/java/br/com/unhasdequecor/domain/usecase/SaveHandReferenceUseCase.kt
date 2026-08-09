@@ -18,5 +18,6 @@ class SaveHandReferenceUseCase @Inject constructor(
             sourceAbsolutePath = sourceAbsolutePath,
             capturedAtEpochMs = clock.now(),
             source = source,
+            sampleId = null,
         )
 }

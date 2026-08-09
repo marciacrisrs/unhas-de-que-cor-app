@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.domain.model.HandReferenceSource
+import br.com.unhasdequecor.domain.model.HandSampleCatalog
 import br.com.unhasdequecor.domain.model.NailStyle
 import br.com.unhasdequecor.domain.usecase.GetDistinctColorCountUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
@@ -22,6 +23,7 @@ data class ProfileUiState(
     val distinctColorCount: Int = 0,
     val hasHandReference: Boolean = false,
     val isSampleHand: Boolean = false,
+    val sampleTitle: String? = null,
     val appVersion: String = BuildConfig.VERSION_NAME,
 )
 
@@ -39,11 +41,14 @@ class ProfileViewModel @Inject constructor(
     ) { preferences, hand ->
         preferences to hand
     }.mapLatest { (preferences, hand) ->
+        val sampleTitle = hand?.sampleId
+            ?.let { HandSampleCatalog.findById(it)?.title }
         ProfileUiState(
             preferredStyles = preferences.preferredStyles,
             distinctColorCount = getDistinctColorCount(),
             hasHandReference = hand != null,
             isSampleHand = hand?.source == HandReferenceSource.SAMPLE,
+            sampleTitle = sampleTitle,
             appVersion = BuildConfig.VERSION_NAME,
         )
     }.stateIn(

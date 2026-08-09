@@ -29,13 +29,17 @@ class HandReferenceUseCasesTest {
     }
 
     @Test
-    fun `use sample marks reference as sample`() = runTest {
-        val outcome = UseSampleHandReferenceUseCase(repository, clock)("/tmp/sample.webp")
+    fun `use sample marks reference as sample with id`() = runTest {
+        val outcome = UseSampleHandReferenceUseCase(repository, clock)(
+            sampleId = "morena_nude",
+            sampleAbsolutePath = "/tmp/sample.webp",
+        )
 
         assertThat(outcome).isInstanceOf(HandReferenceSaveOutcome.Saved::class.java)
         val saved = (outcome as HandReferenceSaveOutcome.Saved).reference
         assertThat(saved.source).isEqualTo(HandReferenceSource.SAMPLE)
-        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(saved.sampleId).isEqualTo("morena_nude")
+        assertThat(repository.lastSampleId).isEqualTo("morena_nude")
     }
 
     @Test

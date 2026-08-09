@@ -9,15 +9,21 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,11 +33,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,13 +53,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.domain.model.HandSampleOption
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
@@ -135,6 +146,15 @@ fun HandReferenceScreen(
         onPermissionDeniedConsumed = { cameraPermissionDenied = false },
     )
 
+    if (state.showSamplePicker) {
+        HandSamplePickerSheet(
+            options = state.sampleOptions,
+            selectedSampleId = state.reference?.sampleId,
+            onSelect = viewModel::useSampleHand,
+            onDismiss = viewModel::dismissSamplePicker,
+        )
+    }
+
     HandReferenceScaffold(
         state = state,
         snackbarHostState = snackbarHostState,
@@ -145,7 +165,7 @@ fun HandReferenceScreen(
             )
         },
         onOpenCamera = ::requestOrOpenCamera,
-        onUseSample = viewModel::useSampleHand,
+        onOpenSamplePicker = viewModel::openSamplePicker,
         onClear = viewModel::clear,
     )
 }
@@ -181,7 +201,7 @@ private fun HandReferenceScaffold(
     onBack: () -> Unit,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
-    onUseSample: () -> Unit,
+    onOpenSamplePicker: () -> Unit,
     onClear: () -> Unit,
 ) {
     Box(
@@ -207,7 +227,7 @@ private fun HandReferenceScaffold(
                 state = state,
                 onPickGallery = onPickGallery,
                 onOpenCamera = onOpenCamera,
-                onUseSample = onUseSample,
+                onOpenSamplePicker = onOpenSamplePicker,
                 onClear = onClear,
             )
         }
@@ -237,7 +257,7 @@ private fun HandReferenceContent(
     state: HandReferenceUiState,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
-    onUseSample: () -> Unit,
+    onOpenSamplePicker: () -> Unit,
     onClear: () -> Unit,
 ) {
     Column(
@@ -254,7 +274,7 @@ private fun HandReferenceContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Prefere começar sem foto? Use a mão de exemplo e troque pela sua depois. " +
+            text = "Sem foto agora? Escolha uma mão de exemplo por tom de pele. " +
                 "Dica para a sua: fundo simples, boa luz e unhas à mostra.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -267,7 +287,7 @@ private fun HandReferenceContent(
             enabled = !state.isSaving,
             onPickGallery = onPickGallery,
             onOpenCamera = onOpenCamera,
-            onUseSample = onUseSample,
+            onOpenSamplePicker = onOpenSamplePicker,
             onClear = onClear,
         )
     }
@@ -279,7 +299,7 @@ private fun HandReferenceActions(
     enabled: Boolean,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
-    onUseSample: () -> Unit,
+    onOpenSamplePicker: () -> Unit,
     onClear: () -> Unit,
 ) {
     if (!hasReference) {
@@ -291,7 +311,7 @@ private fun HandReferenceActions(
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Tirar foto", onClick = onOpenCamera)
         Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onUseSample)
+        SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onOpenSamplePicker)
     } else {
         PrimaryCtaButton(
             text = "Substituir foto",
@@ -301,9 +321,115 @@ private fun HandReferenceActions(
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Tirar nova foto", onClick = onOpenCamera)
         Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onUseSample)
+        SecondaryCtaButton(text = "Trocar exemplo", onClick = onOpenSamplePicker)
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Remover foto", onClick = onClear)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HandSamplePickerSheet(
+    options: List<HandSampleOption>,
+    selectedSampleId: String?,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = "Escolha uma mão de exemplo",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Combine com o seu tom de pele. Depois você troca pela sua foto.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 28.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(420.dp),
+            ) {
+                items(options, key = { it.id }) { option ->
+                    HandSampleCard(
+                        option = option,
+                        selected = option.id == selectedSampleId,
+                        onClick = { onSelect(option.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HandSampleCard(
+    option: HandSampleOption,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val bitmap by produceState(initialValue = null as android.graphics.Bitmap?, option.assetPath) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.assets.open(option.assetPath).use { input ->
+                    BitmapFactory.decodeStream(input)
+                }
+            }.getOrNull()
+        }
+    }
+    val borderColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+    Column(
+        modifier = Modifier
+            .clip(SoftSurfaceShape)
+            .border(1.5.dp, borderColor, SoftSurfaceShape)
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Exemplo ${option.title}"
+            },
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 4f)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            val preview = bitmap
+            if (preview != null) {
+                Image(
+                    bitmap = preview.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(option.skinLabel, style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = option.polishLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -355,7 +481,7 @@ private fun HandPreview(path: String?) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Galeria ou câmera — a foto fica só neste aparelho.",
+                    text = "Galeria, câmera ou uma das mãos de exemplo.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

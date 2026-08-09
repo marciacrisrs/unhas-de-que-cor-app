@@ -31,8 +31,16 @@ class HandReferenceRepositoryImpl @Inject constructor(
         sourceAbsolutePath: String,
         capturedAtEpochMs: Long,
         source: HandReferenceSource,
+        sampleId: String?,
     ): HandReferenceSaveOutcome = withContext(Dispatchers.IO) {
-        when (val outcome = fileStore.persist(sourceAbsolutePath, capturedAtEpochMs, source)) {
+        when (
+            val outcome = fileStore.persist(
+                sourceAbsolutePath = sourceAbsolutePath,
+                capturedAtEpochMs = capturedAtEpochMs,
+                source = source,
+                sampleId = sampleId,
+            )
+        ) {
             is HandReferenceSaveOutcome.Saved -> {
                 preferences.save(outcome.reference)
                 outcome

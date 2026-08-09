@@ -9,6 +9,7 @@ data class HandReference(
     val localPath: String,
     val capturedAtEpochMs: Long,
     val source: HandReferenceSource = HandReferenceSource.USER,
+    val sampleId: String? = null,
 )
 
 sealed interface HandReferenceSaveOutcome {

@@ -12,6 +12,7 @@ interface HandReferenceRepository {
         sourceAbsolutePath: String,
         capturedAtEpochMs: Long,
         source: HandReferenceSource = HandReferenceSource.USER,
+        sampleId: String? = null,
     ): HandReferenceSaveOutcome
 
     suspend fun clear()
