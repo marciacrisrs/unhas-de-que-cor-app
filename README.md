@@ -50,6 +50,33 @@ Princípios de UI: cards grandes e arredondados, muito respiro no `#FCF1EE`, ilu
 
 Requer Android SDK (compileSdk 36) e JDK 17+.
 
+## CI / qualidade
+
+O mesmo conjunto do GitHub Actions:
+
+```bash
+./gradlew verifyCi
+```
+
+Isso executa, em sequência:
+
+1. **Detekt** (`:app:detekt`) — análise estática Kotlin  
+2. **Android Lint** (`:app:lintDebug`)  
+3. **Testes unitários** (`:app:testDebugUnitTest`)  
+4. **Cobertura do domínio** (`:app:jacocoDomainCoverageVerification`) — ≥80% linhas  
+5. **Assemble debug** (`:app:assembleDebug`)
+
+Relatório HTML local: `app/build/reports/jacoco/jacocoDomainReport/html/index.html`.
+
+Configurações em `config/detekt/detekt.yml` e `config/lint/lint.xml`.  
+Workflow: `.github/workflows/ci.yml` (roda em qualquer PR e em push para `master`/`main`).
+
+Para atualizar o baseline do Detekt após dívida conhecida:
+
+```bash
+./gradlew :app:detektBaseline
+```
+
 ## Princípios
 
 | Princípio | Decisão |

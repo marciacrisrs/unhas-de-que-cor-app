@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.detekt)
+    jacoco
 }
 
 android {
@@ -20,6 +22,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -49,6 +54,24 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+        checkReleaseBuilds = true
+        lintConfig = rootProject.file("config/lint/lint.xml")
+    }
+}
+
+detekt {
+    toolVersion = libs.versions.detekt.get()
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+    baseline = file("detekt-baseline.xml")
+    basePath.set(rootProject.projectDir)
+    ignoredBuildTypes = listOf("release")
 }
 
 dependencies {
@@ -89,4 +112,110 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
+    jvmTarget.set("17")
+    exclude("**/build/**")
+    reports {
+        html.required.set(true)
+        sarif.required.set(true)
+        checkstyle.required.set(true)
+        markdown.required.set(true)
+    }
+}
+
+tasks.withType<dev.detekt.gradle.DetektCreateBaselineTask>().configureEach {
+    jvmTarget.set("17")
+    exclude("**/build/**")
+}
+
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+val domainCoverageIncludes = listOf(
+    "**/br/com/unhasdequecor/domain/**",
+)
+
+val jacocoExcludes = listOf(
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "**/*_Hilt*",
+    "**/Hilt_*.*",
+    "**/*_Factory*",
+    "**/*_MembersInjector*",
+    "**/*Module*",
+    "**/*Module$*",
+    "**/di/**",
+)
+
+fun Project.domainClassDirectories(): FileCollection {
+    val buildDirPath = layout.buildDirectory.get().asFile
+    // AGP 9 (built-in Kotlin compiler): classes live under intermediates/, not tmp/kotlin-classes.
+    val kotlinTree = fileTree(
+        buildDirPath.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+    ) {
+        include(domainCoverageIncludes)
+        exclude(jacocoExcludes)
+    }
+    val javaTree = fileTree(
+        buildDirPath.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
+    ) {
+        include(domainCoverageIncludes)
+        exclude(jacocoExcludes)
+    }
+    return files(kotlinTree, javaTree)
+}
+
+tasks.register<JacocoReport>("jacocoDomainReport") {
+    group = "verification"
+    description = "Gera relatório JaCoCo focado no pacote domain."
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(domainClassDirectories())
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get().asFile) {
+            include(
+                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
+                "jacoco/testDebugUnitTest.exec",
+            )
+        },
+    )
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
+    group = "verification"
+    description = "Exige ≥80% de cobertura de linhas no pacote domain."
+    dependsOn("jacocoDomainReport")
+
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(domainClassDirectories())
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get().asFile) {
+            include(
+                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
+                "jacoco/testDebugUnitTest.exec",
+            )
+        },
+    )
+
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
 }
