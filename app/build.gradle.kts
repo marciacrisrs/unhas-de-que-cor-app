@@ -4,14 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "com.example.unhasdequecor"
+    namespace = "br.com.unhasdequecor"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.unhasdequecor"
-        minSdk = 37
+        applicationId = "br.com.unhasdequecor"
+        minSdk = 36
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"

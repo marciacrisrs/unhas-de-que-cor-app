@@ -1,4 +1,4 @@
-package com.example.unhasdequecor.ui.theme
+package br.com.unhasdequecor.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

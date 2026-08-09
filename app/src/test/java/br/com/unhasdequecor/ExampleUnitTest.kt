@@ -1,4 +1,4 @@
-package com.example.unhasdequecor
+package br.com.unhasdequecor
 
 import org.junit.Test
 
