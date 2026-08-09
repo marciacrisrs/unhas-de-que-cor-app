@@ -83,3 +83,18 @@ Quando a dashboard estiver estável, defina a variable `SONAR_QUALITY_GATE_WAIT=
 
 No SonarCloud: Administration → General Settings → Pull Requests / DevOps Platform → bind ao GitHub App da org.  
 Com isso, issues aparecem no próprio PR.
+
+## 7. Supply chain (Sonar security)
+
+Para o Quality Gate de segurança:
+
+- Actions do CI pinadas por **SHA completo** (`.github/workflows/ci.yml`)
+- `gradle/verification-metadata.xml` (checksums sha256 das dependências)
+
+Ao adicionar/atualizar dependências:
+
+```bash
+./gradlew --write-verification-metadata sha256 verifyCi --no-configuration-cache
+```
+
+Revise o diff do XML e faça commit.
