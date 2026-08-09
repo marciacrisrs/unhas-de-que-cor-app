@@ -175,11 +175,17 @@ fun ResultScreen(
 
                                 Spacer(modifier = Modifier.height(20.dp))
                                 Text(
-                                    text = color.name,
+                                    text = "Sua cor do momento é",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = color.name.uppercase(),
                                     style = MaterialTheme.typography.displayMedium,
                                     color = MaterialTheme.colorScheme.onBackground,
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.horizontalScroll(rememberScrollState()),

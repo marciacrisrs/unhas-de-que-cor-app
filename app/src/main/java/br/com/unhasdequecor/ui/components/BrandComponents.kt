@@ -138,26 +138,20 @@ fun BrandHeader(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            NailPolishMark(markSize = 56.dp)
-            Column {
-                Text(
-                    text = "UNHAS",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Text(
-                    text = "DE QUE COR?",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
+        NailPolishMark(markSize = 72.dp)
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "UNHAS",
+            style = MaterialTheme.typography.displayMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = "DE QUE COR?",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         if (showTagline) {
-            Box(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = "Sua cor, seu estilo, seu momento.",
                 style = MaterialTheme.typography.bodyMedium,

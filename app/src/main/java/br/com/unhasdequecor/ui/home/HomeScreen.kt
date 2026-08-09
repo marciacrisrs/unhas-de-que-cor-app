@@ -79,42 +79,47 @@ fun HomeScreen(
             .padding(horizontal = 24.dp, vertical = 28.dp)
             .alpha(alpha),
     ) {
+        // Brand como sinal hero (telas guia).
         BrandHeader()
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         Text(
-            text = if (state.displayName.isBlank()) {
-                "Qual cor combina com você hoje?"
-            } else {
-                "Qual cor combina com você hoje, ${state.displayName}?"
-            },
-            style = MaterialTheme.typography.headlineMedium,
+            text = if (state.displayName.isBlank()) "Olá!" else "Olá, ${state.displayName}!",
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = "Menos dúvida. Mais unha bonita.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
-        HeroActionCard(
-            title = "Escolher minha cor",
-            subtitle = "Ocasião e humor em poucos toques — a sugestão respira com você.",
-            icon = Icons.Outlined.Palette,
-            emphasized = true,
-            onClick = onChooseByContext,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        HeroActionCard(
-            title = "Escolha por mim",
-            subtitle = "Surpresa com personalidade. Uma cor, sem julgamento.",
-            icon = Icons.Outlined.AutoAwesome,
-            emphasized = false,
-            onClick = onChooseForMe,
-        )
+        // Duas CTAs hero lado a lado — estrutura das imagens guia,
+        // com cards grandes/arredondados e respiro.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            HeroActionCard(
+                title = "Escolher minha cor",
+                subtitle = "A cor ideal para o seu momento",
+                icon = Icons.Outlined.Palette,
+                emphasized = true,
+                onClick = onChooseByContext,
+                modifier = Modifier.weight(1f),
+            )
+            HeroActionCard(
+                title = "Escolha por mim",
+                subtitle = "Surpreenda-se agora",
+                icon = Icons.Outlined.AutoAwesome,
+                emphasized = false,
+                onClick = onChooseForMe,
+                modifier = Modifier.weight(1f),
+            )
+        }
 
         Spacer(modifier = Modifier.height(40.dp))
         Text(
@@ -190,21 +195,21 @@ private fun HeroActionCard(
     icon: ImageVector,
     emphasized: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RecommendationCardShape
     val background = if (emphasized) {
-        Brush.linearGradient(
+        Brush.verticalGradient(
             listOf(
                 MaterialTheme.colorScheme.primary,
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
-                MaterialTheme.colorScheme.secondary.copy(alpha = 0.95f),
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.92f),
             ),
         )
     } else {
-        Brush.linearGradient(
+        Brush.verticalGradient(
             listOf(
                 MaterialTheme.colorScheme.surfaceVariant,
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             ),
         )
     }
@@ -215,13 +220,19 @@ private fun HeroActionCard(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(168.dp)
+        modifier = modifier
+            .height(210.dp)
             .clip(shape)
             .background(background)
+            .then(
+                if (!emphasized) {
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f), shape)
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 22.dp)
+            .padding(18.dp)
             .semantics {
                 role = Role.Button
                 contentDescription = title
@@ -230,7 +241,7 @@ private fun HeroActionCard(
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(42.dp)
                 .clip(CircleShape)
                 .background(contentColor.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
@@ -240,13 +251,13 @@ private fun HeroActionCard(
         Column {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleMedium,
                 color = contentColor,
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = contentColor.copy(alpha = 0.9f),
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -254,7 +265,7 @@ private fun HeroActionCard(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
     }
