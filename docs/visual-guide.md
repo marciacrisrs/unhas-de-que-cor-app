@@ -4,7 +4,7 @@ Fonte de verdade: `design/guia/` (boards, logos e mockups claro/escuro).
 
 Logos oficiais já estão no APK como `logo_mark` / `logo_horizontal` (tema claro/escuro) e no ícone do launcher.
 
-Resultado: ilustração vetorial (`NailHandIllustration`) até entrarem fotos oficiais da mão/outfit em `design/guia/`.
+Resultado: try-on sempre em foto real (amostra padrão se a usuária ainda não cadastrou a própria). Foto própria usa MediaPipe; amostras calibradas usam máscara/âncoras. Sem ilustração vetorial.
 
 ## Paleta
 

@@ -4,8 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.ColorRecommendation
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.RecommendationContext
+import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.GenerateAndSaveRecommendationUseCase
+import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.RestoreRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.ToggleFavoriteUseCase
 import br.com.unhasdequecor.ui.navigation.ResultSources
@@ -25,7 +28,13 @@ data class ResultUiState(
     val isFavorite: Boolean = false,
     val savedToHistory: Boolean = false,
     val errorMessage: String? = null,
-)
+    val handLocalPath: String? = null,
+    val handRevision: Long = 0L,
+    val isSampleHand: Boolean = false,
+    val handSampleId: String? = null,
+) {
+    val hasHandReference: Boolean get() = !handLocalPath.isNullOrBlank()
+}
 
 @HiltViewModel
 class ResultViewModel @Inject constructor(
@@ -33,6 +42,8 @@ class ResultViewModel @Inject constructor(
     private val generateAndSave: GenerateAndSaveRecommendationUseCase,
     private val restoreRecommendation: RestoreRecommendationUseCase,
     private val toggleFavorite: ToggleFavoriteUseCase,
+    observeHandReference: ObserveHandReferenceUseCase,
+    ensureDefaultHandReference: EnsureDefaultHandReferenceUseCase,
 ) : ViewModel() {
 
     private val source = ResultSources.toDomain(checkNotNull(savedStateHandle["source"]))
@@ -47,10 +58,25 @@ class ResultViewModel @Inject constructor(
     val uiState: StateFlow<ResultUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            ensureDefaultHandReference()
+        }
+        viewModelScope.launch {
+            observeHandReference().collect { hand ->
+                _uiState.update {
+                    it.copy(
+                        handLocalPath = hand?.localPath,
+                        handRevision = hand?.capturedAtEpochMs ?: 0L,
+                        isSampleHand = hand?.source == HandReferenceSource.SAMPLE,
+                        handSampleId = hand?.sampleId,
+                    )
+                }
+            }
+        }
+
         val navColorId = Routes.parseColorId(savedStateHandle.get<String>("colorId") ?: Routes.NONE)
         when {
             navColorId != null -> {
-                // Entrada pelo histórico/favoritos: restaura sem gerar/salvar de novo.
                 savedStateHandle[KEY_COLOR_ID] = navColorId
                 restoreCached(navColorId)
             }

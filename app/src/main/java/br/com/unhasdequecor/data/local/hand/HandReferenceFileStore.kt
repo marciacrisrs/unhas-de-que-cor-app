@@ -104,13 +104,8 @@ class HandReferenceFileStore @Inject constructor(
         HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
     }
 
-    private fun decodeSampledBitmap(source: File): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(source.absolutePath, bounds)
-        val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, TARGET_MAX_EDGE)
-        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        return BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
-    }
+    private fun decodeSampledBitmap(source: File): Bitmap? =
+        OrientedBitmapDecoder.decodeFile(source.absolutePath, maxEdge = TARGET_MAX_EDGE)
 
     private fun storeJpeg(
         bitmap: Bitmap,
@@ -125,7 +120,8 @@ class HandReferenceFileStore @Inject constructor(
             bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
         }
         return if (compressed) {
-            purgeOldHandFiles(directory, keep = destination)
+            // Não apaga o JPEG anterior aqui: o DataStore ainda aponta para o path antigo
+            // até preferences.save. A limpeza roda depois, em purgeObsoleteHandFiles.
             HandReferenceSaveOutcome.Saved(
                 HandReference(
                     localPath = destination.absolutePath,
@@ -140,7 +136,10 @@ class HandReferenceFileStore @Inject constructor(
         }
     }
 
-    private fun purgeOldHandFiles(directory: File, keep: File) {
+    fun purgeObsoleteHandFiles(keepAbsolutePath: String) {
+        val directory = File(context.filesDir, DIRECTORY)
+        if (!directory.isDirectory) return
+        val keep = File(keepAbsolutePath)
         directory.listFiles()?.forEach { file ->
             val isHandJpeg = file.name == LEGACY_FILE_NAME ||
                 (file.name.startsWith("hand_") && file.name.endsWith(".jpg"))
@@ -148,16 +147,6 @@ class HandReferenceFileStore @Inject constructor(
                 file.delete()
             }
         }
-    }
-
-    private fun calculateInSampleSize(width: Int, height: Int, maxEdge: Int): Int {
-        var inSampleSize = 1
-        val halfWidth = width / 2
-        val halfHeight = height / 2
-        while (halfWidth / inSampleSize >= maxEdge && halfHeight / inSampleSize >= maxEdge) {
-            inSampleSize *= 2
-        }
-        return inSampleSize.coerceAtLeast(1)
     }
 
     companion object {

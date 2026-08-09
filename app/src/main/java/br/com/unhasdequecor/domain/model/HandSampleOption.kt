@@ -11,6 +11,15 @@ data class HandSampleOption(
 }
 
 object HandSampleCatalog {
+    /**
+     * Amostra padrão quando a usuária ainda não cadastrou a própria mão.
+     * `clara_vermelho` tem máscara de unha calibrada para o try-on.
+     */
+    const val DEFAULT_ID = "clara_vermelho"
+
+    val defaultOption: HandSampleOption
+        get() = checkNotNull(findById(DEFAULT_ID))
+
     val options: List<HandSampleOption> = listOf(
         HandSampleOption(
             id = "retinta_vinho",

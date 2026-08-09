@@ -188,11 +188,13 @@ fun HandReferenceScreen(
     if (state.showRemoveConfirm) {
         AlertDialog(
             onDismissRequest = viewModel::dismissRemoveConfirm,
-            title = { Text("Remover foto da mão?") },
-            text = { Text("Você poderá cadastrar outra depois.") },
+            title = { Text("Voltar para a mão de exemplo?") },
+            text = {
+                Text("Sua foto sai e o try-on usa de novo uma das mãos de referência.")
+            },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmRemove) {
-                    Text("Remover")
+                    Text("Usar exemplo")
                 }
             },
             dismissButton = {
@@ -207,8 +209,6 @@ fun HandReferenceScreen(
         state = state,
         snackbarHostState = snackbarHostState,
         onBack = onBack,
-        onPickGallery = ::openGallery,
-        onOpenCamera = ::requestOrOpenCamera,
         onOpenSamplePicker = viewModel::openSamplePicker,
         onOpenReplaceSheet = viewModel::openReplaceSheet,
         onOpenRemoveConfirm = viewModel::openRemoveConfirm,
@@ -246,8 +246,6 @@ private fun HandReferenceScaffold(
     state: HandReferenceUiState,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
-    onPickGallery: () -> Unit,
-    onOpenCamera: () -> Unit,
     onOpenSamplePicker: () -> Unit,
     onOpenReplaceSheet: () -> Unit,
     onOpenRemoveConfirm: () -> Unit,
@@ -283,8 +281,6 @@ private fun HandReferenceScaffold(
             } else {
                 HandReferenceContent(
                     state = state,
-                    onPickGallery = onPickGallery,
-                    onOpenCamera = onOpenCamera,
                     onOpenSamplePicker = onOpenSamplePicker,
                     onOpenReplaceSheet = onOpenReplaceSheet,
                     onOpenRemoveConfirm = onOpenRemoveConfirm,
@@ -343,7 +339,6 @@ private fun UserPhotoConfirmContent(
             revision = path.hashCode().toLong(),
             isSample = false,
             sampleTitle = null,
-            empty = false,
         )
         Spacer(modifier = Modifier.height(20.dp))
         PrimaryCtaButton(
@@ -359,8 +354,6 @@ private fun UserPhotoConfirmContent(
 @Composable
 private fun HandReferenceContent(
     state: HandReferenceUiState,
-    onPickGallery: () -> Unit,
-    onOpenCamera: () -> Unit,
     onOpenSamplePicker: () -> Unit,
     onOpenReplaceSheet: () -> Unit,
     onOpenRemoveConfirm: () -> Unit,
@@ -379,37 +372,27 @@ private fun HandReferenceContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = if (state.hasReference) {
-                if (state.isSample) {
+            text = when {
+                !state.hasReference -> "Carregando a mão de referência…"
+                state.isSample ->
                     "Você está com uma mão de exemplo. Troque pela sua para o try-on ficar mais fiel."
-                } else {
-                    "Esta é a mão que vai experimentar as cores."
-                }
-            } else {
-                "Sem foto agora? Escolha um exemplo pelo tom de pele."
+                else -> "Esta é a mão que vai experimentar as cores."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (!state.hasReference) {
-            Spacer(modifier = Modifier.height(12.dp))
-            CaptureGuideTips()
-        }
         Spacer(modifier = Modifier.height(16.dp))
         HandPreview(
             path = state.reference?.localPath,
             revision = state.reference?.capturedAtEpochMs ?: 0L,
             isSample = state.isSample,
             sampleTitle = state.sampleTitle,
-            empty = !state.hasReference,
         )
         Spacer(modifier = Modifier.height(20.dp))
         HandReferenceActions(
             hasReference = state.hasReference,
             isSample = state.isSample,
             enabled = !state.isSaving,
-            onPickGallery = onPickGallery,
-            onOpenCamera = onOpenCamera,
             onOpenSamplePicker = onOpenSamplePicker,
             onOpenReplaceSheet = onOpenReplaceSheet,
             onOpenRemoveConfirm = onOpenRemoveConfirm,
@@ -418,66 +401,38 @@ private fun HandReferenceContent(
 }
 
 @Composable
-private fun CaptureGuideTips() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(SoftSurfaceShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        listOf("Boa luz", "Fundo simples", "Unhas à mostra").forEach { tip ->
-            Text(
-                text = tip,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
 private fun HandReferenceActions(
     hasReference: Boolean,
     isSample: Boolean,
     enabled: Boolean,
-    onPickGallery: () -> Unit,
-    onOpenCamera: () -> Unit,
     onOpenSamplePicker: () -> Unit,
     onOpenReplaceSheet: () -> Unit,
     onOpenRemoveConfirm: () -> Unit,
 ) {
     if (!hasReference) {
+        // Sem empty state: enquanto a amostra padrão materializa, não oferece CTAs vazios.
+        return
+    }
+    if (isSample) {
         PrimaryCtaButton(
-            text = "Escolher da galeria",
-            onClick = onPickGallery,
+            text = "Usar minha mão",
+            onClick = onOpenReplaceSheet,
             enabled = enabled,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Tirar foto", onClick = onOpenCamera)
-        Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onOpenSamplePicker)
+        SecondaryCtaButton(text = "Trocar exemplo", onClick = onOpenSamplePicker)
     } else {
-        if (isSample) {
-            PrimaryCtaButton(
-                text = "Usar minha mão",
-                onClick = onOpenReplaceSheet,
-                enabled = enabled,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            SecondaryCtaButton(text = "Trocar exemplo", onClick = onOpenSamplePicker)
-        } else {
-            PrimaryCtaButton(
-                text = "Trocar foto",
-                onClick = onOpenReplaceSheet,
-                enabled = enabled,
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Remover foto", onClick = onOpenRemoveConfirm)
+        PrimaryCtaButton(
+            text = "Trocar foto",
+            onClick = onOpenReplaceSheet,
+            enabled = enabled,
+        )
     }
+    Spacer(modifier = Modifier.height(12.dp))
+    SecondaryCtaButton(
+        text = if (isSample) "Restaurar exemplo padrão" else "Voltar para exemplo",
+        onClick = onOpenRemoveConfirm,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -658,7 +613,6 @@ private fun HandPreview(
     revision: Long,
     isSample: Boolean,
     sampleTitle: String?,
-    empty: Boolean,
 ) {
     val bitmap by produceState(
         initialValue = null as android.graphics.Bitmap?,
@@ -669,24 +623,22 @@ private fun HandPreview(
             null
         } else {
             withContext(Dispatchers.IO) {
-                BitmapFactory.decodeFile(path)
+                br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder.decodeFile(path)
             }
         }
     }
 
-    val aspect = if (empty) 4f / 3f else 3f / 4f
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(aspect)
+            .aspectRatio(3f / 4f)
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .semantics {
                 contentDescription = when {
                     bitmap != null && isSample -> "Mão de exemplo cadastrada"
                     bitmap != null -> "Pré-visualização da mão cadastrada"
-                    else -> "Nenhuma foto da mão cadastrada"
+                    else -> "Carregando foto da mão"
                 }
             },
         contentAlignment = Alignment.Center,
@@ -713,23 +665,8 @@ private fun HandPreview(
                 )
             }
         } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(24.dp),
-            ) {
-                Text(
-                    text = "Sua mão aparece aqui",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Galeria, câmera ou um exemplo por tom de pele.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // Nunca ilustração nem empty state: só loading até a foto (usuária ou exemplo).
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
     }
 }

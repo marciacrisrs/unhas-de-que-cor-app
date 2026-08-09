@@ -25,3 +25,9 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# MediaPipe Hand Landmarker
+-keep class com.google.mediapipe.** { *; }
+-dontwarn com.google.mediapipe.**
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.common.flogger.**

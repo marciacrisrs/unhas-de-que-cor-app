@@ -19,6 +19,12 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Overlay de landmarks/ROI/máscara no try-on. Ative com -PdebugNailOverlay=true
+        buildConfigField(
+            "boolean",
+            "DEBUG_NAIL_OVERLAY",
+            (project.findProperty("debugNailOverlay") as String? ?: "false"),
+        )
     }
 
     signingConfigs {
@@ -106,6 +112,7 @@ detekt {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -129,6 +136,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.mediapipe.tasks.vision)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
