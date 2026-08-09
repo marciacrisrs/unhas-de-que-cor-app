@@ -8,19 +8,26 @@ import br.com.unhasdequecor.domain.model.NailStyle
 import br.com.unhasdequecor.domain.model.Occasion
 import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.model.RecommendationSource
+import br.com.unhasdequecor.domain.model.HandReference
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.usecase.GenerateAndSaveRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.GeneratedRecommendation
+import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.RestoreRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.ToggleFavoriteUseCase
+import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import br.com.unhasdequecor.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ResultViewModelTest {
 
     @get:Rule
@@ -29,6 +36,16 @@ class ResultViewModelTest {
     private val generateAndSave = mockk<GenerateAndSaveRecommendationUseCase>()
     private val restoreRecommendation = mockk<RestoreRecommendationUseCase>()
     private val toggleFavorite = mockk<ToggleFavoriteUseCase>(relaxed = true)
+    private val handRepository = FakeHandReferenceRepository()
+    private val observeHandReference = ObserveHandReferenceUseCase(handRepository)
+
+    private fun viewModel(handle: SavedStateHandle) = ResultViewModel(
+        savedStateHandle = handle,
+        generateAndSave = generateAndSave,
+        restoreRecommendation = restoreRecommendation,
+        toggleFavorite = toggleFavorite,
+        observeHandReference = observeHandReference,
+    )
 
     @Test
     fun `cached color restores without generating again`() = runTest {
@@ -44,8 +61,8 @@ class ResultViewModelTest {
             )
         } returns GeneratedRecommendation(recommendation, isFavorite = true)
 
-        val viewModel = ResultViewModel(
-            savedStateHandle = SavedStateHandle(
+        val viewModel = viewModel(
+            SavedStateHandle(
                 mapOf(
                     "source" to "context",
                     "occasion" to "ENCONTRO",
@@ -54,9 +71,6 @@ class ResultViewModelTest {
                     "result_cached_color_id" to "romantico_rosa",
                 ),
             ),
-            generateAndSave = generateAndSave,
-            restoreRecommendation = restoreRecommendation,
-            toggleFavorite = toggleFavorite,
         )
 
         assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("romantico_rosa")
@@ -84,12 +98,7 @@ class ResultViewModelTest {
                 "colorId" to "none",
             ),
         )
-        val viewModel = ResultViewModel(
-            savedStateHandle = handle,
-            generateAndSave = generateAndSave,
-            restoreRecommendation = restoreRecommendation,
-            toggleFavorite = toggleFavorite,
-        )
+        val viewModel = viewModel(handle)
 
         assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("romantico_rosa")
         assertThat(handle.get<String>("result_cached_color_id")).isEqualTo("romantico_rosa")
@@ -101,6 +110,43 @@ class ResultViewModelTest {
                 idempotencyKey = any(),
             )
         }
+    }
+
+    @Test
+    fun `observes hand reference for try-on preview`() = runTest {
+        coEvery {
+            generateAndSave(any(), any(), any())
+        } returns GeneratedRecommendation(
+            sampleRecommendation(source = RecommendationSource.FOR_ME),
+            isFavorite = false,
+        )
+        val viewModel = viewModel(
+            SavedStateHandle(
+                mapOf(
+                    "source" to "for_me",
+                    "occasion" to "none",
+                    "mood" to "none",
+                    "colorId" to "none",
+                ),
+            ),
+        )
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.hasHandReference).isFalse()
+
+        handRepository.emit(
+            HandReference(
+                localPath = "/files/hand_reference/hand_1.jpg",
+                capturedAtEpochMs = 42L,
+                source = HandReferenceSource.SAMPLE,
+                sampleId = "media_rosa",
+            ),
+        )
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.hasHandReference).isTrue()
+        assertThat(viewModel.uiState.value.isSampleHand).isTrue()
+        assertThat(viewModel.uiState.value.handSampleId).isEqualTo("media_rosa")
+        assertThat(viewModel.uiState.value.handRevision).isEqualTo(42L)
     }
 
     @Test
@@ -125,12 +171,7 @@ class ResultViewModelTest {
                 "colorId" to "romantico_rosa",
             ),
         )
-        val viewModel = ResultViewModel(
-            savedStateHandle = handle,
-            generateAndSave = generateAndSave,
-            restoreRecommendation = restoreRecommendation,
-            toggleFavorite = toggleFavorite,
-        )
+        val viewModel = viewModel(handle)
 
         assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("romantico_rosa")
         assertThat(handle.get<String>("result_cached_color_id")).isEqualTo("romantico_rosa")
@@ -160,12 +201,7 @@ class ResultViewModelTest {
                 "colorId" to "none",
             ),
         )
-        val viewModel = ResultViewModel(
-            savedStateHandle = handle,
-            generateAndSave = generateAndSave,
-            restoreRecommendation = restoreRecommendation,
-            toggleFavorite = toggleFavorite,
-        )
+        val viewModel = viewModel(handle)
         val firstKey = handle.get<String>("result_idempotency_key")
 
         viewModel.recommendAgain()

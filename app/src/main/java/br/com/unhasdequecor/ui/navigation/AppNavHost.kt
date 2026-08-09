@@ -115,6 +115,9 @@ fun AppNavHost() {
                             popUpTo(Routes.HOME)
                         }
                     },
+                    onOpenHandReference = {
+                        navController.navigate(Routes.HAND_REFERENCE)
+                    },
                 )
             }
             composable(Routes.HISTORY) {

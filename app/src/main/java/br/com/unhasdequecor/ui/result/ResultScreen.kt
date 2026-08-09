@@ -47,12 +47,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.ui.components.HandTryOnPreview
 import br.com.unhasdequecor.ui.components.InfoTag
 import br.com.unhasdequecor.ui.components.NailHandIllustration
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.ProgressSteps
+import br.com.unhasdequecor.ui.components.SecondaryCtaButton
 import br.com.unhasdequecor.ui.theme.FunChipShape
 import br.com.unhasdequecor.ui.theme.RecommendationCardShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
@@ -66,6 +68,7 @@ private const val SHARE_BUTTON_WEIGHT = 1f
 fun ResultScreen(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenHandReference: () -> Unit,
     viewModel: ResultViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -135,13 +138,27 @@ fun ResultScreen(
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 Box(modifier = Modifier.fillMaxWidth()) {
-                                    NailHandIllustration(
-                                        polishColor = Color(color.hex),
-                                        colorName = color.name,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 4.dp),
-                                    )
+                                    val handPath = state.handLocalPath
+                                    if (handPath != null) {
+                                        HandTryOnPreview(
+                                            imagePath = handPath,
+                                            revision = state.handRevision,
+                                            polishColor = Color(color.hex),
+                                            colorName = color.name,
+                                            sampleId = state.handSampleId.takeIf { state.isSampleHand },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp),
+                                        )
+                                    } else {
+                                        NailHandIllustration(
+                                            polishColor = Color(color.hex),
+                                            colorName = color.name,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 4.dp),
+                                        )
+                                    }
                                     IconButton(
                                         onClick = viewModel::onToggleFavorite,
                                         modifier = Modifier
@@ -166,6 +183,19 @@ fun ResultScreen(
                                             tint = MaterialTheme.colorScheme.primary,
                                         )
                                     }
+                                }
+                                if (!state.hasHandReference) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    SecondaryCtaButton(
+                                        text = "Cadastrar minha mão",
+                                        onClick = onOpenHandReference,
+                                    )
+                                } else if (state.isSampleHand) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    SecondaryCtaButton(
+                                        text = "Trocar pela minha mão",
+                                        onClick = onOpenHandReference,
+                                    )
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
