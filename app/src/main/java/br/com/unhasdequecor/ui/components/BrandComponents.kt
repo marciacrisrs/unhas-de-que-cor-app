@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -66,6 +67,10 @@ import br.com.unhasdequecor.ui.theme.FunChipShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import br.com.unhasdequecor.ui.theme.UnhasDeQueCorTheme
 
+/**
+ * Mark compacto para toolbars/listas: frasco + anel quebrado + sparkles em chip circular.
+ * O lockup oficial completo fica em [BrandLogoLockup] / [BrandHeader] (Home/Perfil).
+ */
 @Composable
 fun NailPolishMark(
     modifier: Modifier = Modifier,
@@ -73,6 +78,9 @@ fun NailPolishMark(
     polishColor: Color? = null,
     decorative: Boolean = false,
 ) {
+    val resolvedPolish = polishColor ?: BrandFun
+    val outline = MaterialTheme.colorScheme.onBackground
+    val framed = polishColor == null
     val markModifier = if (decorative) {
         modifier.size(markSize).clearAndSetSemantics { }
     } else {
@@ -80,17 +88,27 @@ fun NailPolishMark(
             .size(markSize)
             .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
     }
-    if (polishColor == null) {
-        Image(
-            painter = painterResource(R.drawable.logo_mark),
-            contentDescription = null,
-            modifier = markModifier,
-            contentScale = ContentScale.Fit,
-        )
-    } else {
-        val outline = MaterialTheme.colorScheme.onBackground
-        Canvas(modifier = markModifier) {
-            drawTintedPolishMark(polishColor = polishColor, outline = outline)
+
+    Box(
+        modifier = markModifier.then(
+            if (framed) {
+                Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f),
+                        shape = CircleShape,
+                    )
+                    .padding(4.dp)
+            } else {
+                Modifier
+            },
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawTintedPolishMark(polishColor = resolvedPolish, outline = outline)
         }
     }
 }
