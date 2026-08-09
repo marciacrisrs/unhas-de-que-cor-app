@@ -11,6 +11,22 @@ Integração pronta no Gradle (`./gradlew sonar`) e no CI (só roda se `SONAR_TO
    - **Project key** (ex.: `marciacrisrs_unhas-de-que-cor-app`)
 4. Gere um **token** (My Account → Security → Generate Tokens).
 
+### Importante: desligar Automatic Analysis
+
+Este repo analisa via **Gradle no GitHub Actions** (`./gradlew sonar`), com JaCoCo/Detekt/Lint.
+
+Se o Automatic Analysis (GitHub App) ficar ligado ao mesmo tempo, o CI falha com:
+
+```text
+You are running CI analysis while Automatic Analysis is enabled.
+```
+
+No SonarCloud, no projeto:
+
+1. **Administration → Analysis Method** (ou **General Settings → Analysis Method**)
+2. Escolha **CI-based analysis** / **Disable Automatic Analysis**
+3. Salve e re-rode o workflow da PR
+
 > Self-hosted SonarQube: use a mesma config e defina `SONAR_HOST_URL` para a URL do servidor.
 
 ## 2. Secrets / variáveis no GitHub
