@@ -1,6 +1,8 @@
 # Guia visual — Unhas de Que Cor?
 
-Fonte de verdade: **imagens guia** reenviadas (boards claro/escuro, home, contexto, resultado, histórico, cores parecidas, logos).
+Fonte de verdade: `design/guia/` (boards, logos e mockups claro/escuro).
+
+Logos oficiais já estão no APK como `logo_mark` / `logo_horizontal` (tema claro/escuro) e no ícone do launcher.
 
 ## Paleta
 

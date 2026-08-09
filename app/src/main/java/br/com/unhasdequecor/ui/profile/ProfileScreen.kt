@@ -19,7 +19,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import br.com.unhasdequecor.ui.components.BrandHeader
+import br.com.unhasdequecor.ui.components.BrandLogoLockup
 
 @Composable
 fun ProfileScreen(
@@ -32,7 +32,7 @@ fun ProfileScreen(
             .padding(20.dp),
     ) {
         Spacer(modifier = Modifier.height(12.dp))
-        BrandHeader()
+        BrandLogoLockup()
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "Perfil",

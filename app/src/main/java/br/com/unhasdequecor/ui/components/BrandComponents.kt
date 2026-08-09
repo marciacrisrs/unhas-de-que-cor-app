@@ -1,6 +1,7 @@
 package br.com.unhasdequecor.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,7 +40,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -53,6 +57,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import br.com.unhasdequecor.R
 import br.com.unhasdequecor.domain.model.NailStyle
 import br.com.unhasdequecor.ui.theme.BrandAction
 import br.com.unhasdequecor.ui.theme.BrandFun
@@ -67,85 +72,124 @@ fun NailPolishMark(
     polishColor: Color? = null,
     decorative: Boolean = false,
 ) {
-    val resolvedPolish = polishColor ?: BrandFun
-    val outline = MaterialTheme.colorScheme.onBackground
-    val canvasModifier = if (decorative) {
+    val markModifier = if (decorative) {
         modifier.size(markSize).clearAndSetSemantics { }
     } else {
         modifier
             .size(markSize)
             .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
     }
-    Canvas(modifier = canvasModifier) {
-        val stroke = Stroke(width = markSize.toPx() * 0.04f, cap = StrokeCap.Round)
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val radius = size.minDimension * 0.42f
-        val ring = Brush.sweepGradient(listOf(BrandFun, BrandAction, BrandFun))
-
-        drawArc(
-            brush = ring,
-            startAngle = -35f,
-            sweepAngle = 250f,
-            useCenter = false,
-            topLeft = Offset(cx - radius, cy - radius),
-            size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
-            style = stroke,
+    if (polishColor == null) {
+        Image(
+            painter = painterResource(R.drawable.logo_mark),
+            contentDescription = null,
+            modifier = markModifier,
+            contentScale = ContentScale.Fit,
         )
-        drawArc(
-            color = outline.copy(alpha = 0.45f),
-            startAngle = 230f,
-            sweepAngle = 50f,
-            useCenter = false,
-            topLeft = Offset(cx - radius, cy - radius),
-            size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
-            style = stroke,
-        )
-
-        val bottleTop = cy - radius * 0.55f
-        val bottleBottom = cy + radius * 0.52f
-        val bottleHalf = radius * 0.28f
-        val bottlePath = Path().apply {
-            moveTo(cx - bottleHalf * 0.55f, bottleTop)
-            lineTo(cx + bottleHalf * 0.55f, bottleTop)
-            lineTo(cx + bottleHalf * 0.7f, bottleTop + radius * 0.2f)
-            lineTo(cx + bottleHalf, bottleTop + radius * 0.28f)
-            lineTo(cx + bottleHalf, bottleBottom)
-            quadraticTo(cx, bottleBottom + radius * 0.12f, cx - bottleHalf, bottleBottom)
-            lineTo(cx - bottleHalf, bottleTop + radius * 0.28f)
-            lineTo(cx - bottleHalf * 0.7f, bottleTop + radius * 0.2f)
-            close()
-        }
-        drawPath(
-            path = bottlePath,
-            brush = Brush.verticalGradient(
-                colors = listOf(resolvedPolish.copy(alpha = 0.55f), resolvedPolish),
-                startY = bottleTop,
-                endY = bottleBottom,
-            ),
-        )
-        drawPath(path = bottlePath, color = outline, style = stroke)
-
-        listOf(
-            Offset(cx + radius * 0.55f, cy - radius * 0.35f) to radius * 0.11f,
-            Offset(cx - radius * 0.58f, cy + radius * 0.08f) to radius * 0.08f,
-            Offset(cx + radius * 0.18f, cy + radius * 0.52f) to radius * 0.07f,
-            Offset(cx - radius * 0.18f, cy - radius * 0.52f) to radius * 0.06f,
-        ).forEach { (center, s) ->
-            val sparklePath = Path().apply {
-                moveTo(center.x, center.y - s)
-                lineTo(center.x + s * 0.22f, center.y - s * 0.22f)
-                lineTo(center.x + s, center.y)
-                lineTo(center.x + s * 0.22f, center.y + s * 0.22f)
-                lineTo(center.x, center.y + s)
-                lineTo(center.x - s * 0.22f, center.y + s * 0.22f)
-                lineTo(center.x - s, center.y)
-                lineTo(center.x - s * 0.22f, center.y - s * 0.22f)
-                close()
-            }
-            drawPath(path = sparklePath, color = BrandFun)
+    } else {
+        val outline = MaterialTheme.colorScheme.onBackground
+        Canvas(modifier = markModifier) {
+            drawTintedPolishMark(polishColor = polishColor, outline = outline)
         }
     }
+}
+
+private fun DrawScope.drawTintedPolishMark(
+    polishColor: Color,
+    outline: Color,
+) {
+    val stroke = Stroke(width = size.minDimension * 0.04f, cap = StrokeCap.Round)
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val radius = size.minDimension * 0.42f
+    val ring = Brush.sweepGradient(listOf(BrandFun, BrandAction, BrandFun))
+    val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+    val topLeft = Offset(cx - radius, cy - radius)
+
+    drawArc(
+        brush = ring,
+        startAngle = -35f,
+        sweepAngle = 250f,
+        useCenter = false,
+        topLeft = topLeft,
+        size = arcSize,
+        style = stroke,
+    )
+    drawArc(
+        color = outline.copy(alpha = 0.45f),
+        startAngle = 230f,
+        sweepAngle = 50f,
+        useCenter = false,
+        topLeft = topLeft,
+        size = arcSize,
+        style = stroke,
+    )
+
+    val bottleTop = cy - radius * 0.55f
+    val bottleBottom = cy + radius * 0.52f
+    val bottleHalf = radius * 0.28f
+    val bottlePath = Path().apply {
+        moveTo(cx - bottleHalf * 0.55f, bottleTop)
+        lineTo(cx + bottleHalf * 0.55f, bottleTop)
+        lineTo(cx + bottleHalf * 0.7f, bottleTop + radius * 0.2f)
+        lineTo(cx + bottleHalf, bottleTop + radius * 0.28f)
+        lineTo(cx + bottleHalf, bottleBottom)
+        quadraticTo(cx, bottleBottom + radius * 0.12f, cx - bottleHalf, bottleBottom)
+        lineTo(cx - bottleHalf, bottleTop + radius * 0.28f)
+        lineTo(cx - bottleHalf * 0.7f, bottleTop + radius * 0.2f)
+        close()
+    }
+    drawPath(
+        path = bottlePath,
+        brush = Brush.verticalGradient(
+            colors = listOf(polishColor.copy(alpha = 0.55f), polishColor),
+            startY = bottleTop,
+            endY = bottleBottom,
+        ),
+    )
+    drawPath(path = bottlePath, color = outline, style = stroke)
+    drawMarkSparkles(cx = cx, cy = cy, radius = radius)
+}
+
+private fun DrawScope.drawMarkSparkles(
+    cx: Float,
+    cy: Float,
+    radius: Float,
+) {
+    listOf(
+        Offset(cx + radius * 0.55f, cy - radius * 0.35f) to radius * 0.11f,
+        Offset(cx - radius * 0.58f, cy + radius * 0.08f) to radius * 0.08f,
+        Offset(cx + radius * 0.18f, cy + radius * 0.52f) to radius * 0.07f,
+        Offset(cx - radius * 0.18f, cy - radius * 0.52f) to radius * 0.06f,
+    ).forEach { (center, s) ->
+        val sparklePath = Path().apply {
+            moveTo(center.x, center.y - s)
+            lineTo(center.x + s * 0.22f, center.y - s * 0.22f)
+            lineTo(center.x + s, center.y)
+            lineTo(center.x + s * 0.22f, center.y + s * 0.22f)
+            lineTo(center.x, center.y + s)
+            lineTo(center.x - s * 0.22f, center.y + s * 0.22f)
+            lineTo(center.x - s, center.y)
+            lineTo(center.x - s * 0.22f, center.y - s * 0.22f)
+            close()
+        }
+        drawPath(path = sparklePath, color = BrandFun)
+    }
+}
+
+@Composable
+fun BrandLogoLockup(
+    modifier: Modifier = Modifier,
+    contentDescription: String = "Unhas de Que Cor?",
+) {
+    Image(
+        painter = painterResource(R.drawable.logo_horizontal),
+        contentDescription = contentDescription,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(96.dp),
+        contentScale = ContentScale.Fit,
+    )
 }
 
 @Composable
@@ -157,7 +201,7 @@ fun BrandHeader(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        NailPolishMark(markSize = 78.dp)
+        NailPolishMark(markSize = 88.dp)
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "UNHAS",

@@ -1,8 +1,8 @@
 # Imagens guia — Unhas de Que Cor?
 
-Coloque aqui os PNGs oficiais das boards e telas.
+Fonte de verdade do design (boards, logos e mockups de tela).
 
-## Estrutura esperada
+## Estrutura
 
 ```
 design/guia/
@@ -12,10 +12,10 @@ design/guia/
     logo-icone.png
     logo-mono.png
   boards/
-    brand-board-claro.png
     brand-board-escuro.png
   telas/
     claro/
+      brand-board-claro.png
       home.png
       contexto.png
       resultado.png
@@ -29,7 +29,16 @@ design/guia/
       cores-parecidas.png
 ```
 
-## Uso no app
+## Uso no app (runtime)
 
-Assets de runtime (ícone/ilustrações) vão para `app/src/main/res/drawable/`
-após validação. Este diretório `design/guia/` é a fonte de verdade do design.
+Assets otimizados derivados dos logos oficiais:
+
+| Recurso | Origem | Uso |
+|---------|--------|-----|
+| `drawable/logo_mark.webp` | `logos/logo-icone.png` | `NailPolishMark` / header |
+| `drawable/logo_horizontal.webp` | `logos/logo-horizontal-claro.png` | lockup (claro) |
+| `drawable-night/logo_horizontal.webp` | `logos/logo-horizontal-escuro.png` | lockup (escuro) |
+| `drawable/logo_horizontal_mono.webp` | `logos/logo-mono.png` | mono / docs |
+| `drawable/ic_launcher_{background,foreground}.webp` + mipmaps | `logo-icone.png` | ícone do app |
+
+Telas em `telas/` são referência visual — não entram no APK.
