@@ -18,9 +18,10 @@ class HandSampleCatalogTest {
     }
 
     @Test
-    fun `findById resolves known sample`() {
+    fun `findById resolves known sample by skin tone title`() {
         val option = HandSampleCatalog.findById("clara_vermelho")
-        assertThat(option?.title).isEqualTo("Pele clara + Vermelho")
+        assertThat(option?.title).isEqualTo("Pele clara")
+        assertThat(option?.detailLabel).isEqualTo("Referência")
         assertThat(option?.assetPath).endsWith("hand_sample_clara_vermelho.webp")
     }
 }

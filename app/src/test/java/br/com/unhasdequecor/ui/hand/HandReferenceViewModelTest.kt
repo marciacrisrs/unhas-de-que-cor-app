@@ -42,17 +42,38 @@ class HandReferenceViewModelTest {
     )
 
     @Test
-    fun `import from camera capture updates state and message`() = runTest {
+    fun `camera stages photo until user confirms`() = runTest {
         val viewModel = viewModel()
         advanceUntilIdle()
 
         viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
         advanceUntilIdle()
 
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/capture.jpg")
+        assertThat(viewModel.uiState.value.reference).isNull()
+        assertThat(repository.lastSavedPath).isNull()
+
+        viewModel.confirmPendingUserPhoto()
+        advanceUntilIdle()
+
         assertThat(viewModel.uiState.value.reference).isNotNull()
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
         assertThat(viewModel.uiState.value.message).contains("sucesso")
-        assertThat(viewModel.uiState.value.isSaving).isFalse()
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+    }
+
+    @Test
+    fun `discard pending user photo does not persist`() = runTest {
+        val viewModel = viewModel()
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+
+        viewModel.discardPendingUserPhoto()
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
+        assertThat(viewModel.uiState.value.reference).isNull()
+        assertThat(repository.lastSavedPath).isNull()
     }
 
     @Test
@@ -69,53 +90,46 @@ class HandReferenceViewModelTest {
 
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
         assertThat(viewModel.uiState.value.reference?.sampleId).isEqualTo("retinta_vinho")
+        assertThat(viewModel.uiState.value.isSample).isTrue()
+        assertThat(viewModel.uiState.value.sampleTitle).isEqualTo("Pele retinta")
         assertThat(viewModel.uiState.value.message).contains("Pele retinta")
-        assertThat(repository.lastSampleId).isEqualTo("retinta_vinho")
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
-        assertThat(viewModel.uiState.value.pendingSampleId).isNull()
     }
 
     @Test
-    fun `camera after sample clears sample source`() = runTest {
+    fun `confirm camera after sample clears sample source`() = runTest {
         every { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         val viewModel = viewModel()
         viewModel.useSampleHand("morena_nude")
         advanceUntilIdle()
-        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(viewModel.uiState.value.isSample).isTrue()
 
         viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+        viewModel.confirmPendingUserPhoto()
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.USER)
         assertThat(viewModel.uiState.value.reference?.sampleId).isNull()
-        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
         assertThat(repository.lastSampleId).isNull()
     }
 
     @Test
-    fun `open and dismiss sample picker`() = runTest {
+    fun `replace sheet and remove confirm toggles`() = runTest {
         val viewModel = viewModel()
-        viewModel.openSamplePicker()
-        assertThat(viewModel.uiState.value.showSamplePicker).isTrue()
-        viewModel.dismissSamplePicker()
-        assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
-        assertThat(viewModel.uiState.value.pendingSampleId).isNull()
+        viewModel.openReplaceSheet()
+        assertThat(viewModel.uiState.value.showReplaceSheet).isTrue()
+        viewModel.dismissReplaceSheet()
+        assertThat(viewModel.uiState.value.showReplaceSheet).isFalse()
+
+        viewModel.openRemoveConfirm()
+        assertThat(viewModel.uiState.value.showRemoveConfirm).isTrue()
+        viewModel.dismissRemoveConfirm()
+        assertThat(viewModel.uiState.value.showRemoveConfirm).isFalse()
     }
 
     @Test
-    fun `rejected save surfaces friendly message`() = runTest {
-        repository.reject(HandReferenceRejection.TOO_LARGE)
-        val viewModel = viewModel()
-
-        viewModel.importFromCameraCapture(File("/tmp/huge.jpg"))
-        advanceUntilIdle()
-
-        assertThat(viewModel.uiState.value.reference).isNull()
-        assertThat(viewModel.uiState.value.message).contains("15 MB")
-    }
-
-    @Test
-    fun `clear removes reference`() = runTest {
+    fun `confirm remove clears reference`() = runTest {
         repository.emit(
             HandReference(
                 localPath = "/files/hand_reference/hand.jpg",
@@ -124,13 +138,29 @@ class HandReferenceViewModelTest {
         )
         val viewModel = viewModel()
         advanceUntilIdle()
-        assertThat(viewModel.uiState.value.reference).isNotNull()
 
-        viewModel.clear()
+        viewModel.openRemoveConfirm()
+        viewModel.confirmRemove()
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.reference).isNull()
         assertThat(viewModel.uiState.value.message).contains("removida")
+        assertThat(viewModel.uiState.value.showRemoveConfirm).isFalse()
+    }
+
+    @Test
+    fun `rejected save surfaces friendly message after confirm`() = runTest {
+        repository.reject(HandReferenceRejection.TOO_LARGE)
+        val viewModel = viewModel()
+
+        viewModel.importFromCameraCapture(File("/tmp/huge.jpg"))
+        advanceUntilIdle()
+        viewModel.confirmPendingUserPhoto()
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.reference).isNull()
+        assertThat(viewModel.uiState.value.message).contains("15 MB")
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/huge.jpg")
     }
 
     @Test
@@ -148,6 +178,8 @@ class HandReferenceViewModelTest {
         )
         val viewModel = viewModel()
         viewModel.importFromCameraCapture(File("/tmp/ok.jpg"))
+        advanceUntilIdle()
+        viewModel.confirmPendingUserPhoto()
         advanceUntilIdle()
         assertThat(viewModel.uiState.value.message).isNotNull()
 

@@ -137,9 +137,12 @@ fun HomeScreen(
             ExploreTile("Histórico", Icons.Outlined.History, onOpenHistory, Modifier.weight(1f))
         }
 
-        if (!state.hasHandReference) {
+        if (state.showHandInvite) {
             Spacer(modifier = Modifier.height(20.dp))
-            HandReferenceInviteCard(onClick = onOpenHandReference)
+            HandReferenceInviteCard(
+                isSampleHand = state.isSampleHand,
+                onClick = onOpenHandReference,
+            )
         }
 
         if (state.recentColors.isNotEmpty()) {
@@ -346,7 +349,20 @@ private fun InspirationCard(
 }
 
 @Composable
-private fun HandReferenceInviteCard(onClick: () -> Unit) {
+private fun HandReferenceInviteCard(
+    isSampleHand: Boolean,
+    onClick: () -> Unit,
+) {
+    val title = if (isSampleHand) {
+        "Troque o exemplo pela sua mão"
+    } else {
+        "Cadastrar minha mão"
+    }
+    val subtitle = if (isSampleHand) {
+        "Assim o try-on fica mais fiel a você."
+    } else {
+        "Salve uma foto da sua mão para o try-on virtual."
+    }
     Surface(
         shape = SoftSurfaceShape,
         color = MaterialTheme.colorScheme.surface,
@@ -355,16 +371,16 @@ private fun HandReferenceInviteCard(onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = "Cadastrar minha mão"
+                contentDescription = title
             },
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
             Text(
-                text = "Cadastrar minha mão",
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Salve uma foto da sua mão para o try-on virtual.",
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

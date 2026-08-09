@@ -15,12 +15,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -28,6 +30,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -37,6 +41,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -138,6 +143,12 @@ fun HandReferenceScreen(
         }
     }
 
+    fun openGallery() {
+        galleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+        )
+    }
+
     HandReferenceMessageEffects(
         message = state.message,
         cameraPermissionDenied = cameraPermissionDenied,
@@ -145,6 +156,24 @@ fun HandReferenceScreen(
         onMessageConsumed = viewModel::consumeMessage,
         onPermissionDeniedConsumed = { cameraPermissionDenied = false },
     )
+
+    if (state.showReplaceSheet) {
+        ReplaceHandSheet(
+            onGallery = {
+                viewModel.dismissReplaceSheet()
+                openGallery()
+            },
+            onCamera = {
+                viewModel.dismissReplaceSheet()
+                requestOrOpenCamera()
+            },
+            onSample = {
+                viewModel.dismissReplaceSheet()
+                viewModel.openSamplePicker()
+            },
+            onDismiss = viewModel::dismissReplaceSheet,
+        )
+    }
 
     if (state.showSamplePicker) {
         HandSamplePickerSheet(
@@ -156,18 +185,35 @@ fun HandReferenceScreen(
         )
     }
 
+    if (state.showRemoveConfirm) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRemoveConfirm,
+            title = { Text("Remover foto da mão?") },
+            text = { Text("Você poderá cadastrar outra depois.") },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmRemove) {
+                    Text("Remover")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRemoveConfirm) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+
     HandReferenceScaffold(
         state = state,
         snackbarHostState = snackbarHostState,
         onBack = onBack,
-        onPickGallery = {
-            galleryLauncher.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-            )
-        },
+        onPickGallery = ::openGallery,
         onOpenCamera = ::requestOrOpenCamera,
         onOpenSamplePicker = viewModel::openSamplePicker,
-        onClear = viewModel::clear,
+        onOpenReplaceSheet = viewModel::openReplaceSheet,
+        onOpenRemoveConfirm = viewModel::openRemoveConfirm,
+        onConfirmUserPhoto = viewModel::confirmPendingUserPhoto,
+        onDiscardUserPhoto = viewModel::discardPendingUserPhoto,
     )
 }
 
@@ -203,7 +249,10 @@ private fun HandReferenceScaffold(
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenSamplePicker: () -> Unit,
-    onClear: () -> Unit,
+    onOpenReplaceSheet: () -> Unit,
+    onOpenRemoveConfirm: () -> Unit,
+    onConfirmUserPhoto: () -> Unit,
+    onDiscardUserPhoto: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -224,13 +273,23 @@ private fun HandReferenceScaffold(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
             )
-            HandReferenceContent(
-                state = state,
-                onPickGallery = onPickGallery,
-                onOpenCamera = onOpenCamera,
-                onOpenSamplePicker = onOpenSamplePicker,
-                onClear = onClear,
-            )
+            if (state.isConfirmingUserPhoto) {
+                UserPhotoConfirmContent(
+                    path = state.pendingUserPreviewPath.orEmpty(),
+                    enabled = !state.isSaving,
+                    onConfirm = onConfirmUserPhoto,
+                    onDiscard = onDiscardUserPhoto,
+                )
+            } else {
+                HandReferenceContent(
+                    state = state,
+                    onPickGallery = onPickGallery,
+                    onOpenCamera = onOpenCamera,
+                    onOpenSamplePicker = onOpenSamplePicker,
+                    onOpenReplaceSheet = onOpenReplaceSheet,
+                    onOpenRemoveConfirm = onOpenRemoveConfirm,
+                )
+            }
         }
 
         if (state.isSaving) {
@@ -254,12 +313,57 @@ private fun HandReferenceScaffold(
 }
 
 @Composable
+private fun UserPhotoConfirmContent(
+    path: String,
+    enabled: Boolean,
+    onConfirm: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 28.dp),
+    ) {
+        Text(
+            text = "É esta a mão que você quer usar?",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Confira se as unhas aparecem bem e a luz está boa.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        HandPreview(
+            path = path,
+            revision = path.hashCode().toLong(),
+            isSample = false,
+            sampleTitle = null,
+            empty = false,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        PrimaryCtaButton(
+            text = "OK, usar esta",
+            onClick = onConfirm,
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SecondaryCtaButton(text = "Escolher outra", onClick = onDiscard)
+    }
+}
+
+@Composable
 private fun HandReferenceContent(
     state: HandReferenceUiState,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenSamplePicker: () -> Unit,
-    onClear: () -> Unit,
+    onOpenReplaceSheet: () -> Unit,
+    onOpenRemoveConfirm: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -275,36 +379,75 @@ private fun HandReferenceContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Sem foto agora? Escolha uma mão de exemplo por tom de pele. " +
-                "Dica para a sua: fundo simples, boa luz e unhas à mostra.",
+            text = if (state.hasReference) {
+                if (state.isSample) {
+                    "Você está com uma mão de exemplo. Troque pela sua para o try-on ficar mais fiel."
+                } else {
+                    "Esta é a mão que vai experimentar as cores."
+                }
+            } else {
+                "Sem foto agora? Escolha um exemplo pelo tom de pele."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        if (!state.hasReference) {
+            Spacer(modifier = Modifier.height(12.dp))
+            CaptureGuideTips()
+        }
+        Spacer(modifier = Modifier.height(16.dp))
         HandPreview(
             path = state.reference?.localPath,
             revision = state.reference?.capturedAtEpochMs ?: 0L,
+            isSample = state.isSample,
+            sampleTitle = state.sampleTitle,
+            empty = !state.hasReference,
         )
         Spacer(modifier = Modifier.height(20.dp))
         HandReferenceActions(
-            hasReference = state.reference != null,
+            hasReference = state.hasReference,
+            isSample = state.isSample,
             enabled = !state.isSaving,
             onPickGallery = onPickGallery,
             onOpenCamera = onOpenCamera,
             onOpenSamplePicker = onOpenSamplePicker,
-            onClear = onClear,
+            onOpenReplaceSheet = onOpenReplaceSheet,
+            onOpenRemoveConfirm = onOpenRemoveConfirm,
         )
+    }
+}
+
+@Composable
+private fun CaptureGuideTips() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(SoftSurfaceShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        listOf("Boa luz", "Fundo simples", "Unhas à mostra").forEach { tip ->
+            Text(
+                text = tip,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
 @Composable
 private fun HandReferenceActions(
     hasReference: Boolean,
+    isSample: Boolean,
     enabled: Boolean,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenSamplePicker: () -> Unit,
-    onClear: () -> Unit,
+    onOpenReplaceSheet: () -> Unit,
+    onOpenRemoveConfirm: () -> Unit,
 ) {
     if (!hasReference) {
         PrimaryCtaButton(
@@ -317,17 +460,61 @@ private fun HandReferenceActions(
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onOpenSamplePicker)
     } else {
-        PrimaryCtaButton(
-            text = "Substituir foto",
-            onClick = onPickGallery,
-            enabled = enabled,
-        )
+        if (isSample) {
+            PrimaryCtaButton(
+                text = "Usar minha mão",
+                onClick = onOpenReplaceSheet,
+                enabled = enabled,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            SecondaryCtaButton(text = "Trocar exemplo", onClick = onOpenSamplePicker)
+        } else {
+            PrimaryCtaButton(
+                text = "Trocar foto",
+                onClick = onOpenReplaceSheet,
+                enabled = enabled,
+            )
+        }
         Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Tirar nova foto", onClick = onOpenCamera)
-        Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Trocar exemplo", onClick = onOpenSamplePicker)
-        Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Remover foto", onClick = onClear)
+        SecondaryCtaButton(text = "Remover foto", onClick = onOpenRemoveConfirm)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReplaceHandSheet(
+    onGallery: () -> Unit,
+    onCamera: () -> Unit,
+    onSample: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = "Trocar foto",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Escolha de onde vem a nova mão.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            PrimaryCtaButton(text = "Galeria", onClick = onGallery)
+            Spacer(modifier = Modifier.height(12.dp))
+            SecondaryCtaButton(text = "Câmera", onClick = onCamera)
+            Spacer(modifier = Modifier.height(12.dp))
+            SecondaryCtaButton(text = "Mão de exemplo", onClick = onSample)
+            Spacer(modifier = Modifier.height(12.dp))
+            SecondaryCtaButton(text = "Cancelar", onClick = onDismiss)
+            Spacer(modifier = Modifier.height(20.dp))
+        }
     }
 }
 
@@ -348,12 +535,12 @@ private fun HandSamplePickerSheet(
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
-                text = "Escolha uma mão de exemplo",
+                text = "Escolha pelo tom de pele",
                 style = MaterialTheme.typography.titleLarge,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Toque em uma opção e confirme com OK.",
+                text = "A cor do esmalte no exemplo é só referência visual.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -412,7 +599,7 @@ private fun HandSampleCard(
     Column(
         modifier = Modifier
             .clip(SoftSurfaceShape)
-            .border(1.5.dp, borderColor, SoftSurfaceShape)
+            .border(if (selected) 2.5.dp else 1.dp, borderColor, SoftSurfaceShape)
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
@@ -435,11 +622,29 @@ private fun HandSampleCard(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .size(28.dp)
+                        .clip(SoftSurfaceShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Selecionada",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
         Column(modifier = Modifier.padding(10.dp)) {
             Text(option.skinLabel, style = MaterialTheme.typography.labelLarge)
             Text(
-                text = option.polishLabel,
+                text = option.detailLabel,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -448,7 +653,13 @@ private fun HandSampleCard(
 }
 
 @Composable
-private fun HandPreview(path: String?, revision: Long) {
+private fun HandPreview(
+    path: String?,
+    revision: Long,
+    isSample: Boolean,
+    sampleTitle: String?,
+    empty: Boolean,
+) {
     val bitmap by produceState(
         initialValue = null as android.graphics.Bitmap?,
         path,
@@ -463,17 +674,19 @@ private fun HandPreview(path: String?, revision: Long) {
         }
     }
 
+    val aspect = if (empty) 4f / 3f else 3f / 4f
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(3f / 4f)
+            .aspectRatio(aspect)
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .semantics {
-                contentDescription = if (bitmap != null) {
-                    "Pré-visualização da mão cadastrada"
-                } else {
-                    "Nenhuma foto da mão cadastrada"
+                contentDescription = when {
+                    bitmap != null && isSample -> "Mão de exemplo cadastrada"
+                    bitmap != null -> "Pré-visualização da mão cadastrada"
+                    else -> "Nenhuma foto da mão cadastrada"
                 }
             },
         contentAlignment = Alignment.Center,
@@ -486,6 +699,19 @@ private fun HandPreview(path: String?, revision: Long) {
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            if (isSample) {
+                Text(
+                    text = sampleTitle?.let { "Exemplo · $it" } ?: "Mão de exemplo",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .clip(SoftSurfaceShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.92f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         } else {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -499,7 +725,7 @@ private fun HandPreview(path: String?, revision: Long) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Galeria, câmera ou uma das mãos de exemplo.",
+                    text = "Galeria, câmera ou um exemplo por tom de pele.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

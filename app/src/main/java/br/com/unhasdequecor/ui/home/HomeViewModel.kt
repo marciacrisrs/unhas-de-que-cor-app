@@ -3,6 +3,7 @@ package br.com.unhasdequecor.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.HandReference
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.HistoryEntry
 import br.com.unhasdequecor.domain.model.NailColor
 import br.com.unhasdequecor.domain.model.UserPreferences
@@ -21,7 +22,8 @@ data class HomeUiState(
     val displayName: String = "",
     val recentColors: List<HistoryEntry> = emptyList(),
     val inspiration: NailColor? = null,
-    val hasHandReference: Boolean = false,
+    val showHandInvite: Boolean = true,
+    val isSampleHand: Boolean = false,
 )
 
 @HiltViewModel
@@ -43,11 +45,13 @@ class HomeViewModel @Inject constructor(
         history: List<HistoryEntry>,
         hand: HandReference?,
         ->
+        val isSample = hand?.source == HandReferenceSource.SAMPLE
         HomeUiState(
             displayName = preferences.displayName,
             recentColors = history.distinctBy { it.colorId }.take(4),
             inspiration = inspiration,
-            hasHandReference = hand != null,
+            showHandInvite = hand == null || isSample,
+            isSampleHand = isSample,
         )
     }.stateIn(
         scope = viewModelScope,

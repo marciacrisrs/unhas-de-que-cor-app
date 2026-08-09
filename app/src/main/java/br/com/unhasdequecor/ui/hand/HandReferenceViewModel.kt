@@ -29,10 +29,19 @@ data class HandReferenceUiState(
     val reference: HandReference? = null,
     val sampleOptions: List<HandSampleOption> = HandSampleCatalog.options,
     val showSamplePicker: Boolean = false,
+    val showReplaceSheet: Boolean = false,
+    val showRemoveConfirm: Boolean = false,
     val pendingSampleId: String? = null,
+    val pendingUserPreviewPath: String? = null,
     val isSaving: Boolean = false,
     val message: String? = null,
-)
+) {
+    val hasReference: Boolean get() = reference != null
+    val isSample: Boolean get() = reference?.source == HandReferenceSource.SAMPLE
+    val sampleTitle: String?
+        get() = reference?.sampleId?.let { HandSampleCatalog.findById(it)?.title }
+    val isConfirmingUserPhoto: Boolean get() = pendingUserPreviewPath != null
+}
 
 @HiltViewModel
 class HandReferenceViewModel @Inject constructor(
@@ -57,10 +66,21 @@ class HandReferenceViewModel @Inject constructor(
 
     fun createCameraCaptureFile(): File = fileStore.createCameraCaptureFile()
 
+    fun openReplaceSheet() {
+        _uiState.update {
+            it.copy(showReplaceSheet = true, showSamplePicker = false, message = null)
+        }
+    }
+
+    fun dismissReplaceSheet() {
+        _uiState.update { it.copy(showReplaceSheet = false) }
+    }
+
     fun openSamplePicker() {
         _uiState.update {
             it.copy(
                 showSamplePicker = true,
+                showReplaceSheet = false,
                 pendingSampleId = it.reference?.sampleId,
                 message = null,
             )
@@ -80,6 +100,22 @@ class HandReferenceViewModel @Inject constructor(
         useSampleHand(sampleId)
     }
 
+    fun openRemoveConfirm() {
+        _uiState.update { it.copy(showRemoveConfirm = true) }
+    }
+
+    fun dismissRemoveConfirm() {
+        _uiState.update { it.copy(showRemoveConfirm = false) }
+    }
+
+    fun confirmRemove() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(showRemoveConfirm = false) }
+            clearHandReference()
+            _uiState.update { it.copy(message = "Foto da mão removida.") }
+        }
+    }
+
     fun importFromGallery(uri: Uri) {
         viewModelScope.launch {
             _uiState.update {
@@ -87,6 +123,7 @@ class HandReferenceViewModel @Inject constructor(
                     isSaving = true,
                     message = null,
                     showSamplePicker = false,
+                    showReplaceSheet = false,
                     pendingSampleId = null,
                 )
             }
@@ -104,7 +141,7 @@ class HandReferenceViewModel @Inject constructor(
                 }
                 return@launch
             }
-            persistUser(prepared.absolutePath)
+            stageUserPhoto(prepared.absolutePath)
         }
     }
 
@@ -115,10 +152,25 @@ class HandReferenceViewModel @Inject constructor(
                     isSaving = true,
                     message = null,
                     showSamplePicker = false,
+                    showReplaceSheet = false,
                     pendingSampleId = null,
                 )
             }
-            persistUser(file.absolutePath)
+            stageUserPhoto(file.absolutePath)
+        }
+    }
+
+    fun confirmPendingUserPhoto() {
+        val path = _uiState.value.pendingUserPreviewPath ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, message = null) }
+            persistUser(path)
+        }
+    }
+
+    fun discardPendingUserPhoto() {
+        _uiState.update {
+            it.copy(pendingUserPreviewPath = null, isSaving = false)
         }
     }
 
@@ -130,7 +182,9 @@ class HandReferenceViewModel @Inject constructor(
                     isSaving = true,
                     message = null,
                     showSamplePicker = false,
+                    showReplaceSheet = false,
                     pendingSampleId = null,
+                    pendingUserPreviewPath = null,
                 )
             }
             val prepared = runCatching {
@@ -166,15 +220,17 @@ class HandReferenceViewModel @Inject constructor(
         }
     }
 
-    fun clear() {
-        viewModelScope.launch {
-            clearHandReference()
-            _uiState.update { it.copy(message = "Foto da mão removida.") }
-        }
-    }
-
     fun consumeMessage() {
         _uiState.update { it.copy(message = null) }
+    }
+
+    private fun stageUserPhoto(path: String) {
+        _uiState.update {
+            it.copy(
+                isSaving = false,
+                pendingUserPreviewPath = path,
+            )
+        }
     }
 
     private suspend fun persistUser(path: String) {
@@ -183,6 +239,7 @@ class HandReferenceViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isSaving = false,
+                        pendingUserPreviewPath = null,
                         message = "Mão cadastrada com sucesso.",
                     )
                 }
