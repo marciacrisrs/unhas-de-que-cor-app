@@ -1,0 +1,104 @@
+config:
+  validation: true
+  warningsAsErrors: true
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+
+complexity:
+  LongMethod:
+    active: true
+    allowedLines: 120
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 8
+    allowedConstructorParameters: 9
+    ignoreDefaultParameters: true
+  TooManyFunctions:
+    active: true
+    allowedFunctionsPerFile: 20
+    allowedFunctionsPerClass: 20
+    allowedFunctionsPerInterface: 12
+    allowedFunctionsPerObject: 20
+    allowedFunctionsPerEnum: 12
+    ignoreDeprecated: true
+    ignorePrivate: true
+    ignoreOverridden: true
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 18
+  CognitiveComplexMethod:
+    active: true
+    allowedComplexity: 25
+
+
+coroutines:
+  active: true
+
+naming:
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    active: true
+  VariableNaming:
+    active: true
+
+style:
+  MagicNumber:
+    active: true
+    # Desenho/Compose tende a usar literals de layout; cobrimos dívida via baseline.
+    ignoreNumbers: ['-1', '0', '1', '2', '3', '4', '5', '6', '8', '10', '12']
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+    ignoreLocalVariableDeclaration: true
+    ignoreConstantDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    ignoreRanges: true
+    excludes: ['**/ui/components/**', '**/ui/theme/**']
+
+  UnusedPrivateFunction:
+    active: true
+    ignoreAnnotated: ['Preview']
+  UnusedPrivateProperty:
+    active: true
+    ignoreAnnotated: ['Preview']
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+    excludeCommentStatements: true
+  ReturnCount:
+    active: true
+    max: 3
+    excludeGuardClauses: true
+  ThrowsCount:
+    active: true
+    max: 3
+  WildcardImport:
+    active: true
+
+comments:
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false
+
+potential-bugs:
+  active: true
+
+performance:
+  active: true
+
+exceptions:
+  active: true
+
+empty-blocks:
+  active: true

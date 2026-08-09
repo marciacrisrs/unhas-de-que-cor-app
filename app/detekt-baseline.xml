@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:ResultScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun ResultScreen</ID>
+    <ID>LongMethod:ResultScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun ResultScreen</ID>
+    <ID>MagicNumber:HomeScreen.kt:8</ID>
+    <ID>MagicNumber:ResultScreen.kt:50</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -106,7 +106,8 @@ fun HistoryScreen(
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                             Text(
-                                text = "Você já explorou ${state.distinctColorCount} cores diferentes. Continue explorando e descubra novas combinações!",
+                                text = "Você já explorou ${state.distinctColorCount} cores diferentes. " +
+                                "Continue explorando e descubra novas combinações!",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }

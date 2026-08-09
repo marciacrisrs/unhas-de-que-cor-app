@@ -36,6 +36,30 @@ O app recomenda cores considerando ocasião, humor e estilo — ou escolhe por v
 
 Requer Android SDK (compileSdk 36) e JDK 17+.
 
+## CI / qualidade
+
+O mesmo conjunto do GitHub Actions:
+
+```bash
+./gradlew verifyCi
+```
+
+Isso executa, em sequência:
+
+1. **Detekt** (`:app:detekt`) — análise estática Kotlin  
+2. **Android Lint** (`:app:lintDebug`)  
+3. **Testes unitários** (`:app:testDebugUnitTest`)  
+4. **Assemble debug** (`:app:assembleDebug`)
+
+Configurações em `config/detekt/detekt.yml` e `config/lint/lint.xml`.  
+Workflow: `.github/workflows/ci.yml` (roda em push/PR para `master`/`main`).
+
+Para atualizar o baseline do Detekt após dívida conhecida:
+
+```bash
+./gradlew :app:detektBaseline
+```
+
 ## Princípios
 
 | Princípio | Decisão |
