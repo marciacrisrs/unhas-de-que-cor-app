@@ -13,8 +13,11 @@ import br.com.unhasdequecor.data.repository.ColorCatalogRepositoryImpl
 import br.com.unhasdequecor.data.repository.HandReferenceRepositoryImpl
 import br.com.unhasdequecor.data.repository.HistoryRepositoryImpl
 import br.com.unhasdequecor.data.repository.PreferencesRepositoryImpl
+import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.HandNailDetector
 import br.com.unhasdequecor.data.vision.MediaPipeHandNailDetector
+import br.com.unhasdequecor.data.vision.nail.GeometricNailSegmenter
+import br.com.unhasdequecor.data.vision.nail.NailSegmenter
 import br.com.unhasdequecor.domain.repository.ColorCatalogRepository
 import br.com.unhasdequecor.domain.repository.HandReferenceRepository
 import br.com.unhasdequecor.domain.repository.HistoryRepository
@@ -90,4 +93,16 @@ abstract class RepositoryModule {
     abstract fun bindHandNailDetector(
         impl: MediaPipeHandNailDetector,
     ): HandNailDetector
+
+    @Binds
+    @Singleton
+    abstract fun bindHandLandmarkProcessor(
+        impl: MediaPipeHandNailDetector,
+    ): HandLandmarkProcessor
+
+    @Binds
+    @Singleton
+    abstract fun bindNailSegmenter(
+        impl: GeometricNailSegmenter,
+    ): NailSegmenter
 }

@@ -3,6 +3,7 @@ package br.com.unhasdequecor.data.vision
 import android.content.Context
 import android.graphics.Bitmap
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
+import br.com.unhasdequecor.data.vision.nail.ImageCoordinates
 import br.com.unhasdequecor.ui.components.NailLandmarkMapper
 import br.com.unhasdequecor.ui.components.NailOverlayAnchor
 import com.google.mediapipe.framework.image.BitmapImageBuilder
@@ -13,47 +14,53 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-interface HandNailDetector {
-    fun detect(bitmap: Bitmap): List<NailOverlayAnchor>?
-
-    /**
-     * Tenta a bitmap e, se falhar, rotações 90/180/270 (fotos salvas sem EXIF).
-     * Devolve a bitmap na orientação em que a mão foi detectada + âncoras.
-     */
-    fun detectWithOrientationFallback(bitmap: Bitmap): DetectedHand? {
-        val anchors = detect(bitmap) ?: return null
-        return DetectedHand(bitmap = bitmap, anchors = anchors)
-    }
-}
-
-data class DetectedHand(
-    val bitmap: Bitmap,
-    val anchors: List<NailOverlayAnchor>,
-)
-
+/**
+ * Detecção de mão via MediaPipe Hand Landmarker (IMAGE).
+ * Expõe landmarks brutos ([HandLandmarkProcessor]) e âncoras legadas ([HandNailDetector]).
+ */
 @Singleton
 class MediaPipeHandNailDetector @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) : HandNailDetector {
+) : HandLandmarkProcessor, HandNailDetector {
 
     @Volatile
     private var landmarker: HandLandmarker? = null
 
-    override fun detect(bitmap: Bitmap): List<NailOverlayAnchor>? =
-        detectOnBitmap(bitmap)
+    override fun detect(bitmap: Bitmap): List<NailOverlayAnchor>? {
+        val landmarks = detectLandmarks(bitmap) ?: return null
+        return NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks.points.map {
+                NailLandmarkMapper.NormalizedPoint(it.x, it.y)
+            },
+            imageWidth = landmarks.imageWidth,
+            imageHeight = landmarks.imageHeight,
+        )
+    }
 
     override fun detectWithOrientationFallback(bitmap: Bitmap): DetectedHand? {
-        detectOnBitmap(bitmap)?.let { anchors ->
-            return DetectedHand(bitmap = bitmap, anchors = anchors)
+        val oriented = detectLandmarksWithOrientationFallback(bitmap) ?: return null
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = oriented.landmarks.points.map {
+                NailLandmarkMapper.NormalizedPoint(it.x, it.y)
+            },
+            imageWidth = oriented.landmarks.imageWidth,
+            imageHeight = oriented.landmarks.imageHeight,
+        ) ?: return null
+        return DetectedHand(bitmap = oriented.bitmap, anchors = anchors)
+    }
+
+    override fun detectLandmarks(bitmap: Bitmap): HandLandmarks? =
+        detectLandmarksOnBitmap(bitmap)
+
+    override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
+        detectLandmarksOnBitmap(bitmap)?.let {
+            return OrientedHandLandmarks(bitmap = bitmap, landmarks = it)
         }
         for (degrees in ROTATION_FALLBACKS) {
             val rotated = OrientedBitmapDecoder.rotate(bitmap, degrees)
-            val anchors = detectOnBitmap(rotated)
-            if (anchors != null) {
-                if (rotated !== bitmap && !bitmap.isRecycled) {
-                    // Mantém a rotacionada para o preview; a original pode ser reciclada pelo caller.
-                }
-                return DetectedHand(bitmap = rotated, anchors = anchors)
+            val landmarks = detectLandmarksOnBitmap(rotated)
+            if (landmarks != null) {
+                return OrientedHandLandmarks(bitmap = rotated, landmarks = landmarks)
             }
             if (rotated !== bitmap && !rotated.isRecycled) {
                 rotated.recycle()
@@ -62,7 +69,7 @@ class MediaPipeHandNailDetector @Inject constructor(
         return null
     }
 
-    private fun detectOnBitmap(bitmap: Bitmap): List<NailOverlayAnchor>? {
+    private fun detectLandmarksOnBitmap(bitmap: Bitmap): HandLandmarks? {
         return runCatching {
             val marker = landmarker() ?: return null
             val working = prepareForInference(bitmap)
@@ -72,12 +79,31 @@ class MediaPipeHandNailDetector @Inject constructor(
                 working.recycle()
             }
             val landmarks = result.landmarks().firstOrNull() ?: return null
-            NailLandmarkMapper.fromNormalizedLandmarks(
-                landmarks = landmarks.map {
-                    NailLandmarkMapper.NormalizedPoint(it.x(), it.y())
+            if (landmarks.size < HandLandmarks.MIN_POINTS) return null
+            val handedness = result.handednesses()
+                .firstOrNull()
+                ?.firstOrNull()
+                ?.categoryName()
+                ?.let { name ->
+                    when (name.lowercase()) {
+                        "left" -> Handedness.LEFT
+                        "right" -> Handedness.RIGHT
+                        else -> Handedness.UNKNOWN
+                    }
+                } ?: Handedness.UNKNOWN
+            val score = result.handednesses()
+                .firstOrNull()
+                ?.firstOrNull()
+                ?.score()
+                ?: 1f
+            HandLandmarks(
+                points = landmarks.map {
+                    ImageCoordinates.NormPoint(it.x(), it.y())
                 },
                 imageWidth = bitmap.width,
                 imageHeight = bitmap.height,
+                handedness = handedness,
+                presenceScore = score,
             )
         }.getOrNull()
     }

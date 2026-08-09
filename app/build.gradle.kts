@@ -19,6 +19,12 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Overlay de landmarks/ROI/máscara no try-on. Ative com -PdebugNailOverlay=true
+        buildConfigField(
+            "boolean",
+            "DEBUG_NAIL_OVERLAY",
+            (project.findProperty("debugNailOverlay") as String? ?: "false"),
+        )
     }
 
     signingConfigs {

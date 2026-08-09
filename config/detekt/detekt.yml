@@ -61,7 +61,7 @@ style:
     ignoreNamedArgument: true
     ignoreEnums: true
     ignoreRanges: true
-    excludes: ['**/ui/components/**', '**/ui/theme/**']
+    excludes: ['**/ui/components/**', '**/ui/theme/**', '**/test/**', '**/androidTest/**']
 
   UnusedPrivateFunction:
     active: true

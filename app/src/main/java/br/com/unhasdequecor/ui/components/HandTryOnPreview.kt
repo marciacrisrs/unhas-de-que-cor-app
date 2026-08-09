@@ -31,10 +31,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
-import br.com.unhasdequecor.data.vision.HandNailDetector
-import br.com.unhasdequecor.data.vision.MediaPipeHandNailDetector
+import br.com.unhasdequecor.data.vision.HandLandmarks
+import br.com.unhasdequecor.data.vision.nail.DetectedNail
+import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
+import br.com.unhasdequecor.di.NailPipelineEntryPoint
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -42,6 +46,9 @@ private data class TryOnPreviewData(
     val bitmap: android.graphics.Bitmap,
     val anchors: List<NailOverlayAnchor>,
     val mode: TryOnMode,
+    val nails: List<DetectedNail> = emptyList(),
+    val landmarks: HandLandmarks? = null,
+    val showDebug: Boolean = false,
 )
 
 private enum class TryOnMode {
@@ -58,11 +65,17 @@ fun HandTryOnPreview(
     colorName: String,
     sampleId: String?,
     modifier: Modifier = Modifier,
-    nailDetector: HandNailDetector? = null,
+    nailPipeline: NailTryOnPipeline? = null,
 ) {
     val context = LocalContext.current
-    val detector = nailDetector ?: remember(context) {
-        MediaPipeHandNailDetector(context.applicationContext)
+    val pipeline = nailPipeline ?: remember(context) {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            NailPipelineEntryPoint::class.java,
+        ).nailTryOnPipeline().also {
+            // Debug só em builds debug; não polui a UI de release.
+            it.debugEnabled = BuildConfig.DEBUG && BuildConfig.DEBUG_NAIL_OVERLAY
+        }
     }
     val preview by produceState<TryOnPreviewData?>(
         initialValue = null,
@@ -70,7 +83,7 @@ fun HandTryOnPreview(
         revision,
         sampleId,
         polishColor,
-        detector,
+        pipeline,
     ) {
         value = withContext(Dispatchers.Default) {
             val bitmap = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 2048)
@@ -80,7 +93,7 @@ fun HandTryOnPreview(
                 bitmap = bitmap,
                 polishColor = polishColor,
                 sampleId = sampleId,
-                detector = detector,
+                pipeline = pipeline,
             )
         }
     }
@@ -104,7 +117,6 @@ fun HandTryOnPreview(
             Image(
                 bitmap = data.bitmap.asImageBitmap(),
                 contentDescription = null,
-                // FillBounds + aspect da bitmap: coords da imagem == coords do canvas.
                 contentScale = ContentScale.FillBounds,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -114,6 +126,13 @@ fun HandTryOnPreview(
                         drawPolishNail(anchor = anchor, polishColor = polishColor)
                     }
                 }
+            }
+            if (data.showDebug) {
+                NailDebugOverlay(
+                    landmarks = data.landmarks,
+                    nails = data.nails,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
         Text(
@@ -141,41 +160,36 @@ private fun resolvePreview(
     bitmap: android.graphics.Bitmap,
     polishColor: Color,
     sampleId: String?,
-    detector: HandNailDetector,
+    pipeline: NailTryOnPipeline,
 ): TryOnPreviewData {
     val isUserPhoto = sampleId == null
     return when {
-        // Foto da usuária: MediaPipe → máscara elíptica + recolor (como as amostras).
         isUserPhoto -> {
-            val detected = detector.detectWithOrientationFallback(bitmap)
-            if (detected != null) {
-                val painted = DetectedNailPolishApplier.apply(
-                    source = detected.bitmap,
-                    anchors = detected.anchors,
-                    polishColor = polishColor,
+            val result = pipeline.process(
+                image = bitmap,
+                polishColor = polishColor,
+                stabilize = false,
+            )
+            if (result != null && result.nails.isNotEmpty()) {
+                TryOnPreviewData(
+                    bitmap = result.bitmap,
+                    anchors = emptyList(),
+                    mode = TryOnMode.DETECTED,
+                    nails = result.nails,
+                    landmarks = result.landmarks,
+                    showDebug = result.debugEnabled,
                 )
-                if (painted != null) {
-                    TryOnPreviewData(
-                        bitmap = painted,
-                        anchors = emptyList(),
-                        mode = TryOnMode.DETECTED,
-                    )
-                } else {
-                    TryOnPreviewData(
-                        bitmap = detected.bitmap,
-                        anchors = detected.anchors,
-                        mode = TryOnMode.DETECTED,
-                    )
-                }
             } else {
                 TryOnPreviewData(
-                    bitmap = bitmap,
+                    bitmap = result?.bitmap ?: bitmap,
                     anchors = emptyList(),
                     mode = TryOnMode.APPROXIMATE,
+                    nails = result?.nails.orEmpty(),
+                    landmarks = result?.landmarks,
+                    showDebug = result?.debugEnabled == true,
                 )
             }
         }
-        // Amostra: máscara calibrada > recolor pelo esmalte da foto > âncoras.
         else -> resolveSamplePreview(
             context = context,
             bitmap = bitmap,
@@ -191,7 +205,6 @@ private fun resolveSamplePreview(
     polishColor: Color,
     sampleId: String,
 ): TryOnPreviewData {
-    // Só máscara calibrada recolorre pixels. Nunca “seed” por cor (pintava a pele).
     if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
         val mask = PolishMaskRecolorer.loadMask(context, sampleId)
         val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
@@ -221,7 +234,6 @@ private fun DrawScope.drawPolishNail(
     val nailSize = Size(nailWidth, nailHeight)
     val radius = CornerRadius(nailWidth * 0.48f, nailHeight * 0.42f)
     rotate(degrees = anchor.rotationDegrees, pivot = center) {
-        // Base: multiplica a textura da unha (menos “adesivo”).
         drawRoundRect(
             color = polishColor.copy(alpha = 0.55f),
             topLeft = topLeft,
@@ -229,7 +241,6 @@ private fun DrawScope.drawPolishNail(
             cornerRadius = radius,
             blendMode = BlendMode.Multiply,
         )
-        // Camada de cor do esmalte.
         drawRoundRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
@@ -242,7 +253,6 @@ private fun DrawScope.drawPolishNail(
             size = nailSize,
             cornerRadius = radius,
         )
-        // Specular along the nail curve.
         drawRoundRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
@@ -258,17 +268,6 @@ private fun DrawScope.drawPolishNail(
             size = Size(nailWidth * 0.22f, nailHeight * 0.72f),
             cornerRadius = CornerRadius(nailWidth * 0.16f, nailHeight * 0.2f),
             blendMode = BlendMode.Screen,
-        )
-        // Sombra suave na cutícula.
-        drawRoundRect(
-            color = Color.Black.copy(alpha = 0.12f),
-            topLeft = Offset(
-                center.x - nailWidth * 0.42f,
-                center.y + nailHeight * 0.18f,
-            ),
-            size = Size(nailWidth * 0.84f, nailHeight * 0.28f),
-            cornerRadius = CornerRadius(nailWidth * 0.3f, nailHeight * 0.2f),
-            blendMode = BlendMode.Multiply,
         )
     }
 }
