@@ -19,6 +19,8 @@ O app recomenda cores considerando ocasião, humor e estilo — ou escolhe por v
 - Motor inicial de recomendação
 - Tela de resultado visual
 - Histórico e favoritos locais (Room + DataStore)
+- Room com schema exportado e migrações versionadas (sem wipe destrutivo)
+- Result idempotente (SavedStateHandle + `idempotencyKey` no histórico)
 - Histórico/Favoritos abrem Result em modo restore (sem novo save)
 - Room com migrações versionadas + Result idempotente
 - Release com R8/minify (ver `docs/release.md`)
