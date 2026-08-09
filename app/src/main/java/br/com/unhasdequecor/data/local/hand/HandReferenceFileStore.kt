@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileOutputStream
@@ -19,13 +20,25 @@ class HandReferenceFileStore @Inject constructor(
     fun persist(
         sourceAbsolutePath: String,
         capturedAtEpochMs: Long,
+        source: HandReferenceSource = HandReferenceSource.USER,
     ): HandReferenceSaveOutcome {
         val validationError = validateSource(File(sourceAbsolutePath))
         return if (validationError != null) {
             HandReferenceSaveOutcome.Rejected(validationError)
         } else {
-            writeHandJpeg(File(sourceAbsolutePath), capturedAtEpochMs)
+            writeHandJpeg(File(sourceAbsolutePath), capturedAtEpochMs, source)
         }
+    }
+
+    fun copySampleAssetToCache(): File {
+        val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
+        val target = File(cacheDir, "sample_import.webp")
+        context.assets.open(SAMPLE_ASSET).use { input ->
+            FileOutputStream(target).use { output ->
+                input.copyTo(output)
+            }
+        }
+        return target
     }
 
     fun deleteStoredImage() {
@@ -70,12 +83,13 @@ class HandReferenceFileStore @Inject constructor(
     private fun writeHandJpeg(
         source: File,
         capturedAtEpochMs: Long,
+        referenceSource: HandReferenceSource,
     ): HandReferenceSaveOutcome = try {
         val bitmap = decodeSampledBitmap(source)
         if (bitmap == null) {
             HandReferenceSaveOutcome.Rejected(HandReferenceRejection.INVALID_IMAGE)
         } else {
-            storeJpeg(bitmap, capturedAtEpochMs).also {
+            storeJpeg(bitmap, capturedAtEpochMs, referenceSource).also {
                 if (!bitmap.isRecycled) {
                     bitmap.recycle()
                 }
@@ -96,6 +110,7 @@ class HandReferenceFileStore @Inject constructor(
     private fun storeJpeg(
         bitmap: Bitmap,
         capturedAtEpochMs: Long,
+        referenceSource: HandReferenceSource,
     ): HandReferenceSaveOutcome {
         val directory = File(context.filesDir, DIRECTORY).also { it.mkdirs() }
         val destination = File(directory, FILE_NAME)
@@ -107,6 +122,7 @@ class HandReferenceFileStore @Inject constructor(
                 HandReference(
                     localPath = destination.absolutePath,
                     capturedAtEpochMs = capturedAtEpochMs,
+                    source = referenceSource,
                 ),
             )
         } else {
@@ -128,6 +144,7 @@ class HandReferenceFileStore @Inject constructor(
         const val DIRECTORY = "hand_reference"
         const val FILE_NAME = "hand.jpg"
         const val CACHE_DIR = "hand_capture"
+        const val SAMPLE_ASSET = "hand_example.webp"
         const val MIN_DIMENSION = 480
         const val MAX_BYTES = 15L * 1024L * 1024L
         const val TARGET_MAX_EDGE = 2048

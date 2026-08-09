@@ -4,6 +4,7 @@ import br.com.unhasdequecor.data.local.hand.HandReferenceFileStore
 import br.com.unhasdequecor.data.local.hand.HandReferencePreferencesDataSource
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.repository.HandReferenceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -29,8 +30,9 @@ class HandReferenceRepositoryImpl @Inject constructor(
     override suspend fun save(
         sourceAbsolutePath: String,
         capturedAtEpochMs: Long,
+        source: HandReferenceSource,
     ): HandReferenceSaveOutcome = withContext(Dispatchers.IO) {
-        when (val outcome = fileStore.persist(sourceAbsolutePath, capturedAtEpochMs)) {
+        when (val outcome = fileStore.persist(sourceAbsolutePath, capturedAtEpochMs, source)) {
             is HandReferenceSaveOutcome.Saved -> {
                 preferences.save(outcome.reference)
                 outcome

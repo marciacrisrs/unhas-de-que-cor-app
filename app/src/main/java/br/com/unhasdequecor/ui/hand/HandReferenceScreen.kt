@@ -145,6 +145,7 @@ fun HandReferenceScreen(
             )
         },
         onOpenCamera = ::requestOrOpenCamera,
+        onUseSample = viewModel::useSampleHand,
         onClear = viewModel::clear,
     )
 }
@@ -180,6 +181,7 @@ private fun HandReferenceScaffold(
     onBack: () -> Unit,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
+    onUseSample: () -> Unit,
     onClear: () -> Unit,
 ) {
     Box(
@@ -205,6 +207,7 @@ private fun HandReferenceScaffold(
                 state = state,
                 onPickGallery = onPickGallery,
                 onOpenCamera = onOpenCamera,
+                onUseSample = onUseSample,
                 onClear = onClear,
             )
         }
@@ -234,6 +237,7 @@ private fun HandReferenceContent(
     state: HandReferenceUiState,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
+    onUseSample: () -> Unit,
     onClear: () -> Unit,
 ) {
     Column(
@@ -250,8 +254,8 @@ private fun HandReferenceContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Dica: fundo claro, boa luz e unhas à mostra. Sem segmentação ainda — " +
-                "só salvamos a referência no aparelho.",
+            text = "Prefere começar sem foto? Use a mão de exemplo e troque pela sua depois. " +
+                "Dica para a sua: fundo simples, boa luz e unhas à mostra.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -263,6 +267,7 @@ private fun HandReferenceContent(
             enabled = !state.isSaving,
             onPickGallery = onPickGallery,
             onOpenCamera = onOpenCamera,
+            onUseSample = onUseSample,
             onClear = onClear,
         )
     }
@@ -274,6 +279,7 @@ private fun HandReferenceActions(
     enabled: Boolean,
     onPickGallery: () -> Unit,
     onOpenCamera: () -> Unit,
+    onUseSample: () -> Unit,
     onClear: () -> Unit,
 ) {
     if (!hasReference) {
@@ -284,6 +290,8 @@ private fun HandReferenceActions(
         )
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Tirar foto", onClick = onOpenCamera)
+        Spacer(modifier = Modifier.height(12.dp))
+        SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onUseSample)
     } else {
         PrimaryCtaButton(
             text = "Substituir foto",
@@ -292,6 +300,8 @@ private fun HandReferenceActions(
         )
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Tirar nova foto", onClick = onOpenCamera)
+        Spacer(modifier = Modifier.height(12.dp))
+        SecondaryCtaButton(text = "Usar foto de exemplo", onClick = onUseSample)
         Spacer(modifier = Modifier.height(12.dp))
         SecondaryCtaButton(text = "Remover foto", onClick = onClear)
     }

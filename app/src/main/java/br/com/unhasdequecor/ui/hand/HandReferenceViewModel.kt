@@ -8,9 +8,11 @@ import br.com.unhasdequecor.data.local.hand.HandReferenceFileStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
+import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,7 @@ class HandReferenceViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     observeHandReference: ObserveHandReferenceUseCase,
     private val saveHandReference: SaveHandReferenceUseCase,
+    private val useSampleHandReference: UseSampleHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
     private val fileStore: HandReferenceFileStore,
 ) : ViewModel() {
@@ -66,14 +69,48 @@ class HandReferenceViewModel @Inject constructor(
                 }
                 return@launch
             }
-            persist(prepared.absolutePath)
+            persistUser(prepared.absolutePath)
         }
     }
 
     fun importFromCameraCapture(file: File) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, message = null) }
-            persist(file.absolutePath)
+            persistUser(file.absolutePath)
+        }
+    }
+
+    fun useSampleHand() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, message = null) }
+            val prepared = runCatching { fileStore.copySampleAssetToCache() }.getOrNull()
+            if (prepared == null) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        message = messageFor(HandReferenceRejection.IO_ERROR),
+                    )
+                }
+                return@launch
+            }
+            when (val outcome = useSampleHandReference(prepared.absolutePath)) {
+                is HandReferenceSaveOutcome.Saved -> {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            message = "Foto de exemplo salva. Troque pela sua quando quiser.",
+                        )
+                    }
+                }
+                is HandReferenceSaveOutcome.Rejected -> {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            message = messageFor(outcome.reason),
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -88,8 +125,8 @@ class HandReferenceViewModel @Inject constructor(
         _uiState.update { it.copy(message = null) }
     }
 
-    private suspend fun persist(path: String) {
-        when (val outcome = saveHandReference(path)) {
+    private suspend fun persistUser(path: String) {
+        when (val outcome = saveHandReference(path, HandReferenceSource.USER)) {
             is HandReferenceSaveOutcome.Saved -> {
                 _uiState.update {
                     it.copy(

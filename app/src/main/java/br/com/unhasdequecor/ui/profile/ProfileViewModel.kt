@@ -3,6 +3,7 @@ package br.com.unhasdequecor.ui.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.BuildConfig
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.NailStyle
 import br.com.unhasdequecor.domain.usecase.GetDistinctColorCountUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
@@ -20,6 +21,7 @@ data class ProfileUiState(
     val preferredStyles: Set<NailStyle> = emptySet(),
     val distinctColorCount: Int = 0,
     val hasHandReference: Boolean = false,
+    val isSampleHand: Boolean = false,
     val appVersion: String = BuildConfig.VERSION_NAME,
 )
 
@@ -41,6 +43,7 @@ class ProfileViewModel @Inject constructor(
             preferredStyles = preferences.preferredStyles,
             distinctColorCount = getDistinctColorCount(),
             hasHandReference = hand != null,
+            isSampleHand = hand?.source == HandReferenceSource.SAMPLE,
             appVersion = BuildConfig.VERSION_NAME,
         )
     }.stateIn(

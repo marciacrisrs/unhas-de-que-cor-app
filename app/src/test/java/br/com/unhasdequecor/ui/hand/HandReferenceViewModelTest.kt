@@ -5,9 +5,11 @@ import br.com.unhasdequecor.data.local.hand.HandReferenceFileStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
+import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import br.com.unhasdequecor.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
@@ -34,6 +36,7 @@ class HandReferenceViewModelTest {
         context = context,
         observeHandReference = ObserveHandReferenceUseCase(repository),
         saveHandReference = SaveHandReferenceUseCase(repository) { FIXED_NOW_MS },
+        useSampleHandReference = UseSampleHandReferenceUseCase(repository) { FIXED_NOW_MS },
         clearHandReference = ClearHandReferenceUseCase(repository),
         fileStore = fileStore,
     )
@@ -49,6 +52,20 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.reference).isNotNull()
         assertThat(viewModel.uiState.value.message).contains("sucesso")
         assertThat(viewModel.uiState.value.isSaving).isFalse()
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+    }
+
+    @Test
+    fun `use sample hand marks source as sample`() = runTest {
+        every { fileStore.copySampleAssetToCache() } returns File("/tmp/sample.webp")
+        val viewModel = viewModel()
+
+        viewModel.useSampleHand()
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(viewModel.uiState.value.message).contains("exemplo")
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.SAMPLE)
     }
 
     @Test

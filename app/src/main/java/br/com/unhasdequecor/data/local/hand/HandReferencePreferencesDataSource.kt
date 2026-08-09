@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import br.com.unhasdequecor.domain.model.HandReference
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -21,7 +22,14 @@ class HandReferencePreferencesDataSource @Inject constructor(
         if (path.isBlank() || capturedAt <= 0L) {
             null
         } else {
-            HandReference(localPath = path, capturedAtEpochMs = capturedAt)
+            val source = prefs[KEY_SOURCE]
+                ?.let { runCatching { HandReferenceSource.valueOf(it) }.getOrNull() }
+                ?: HandReferenceSource.USER
+            HandReference(
+                localPath = path,
+                capturedAtEpochMs = capturedAt,
+                source = source,
+            )
         }
     }
 
@@ -29,6 +37,7 @@ class HandReferencePreferencesDataSource @Inject constructor(
         dataStore.edit { prefs ->
             prefs[KEY_LOCAL_PATH] = reference.localPath
             prefs[KEY_CAPTURED_AT] = reference.capturedAtEpochMs
+            prefs[KEY_SOURCE] = reference.source.name
         }
     }
 
@@ -36,11 +45,13 @@ class HandReferencePreferencesDataSource @Inject constructor(
         dataStore.edit { prefs ->
             prefs.remove(KEY_LOCAL_PATH)
             prefs.remove(KEY_CAPTURED_AT)
+            prefs.remove(KEY_SOURCE)
         }
     }
 
     private companion object {
         val KEY_LOCAL_PATH = stringPreferencesKey("hand_local_path")
         val KEY_CAPTURED_AT = longPreferencesKey("hand_captured_at")
+        val KEY_SOURCE = stringPreferencesKey("hand_source")
     }
 }

@@ -1,8 +1,14 @@
 package br.com.unhasdequecor.domain.model
 
+enum class HandReferenceSource {
+    USER,
+    SAMPLE,
+}
+
 data class HandReference(
     val localPath: String,
     val capturedAtEpochMs: Long,
+    val source: HandReferenceSource = HandReferenceSource.USER,
 )
 
 sealed interface HandReferenceSaveOutcome {

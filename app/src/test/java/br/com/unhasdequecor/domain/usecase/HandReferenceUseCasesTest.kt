@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
+import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.time.Clock
 import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import com.google.common.truth.Truth.assertThat
@@ -23,7 +24,18 @@ class HandReferenceUseCasesTest {
         assertThat(outcome).isInstanceOf(HandReferenceSaveOutcome.Saved::class.java)
         val saved = (outcome as HandReferenceSaveOutcome.Saved).reference
         assertThat(saved.capturedAtEpochMs).isEqualTo(fixedNowMs)
+        assertThat(saved.source).isEqualTo(HandReferenceSource.USER)
         assertThat(repository.lastSavedPath).isEqualTo("/tmp/source.jpg")
+    }
+
+    @Test
+    fun `use sample marks reference as sample`() = runTest {
+        val outcome = UseSampleHandReferenceUseCase(repository, clock)("/tmp/sample.webp")
+
+        assertThat(outcome).isInstanceOf(HandReferenceSaveOutcome.Saved::class.java)
+        val saved = (outcome as HandReferenceSaveOutcome.Saved).reference
+        assertThat(saved.source).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.SAMPLE)
     }
 
     @Test

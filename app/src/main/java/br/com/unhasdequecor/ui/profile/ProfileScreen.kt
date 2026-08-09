@@ -38,10 +38,10 @@ fun ProfileScreen(
     } else {
         state.preferredStyles.joinToString(" · ") { it.displayName }
     }
-    val handLabel = if (state.hasHandReference) {
-        "Foto cadastrada neste aparelho · toque para trocar"
-    } else {
-        "Toque para cadastrar a foto da sua mão"
+    val handLabel = when {
+        state.isSampleHand -> "Usando foto de exemplo · toque para trocar pela sua"
+        state.hasHandReference -> "Foto cadastrada neste aparelho · toque para trocar"
+        else -> "Toque para cadastrar a foto da sua mão"
     }
 
     Column(
