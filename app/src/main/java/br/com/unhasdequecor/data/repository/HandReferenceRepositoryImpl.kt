@@ -47,6 +47,8 @@ class HandReferenceRepositoryImpl @Inject constructor(
         ) {
             is HandReferenceSaveOutcome.Saved -> {
                 preferences.save(outcome.reference)
+                // Só depois do DataStore apontar para o path novo.
+                fileStore.purgeObsoleteHandFiles(outcome.reference.localPath)
                 outcome
             }
             is HandReferenceSaveOutcome.Rejected -> outcome

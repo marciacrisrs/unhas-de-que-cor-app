@@ -125,7 +125,8 @@ class HandReferenceFileStore @Inject constructor(
             bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
         }
         return if (compressed) {
-            purgeOldHandFiles(directory, keep = destination)
+            // Não apaga o JPEG anterior aqui: o DataStore ainda aponta para o path antigo
+            // até preferences.save. A limpeza roda depois, em purgeObsoleteHandFiles.
             HandReferenceSaveOutcome.Saved(
                 HandReference(
                     localPath = destination.absolutePath,
@@ -140,7 +141,10 @@ class HandReferenceFileStore @Inject constructor(
         }
     }
 
-    private fun purgeOldHandFiles(directory: File, keep: File) {
+    fun purgeObsoleteHandFiles(keepAbsolutePath: String) {
+        val directory = File(context.filesDir, DIRECTORY)
+        if (!directory.isDirectory) return
+        val keep = File(keepAbsolutePath)
         directory.listFiles()?.forEach { file ->
             val isHandJpeg = file.name == LEGACY_FILE_NAME ||
                 (file.name.startsWith("hand_") && file.name.endsWith(".jpg"))

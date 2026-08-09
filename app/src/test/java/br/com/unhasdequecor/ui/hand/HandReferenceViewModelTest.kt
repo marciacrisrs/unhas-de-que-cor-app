@@ -155,15 +155,17 @@ class HandReferenceViewModelTest {
 
     @Test
     fun `rejected save surfaces friendly message after confirm`() = runTest {
-        repository.reject(HandReferenceRejection.TOO_LARGE)
         val viewModel = viewModel()
+        advanceUntilIdle()
+        repository.reject(HandReferenceRejection.TOO_LARGE)
 
         viewModel.importFromCameraCapture(File("/tmp/huge.jpg"))
         advanceUntilIdle()
         viewModel.confirmPendingUserPhoto()
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.reference).isNull()
+        // Mantém a amostra padrão; a foto pendente fica para tentar de novo.
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
         assertThat(viewModel.uiState.value.message).contains("15 MB")
         assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/huge.jpg")
     }

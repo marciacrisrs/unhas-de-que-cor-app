@@ -119,6 +119,8 @@ class HandReferenceViewModel @Inject constructor(
             val restored = clearHandReference()
             _uiState.update {
                 it.copy(
+                    // Atualiza de imediato: evita flash de empty enquanto o Flow observa.
+                    reference = restored ?: it.reference,
                     isSaving = false,
                     message = if (restored != null) {
                         "Voltamos para a mão de referência."
