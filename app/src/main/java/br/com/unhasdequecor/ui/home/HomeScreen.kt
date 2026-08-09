@@ -64,6 +64,7 @@ fun HomeScreen(
     onOpenStyle: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenHandReference: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -134,6 +135,33 @@ fun HomeScreen(
             ExploreTile("Estilo", Icons.Outlined.Checkroom, onOpenStyle, Modifier.weight(1f))
             ExploreTile("Favoritos", Icons.Outlined.FavoriteBorder, onOpenFavorites, Modifier.weight(1f))
             ExploreTile("Histórico", Icons.Outlined.History, onOpenHistory, Modifier.weight(1f))
+        }
+
+        if (!state.hasHandReference) {
+            Spacer(modifier = Modifier.height(20.dp))
+            Surface(
+                shape = SoftSurfaceShape,
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenHandReference)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Cadastrar minha mão"
+                    },
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+                    Text(
+                        text = "Cadastrar minha mão",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Salve uma foto da sua mão para o try-on virtual.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
 
         if (state.recentColors.isNotEmpty()) {

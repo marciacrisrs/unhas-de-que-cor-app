@@ -18,6 +18,7 @@ import br.com.unhasdequecor.ui.context.ContextChoiceViewModel
 import br.com.unhasdequecor.ui.favorites.FavoritesScreen
 import br.com.unhasdequecor.ui.history.HistoryRowUi
 import br.com.unhasdequecor.ui.history.HistoryScreen
+import br.com.unhasdequecor.ui.hand.HandReferenceScreen
 import br.com.unhasdequecor.ui.home.HomeScreen
 import br.com.unhasdequecor.ui.profile.ProfileScreen
 import br.com.unhasdequecor.ui.result.ResultScreen
@@ -79,6 +80,7 @@ fun AppNavHost() {
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
                     onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
+                    onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
                 )
             }
             composable(Routes.CONTEXT) {
@@ -93,6 +95,9 @@ fun AppNavHost() {
             }
             composable(Routes.STYLE) {
                 StyleScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.HAND_REFERENCE) {
+                HandReferenceScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Routes.RESULT,
@@ -119,7 +124,10 @@ fun AppNavHost() {
                 FavoritesScreen(onOpenResult = ::openResultFromHistory)
             }
             composable(Routes.PROFILE) {
-                ProfileScreen(onOpenStyle = { navController.navigate(Routes.STYLE) })
+                ProfileScreen(
+                    onOpenStyle = { navController.navigate(Routes.STYLE) },
+                    onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                )
             }
         }
     }
