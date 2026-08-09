@@ -3,7 +3,9 @@ package br.com.unhasdequecor.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.HistoryEntry
+import br.com.unhasdequecor.domain.model.NailColor
 import br.com.unhasdequecor.domain.model.UserPreferences
+import br.com.unhasdequecor.domain.repository.ColorCatalogRepository
 import br.com.unhasdequecor.domain.usecase.ObserveHistoryUseCase
 import br.com.unhasdequecor.domain.usecase.ObservePreferencesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,13 +18,18 @@ import javax.inject.Inject
 data class HomeUiState(
     val displayName: String = "",
     val recentColors: List<HistoryEntry> = emptyList(),
+    val inspiration: NailColor? = null,
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     observePreferences: ObservePreferencesUseCase,
     observeHistory: ObserveHistoryUseCase,
+    catalogRepository: ColorCatalogRepository,
 ) : ViewModel() {
+
+    private val inspiration = catalogRepository.getById("malva_suave")
+        ?: catalogRepository.getAll().firstOrNull()
 
     val uiState: StateFlow<HomeUiState> = combine(
         observePreferences(),
@@ -31,10 +38,11 @@ class HomeViewModel @Inject constructor(
         HomeUiState(
             displayName = preferences.displayName,
             recentColors = history.distinctBy { it.colorId }.take(4),
+            inspiration = inspiration,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = HomeUiState(),
+        initialValue = HomeUiState(inspiration = inspiration),
     )
 }

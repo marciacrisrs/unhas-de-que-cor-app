@@ -33,8 +33,8 @@ fun AppBottomBar(
 ) {
     Box {
         NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            tonalElevation = 0.dp,
         ) {
             mainDestinations.forEachIndexed { index, destination ->
                 if (index == 2) {
@@ -98,7 +98,7 @@ fun AppBottomBar(
                 .offset(y = (-18).dp)
                 .semantics { contentDescription = "Escolher minha cor" },
             shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             elevation = FloatingActionButtonDefaults.elevation(6.dp),
         ) {

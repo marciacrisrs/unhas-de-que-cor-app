@@ -7,9 +7,10 @@ import br.com.unhasdequecor.domain.model.NailStyle
 import br.com.unhasdequecor.domain.usecase.ObserveHistoryUseCase
 import br.com.unhasdequecor.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -17,6 +18,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
+
+enum class HistoryFilter {
+    ALL,
+    FAVORITES,
+}
 
 data class HistoryRowUi(
     val id: Long,
@@ -34,6 +40,7 @@ data class HistoryMonthGroupUi(
 )
 
 data class HistoryUiState(
+    val filter: HistoryFilter = HistoryFilter.ALL,
     val groups: List<HistoryMonthGroupUi> = emptyList(),
     val distinctColorCount: Int = 0,
     val isEmpty: Boolean = true,
@@ -45,13 +52,24 @@ class HistoryViewModel @Inject constructor(
     private val toggleFavorite: ToggleFavoriteUseCase,
 ) : ViewModel() {
 
-    val uiState: StateFlow<HistoryUiState> = observeHistory(favoritesOnly = false)
-        .map { entries -> entries.toHistoryUiState() }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = HistoryUiState(),
-        )
+    private val filter = MutableStateFlow(HistoryFilter.ALL)
+
+    val uiState: StateFlow<HistoryUiState> = combine(
+        observeHistory(favoritesOnly = false),
+        observeHistory(favoritesOnly = true),
+        filter,
+    ) { all, favorites, selected ->
+        val source = if (selected == HistoryFilter.FAVORITES) favorites else all
+        source.toHistoryUiState(selected)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = HistoryUiState(),
+    )
+
+    fun onFilterSelected(value: HistoryFilter) {
+        filter.value = value
+    }
 
     fun onToggleFavorite(entry: HistoryRowUi) {
         viewModelScope.launch {
@@ -60,7 +78,9 @@ class HistoryViewModel @Inject constructor(
     }
 }
 
-internal fun List<HistoryEntry>.toHistoryUiState(): HistoryUiState {
+internal fun List<HistoryEntry>.toHistoryUiState(
+    filter: HistoryFilter = HistoryFilter.ALL,
+): HistoryUiState {
     val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy").withLocale(Locale("pt", "BR"))
     val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale("pt", "BR"))
     val monthGroups = groupBy {
@@ -92,6 +112,7 @@ internal fun List<HistoryEntry>.toHistoryUiState(): HistoryUiState {
             )
         }
     return HistoryUiState(
+        filter = filter,
         groups = monthGroups,
         distinctColorCount = map { it.colorId }.toSet().size,
         isEmpty = isEmpty(),

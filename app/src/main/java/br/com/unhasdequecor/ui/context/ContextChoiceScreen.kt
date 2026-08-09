@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -57,6 +57,7 @@ import br.com.unhasdequecor.domain.model.Occasion
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.ProgressSteps
+import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,38 +97,38 @@ fun ContextChoiceScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 24.dp),
         ) {
             Text(
-                text = "Conte pra gente sobre o seu momento atual e encontre a cor ideal para você",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Conte o momento — a gente sugere a cor com calma.",
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             ProgressSteps(current = 1, total = 2)
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Text(
                 text = "Qual é a ocasião principal?",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             OccasionGrid(
                 selected = state.selectedOccasion,
                 onSelect = viewModel::selectOccasion,
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(36.dp))
             Text(
                 text = "Como você está se sentindo?",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             MoodRow(
                 selected = state.selectedMood,
                 onSelect = viewModel::selectMood,
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
 
         PrimaryCtaButton(
@@ -140,7 +141,7 @@ fun ContextChoiceScreen(
                 }
             },
             enabled = state.canContinue,
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(24.dp),
         )
     }
 }
@@ -158,9 +159,9 @@ private fun OccasionGrid(
         Occasion.VIAGEM to Icons.Outlined.BeachAccess,
         Occasion.EM_CASA to Icons.Outlined.Home,
     )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { (occasion, icon) ->
                     SelectableCard(
                         label = occasion.displayName,
@@ -214,23 +215,40 @@ private fun SelectableCard(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = SoftSurfaceShape
+    val background = if (selected) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val accent = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val labelStyle = if (compact) {
+        MaterialTheme.typography.labelSmall
+    } else {
+        MaterialTheme.typography.labelLarge
+    }
+    val labelColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val borderWidth = if (selected) 2.dp else 0.dp
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val contentPadding = if (compact) 12.dp else 18.dp
+    val iconSize = if (compact) 22.dp else 28.dp
+
     Box(
         modifier = modifier
-            .heightIn(min = 48.dp)
+            .heightIn(min = 56.dp)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                },
-                shape = shape,
-            )
+            .background(background)
+            .border(width = borderWidth, color = borderColor, shape = shape)
             .clickable(onClick = onClick)
-            .padding(if (compact) 12.dp else 14.dp)
+            .padding(contentPadding)
             .semantics {
                 role = Role.RadioButton
                 this.selected = selected
@@ -238,21 +256,7 @@ private fun SelectableCard(
             },
     ) {
         if (selected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(12.dp),
-                )
-            }
+            SelectedCheckBadge(modifier = Modifier.align(Alignment.TopEnd))
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -261,27 +265,29 @@ private fun SelectableCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(if (compact) 22.dp else 28.dp),
+                tint = accent,
+                modifier = Modifier.size(iconSize),
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = label,
-                style = if (compact) {
-                    MaterialTheme.typography.labelSmall
-                } else {
-                    MaterialTheme.typography.labelLarge
-                },
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
+            Text(text = label, style = labelStyle, color = labelColor)
         }
+    }
+}
+
+@Composable
+private fun SelectedCheckBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(12.dp),
+        )
     }
 }

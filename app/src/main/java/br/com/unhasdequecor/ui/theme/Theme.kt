@@ -8,45 +8,48 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
-    primary = LightPrimary,
-    onPrimary = LightOnPrimary,
-    primaryContainer = LightNeutral,
-    onPrimaryContainer = LightHighlight,
-    secondary = LightSecondary,
-    onSecondary = LightOnPrimary,
-    secondaryContainer = Color(0xFFF3D7EC),
-    onSecondaryContainer = LightHighlight,
-    tertiary = LightSecondary,
-    background = LightBase,
-    onBackground = LightHighlight,
-    surface = LightSurface,
-    onSurface = LightHighlight,
-    surfaceVariant = LightNeutral,
-    onSurfaceVariant = Color(0xFF5C3D48),
-    outline = LightOutline,
+    primary = BrandAction,
+    onPrimary = BrandOnAction,
+    primaryContainer = BrandSoftSurface,
+    onPrimaryContainer = BrandInk,
+    secondary = BrandFun,
+    onSecondary = BrandInk,
+    secondaryContainer = BrandSoftSurface,
+    onSecondaryContainer = BrandInk,
+    tertiary = BrandFun,
+    onTertiary = BrandInk,
+    background = BrandBase,
+    onBackground = BrandInk,
+    surface = BrandCard,
+    onSurface = BrandInk,
+    surfaceVariant = BrandSoftSurface,
+    onSurfaceVariant = BrandInk.copy(alpha = 0.72f),
+    outline = BrandOutline,
+    outlineVariant = BrandSoftSurface,
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = DarkPrimary,
-    onPrimary = DarkOnPrimary,
-    primaryContainer = DarkCard,
-    onPrimaryContainer = DarkSecondary,
-    secondary = DarkSecondary,
+    primary = DarkAction,
+    onPrimary = DarkOnAction,
+    primaryContainer = DarkSoftSurface,
+    onPrimaryContainer = DarkInk,
+    secondary = DarkFun,
     onSecondary = DarkBase,
-    secondaryContainer = DarkCard,
-    onSecondaryContainer = DarkSecondary,
-    tertiary = DarkSecondary,
+    secondaryContainer = DarkSoftSurface,
+    onSecondaryContainer = DarkInk,
+    tertiary = DarkFun,
+    onTertiary = DarkBase,
     background = DarkBase,
-    onBackground = DarkHighlight,
-    surface = DarkSurface,
-    onSurface = DarkHighlight,
-    surfaceVariant = DarkCard,
-    onSurfaceVariant = Color(0xFFE8D0DA),
+    onBackground = DarkInk,
+    surface = DarkCard,
+    onSurface = DarkInk,
+    surfaceVariant = DarkSoftSurface,
+    onSurfaceVariant = DarkInk.copy(alpha = 0.78f),
     outline = DarkOutline,
+    outlineVariant = DarkSoftSurface,
 )
 
 @Composable
@@ -67,6 +70,7 @@ fun UnhasDeQueCorTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = BrandShapes,
         content = content,
     )
 }
