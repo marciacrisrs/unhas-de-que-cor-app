@@ -22,6 +22,7 @@ espressoCore = "3.7.0"
 mockk = "1.14.5"
 truth = "1.4.4"
 turbine = "1.2.1"
+sqliteJdbc = "3.49.1.0"
 
 
 [libraries]
@@ -63,6 +64,7 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqliteJdbc" }
 
 
 [plugins]

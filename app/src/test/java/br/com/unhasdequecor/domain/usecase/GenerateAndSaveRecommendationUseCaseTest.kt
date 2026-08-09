@@ -12,6 +12,7 @@ import br.com.unhasdequecor.testing.FakeColorCatalogRepository
 import br.com.unhasdequecor.testing.FakeHistoryRepository
 import br.com.unhasdequecor.testing.FakePreferencesRepository
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -59,5 +60,21 @@ class GenerateAndSaveRecommendationUseCaseTest {
         assertThat(generated.recommendation.source).isEqualTo(RecommendationSource.FOR_ME)
         assertThat(history.distinctColorCount()).isEqualTo(1)
         assertThat(generated.isFavorite).isFalse()
+    }
+
+    @Test
+    fun `same idempotency key does not create duplicate history rows`() = runTest {
+        useCase(
+            source = RecommendationSource.FOR_ME,
+            idempotencyKey = "session-fixed",
+        )
+        useCase(
+            source = RecommendationSource.FOR_ME,
+            idempotencyKey = "session-fixed",
+        )
+
+        val entries = history.observeHistory().first()
+        assertThat(entries).hasSize(1)
+        assertThat(entries.single().idempotencyKey).isEqualTo("session-fixed")
     }
 }

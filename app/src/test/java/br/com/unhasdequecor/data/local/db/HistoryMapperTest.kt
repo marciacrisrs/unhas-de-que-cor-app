@@ -24,6 +24,7 @@ class HistoryMapperTest {
             mood = Mood.ENERGETICA,
             createdAtEpochMs = 100L,
             isFavorite = true,
+            idempotencyKey = "session-9",
         )
 
         val entity = domain.toEntity()
@@ -46,6 +47,7 @@ class HistoryMapperTest {
             mood = "NEUTRA",
             createdAtEpochMs = 2L,
             isFavorite = false,
+            idempotencyKey = null,
         )
 
         val domain = entity.toDomain()

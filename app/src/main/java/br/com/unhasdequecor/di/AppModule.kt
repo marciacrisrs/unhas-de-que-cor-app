@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import br.com.unhasdequecor.data.local.db.AppDatabase
+import br.com.unhasdequecor.data.local.db.DatabaseMigrations
 import br.com.unhasdequecor.data.local.db.dao.FavoriteDao
 import br.com.unhasdequecor.data.local.db.dao.HistoryDao
 import br.com.unhasdequecor.data.repository.ColorCatalogRepositoryImpl
@@ -33,9 +34,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "unhas_de_que_cor.db")
-            // Schema v1 exportado em app/schemas. Migrations versionadas entram
-            // antes do release; destructive permanece só enquanto o schema for MVP.
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            .addMigrations(*DatabaseMigrations.ALL)
             .build()
 
     @Provides

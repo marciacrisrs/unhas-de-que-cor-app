@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 data class ResultUiState(
@@ -73,8 +74,8 @@ class ResultViewModel @Inject constructor(
                     )
                 }
             }.onFailure {
-                // Cache inválido — gera de novo.
-                savedStateHandle.remove<String>(KEY_COLOR_ID)
+                // Cache inválido — limpa sessão e gera de novo.
+                clearSessionCache()
                 generateFresh()
             }
         }
@@ -83,10 +84,12 @@ class ResultViewModel @Inject constructor(
     private fun generateFresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val idempotencyKey = sessionIdempotencyKey()
             runCatching {
                 generateAndSave(
                     source = source,
                     context = recommendationContext,
+                    idempotencyKey = idempotencyKey,
                 )
             }.onSuccess { generated ->
                 savedStateHandle[KEY_COLOR_ID] = generated.recommendation.color.id
@@ -122,11 +125,25 @@ class ResultViewModel @Inject constructor(
     }
 
     fun recommendAgain() {
-        savedStateHandle.remove<String>(KEY_COLOR_ID)
+        clearSessionCache()
         generateFresh()
+    }
+
+    private fun sessionIdempotencyKey(): String {
+        val existing = savedStateHandle.get<String>(KEY_IDEMPOTENCY)
+        if (existing != null) return existing
+        val created = UUID.randomUUID().toString()
+        savedStateHandle[KEY_IDEMPOTENCY] = created
+        return created
+    }
+
+    private fun clearSessionCache() {
+        savedStateHandle.remove<String>(KEY_COLOR_ID)
+        savedStateHandle.remove<String>(KEY_IDEMPOTENCY)
     }
 
     private companion object {
         const val KEY_COLOR_ID = "result_cached_color_id"
+        const val KEY_IDEMPOTENCY = "result_idempotency_key"
     }
 }

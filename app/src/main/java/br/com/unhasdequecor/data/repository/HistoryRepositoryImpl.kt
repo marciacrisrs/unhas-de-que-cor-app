@@ -16,6 +16,7 @@ import javax.inject.Singleton
 /**
  * Histórico em Room; favoritos têm SoT na tabela `favorites`.
  * O flag `isFavorite` nas linhas de histórico é derivado na leitura.
+ * Saves com a mesma [HistoryEntry.idempotencyKey] são idempotentes.
  */
 @Singleton
 class HistoryRepositoryImpl @Inject constructor(
@@ -51,7 +52,10 @@ class HistoryRepositoryImpl @Inject constructor(
 
     override suspend fun save(entry: HistoryEntry): Long {
         val favorite = favoriteDao.isFavorite(entry.colorId)
-        return historyDao.insert(entry.copy(isFavorite = favorite).toEntity())
+        val insertedId = historyDao.insert(entry.copy(isFavorite = favorite).toEntity())
+        if (insertedId != -1L) return insertedId
+        val key = entry.idempotencyKey ?: return insertedId
+        return historyDao.findIdByIdempotencyKey(key) ?: insertedId
     }
 
     override suspend fun setFavorite(colorId: String, isFavorite: Boolean) {

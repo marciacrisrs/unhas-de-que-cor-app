@@ -20,6 +20,7 @@ fun HistoryEntity.toDomain(): HistoryEntry = HistoryEntry(
     mood = mood?.let { runCatching { Mood.valueOf(it) }.getOrNull() },
     createdAtEpochMs = createdAtEpochMs,
     isFavorite = isFavorite,
+    idempotencyKey = idempotencyKey,
 )
 
 fun HistoryEntry.toEntity(): HistoryEntity = HistoryEntity(
@@ -33,4 +34,5 @@ fun HistoryEntry.toEntity(): HistoryEntity = HistoryEntity(
     mood = mood?.name,
     createdAtEpochMs = createdAtEpochMs,
     isFavorite = isFavorite,
+    idempotencyKey = idempotencyKey,
 )

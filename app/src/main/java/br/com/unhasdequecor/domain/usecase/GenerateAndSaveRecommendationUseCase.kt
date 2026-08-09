@@ -28,6 +28,7 @@ class GenerateAndSaveRecommendationUseCase @Inject constructor(
     suspend operator fun invoke(
         source: RecommendationSource,
         context: RecommendationContext = RecommendationContext(),
+        idempotencyKey: String? = null,
     ): GeneratedRecommendation {
         val recommendation = when (source) {
             RecommendationSource.FOR_ME -> recommendForMe()
@@ -49,6 +50,7 @@ class GenerateAndSaveRecommendationUseCase @Inject constructor(
                 mood = recommendation.context.mood,
                 createdAtEpochMs = clock.now(),
                 isFavorite = isFavorite,
+                idempotencyKey = idempotencyKey,
             ),
         )
         return GeneratedRecommendation(

@@ -12,8 +12,15 @@ interface HistoryDao {
     @Query("SELECT * FROM history ORDER BY createdAtEpochMs DESC")
     fun observeAll(): Flow<List<HistoryEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * IGNORE: se [HistoryEntity.idempotencyKey] já existir, não duplica a linha.
+     * Retorna -1 quando o insert é ignorado por conflito.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entity: HistoryEntity): Long
+
+    @Query("SELECT id FROM history WHERE idempotencyKey = :key LIMIT 1")
+    suspend fun findIdByIdempotencyKey(key: String): Long?
 
     @Query("UPDATE history SET isFavorite = :isFavorite WHERE colorId = :colorId")
     suspend fun updateFavoriteForColor(colorId: String, isFavorite: Boolean)
