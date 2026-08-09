@@ -115,11 +115,16 @@ tasks.register("downloadHandLandmarker") {
         destination.parentFile.mkdirs()
         val url =
             "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-        val result = providers.exec {
-            commandLine("curl", "-fsSL", "-o", destination.absolutePath, url)
-        }.result.get()
-        check(result.exitValue == 0) {
-            "Falha ao baixar hand_landmarker.task (exit=${result.exitValue})"
+        val exit = ProcessBuilder(
+            "curl",
+            "-fsSL",
+            "-o",
+            destination.absolutePath,
+            url,
+        ).inheritIO().start().waitFor()
+        check(exit == 0) { "Falha ao baixar hand_landmarker.task (exit=$exit)" }
+        check(destination.isFile && destination.length() > 0L) {
+            "Arquivo hand_landmarker.task inválido após download"
         }
     }
 }
