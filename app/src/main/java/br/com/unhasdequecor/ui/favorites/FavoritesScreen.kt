@@ -22,9 +22,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.ui.components.HistoryRow
 import br.com.unhasdequecor.ui.components.NailPolishMark
+import br.com.unhasdequecor.ui.history.HistoryRowUi
 
 @Composable
 fun FavoritesScreen(
+    onOpenResult: (HistoryRowUi) -> Unit,
     viewModel: FavoritesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -49,7 +51,7 @@ fun FavoritesScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            NailPolishMark(markSize = 40.dp, decorative = true)
+            NailPolishMark(markSize = 44.dp, decorative = true)
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -79,7 +81,7 @@ fun FavoritesScreen(
                             dateLabel = entry.dateLabel,
                             isFavorite = entry.isFavorite,
                             onFavoriteClick = { viewModel.onToggleFavorite(entry) },
-                            onClick = {},
+                            onClick = { onOpenResult(entry) },
                         )
                     }
                 }

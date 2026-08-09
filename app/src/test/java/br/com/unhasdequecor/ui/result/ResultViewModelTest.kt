@@ -50,6 +50,7 @@ class ResultViewModelTest {
                     "source" to "context",
                     "occasion" to "ENCONTRO",
                     "mood" to "ROMANTICA",
+                    "colorId" to "none",
                     "result_cached_color_id" to "romantico_rosa",
                 ),
             ),
@@ -80,6 +81,7 @@ class ResultViewModelTest {
                 "source" to "for_me",
                 "occasion" to "none",
                 "mood" to "none",
+                "colorId" to "none",
             ),
         )
         val viewModel = ResultViewModel(
@@ -102,6 +104,40 @@ class ResultViewModelTest {
     }
 
     @Test
+    fun `history colorId arg restores without generating`() = runTest {
+        val recommendation = sampleRecommendation()
+        coEvery {
+            restoreRecommendation(
+                colorId = "romantico_rosa",
+                source = RecommendationSource.CONTEXT,
+                context = RecommendationContext(
+                    occasion = Occasion.ENCONTRO,
+                    mood = Mood.ROMANTICA,
+                ),
+            )
+        } returns GeneratedRecommendation(recommendation, isFavorite = false)
+
+        val handle = SavedStateHandle(
+            mapOf(
+                "source" to "context",
+                "occasion" to "ENCONTRO",
+                "mood" to "ROMANTICA",
+                "colorId" to "romantico_rosa",
+            ),
+        )
+        val viewModel = ResultViewModel(
+            savedStateHandle = handle,
+            generateAndSave = generateAndSave,
+            restoreRecommendation = restoreRecommendation,
+            toggleFavorite = toggleFavorite,
+        )
+
+        assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("romantico_rosa")
+        assertThat(handle.get<String>("result_cached_color_id")).isEqualTo("romantico_rosa")
+        coVerify(exactly = 0) { generateAndSave(any(), any(), any()) }
+    }
+
+    @Test
     fun `recommendAgain clears cache and generates new session`() = runTest {
         val first = sampleRecommendation(colorId = "romantico_rosa", source = RecommendationSource.FOR_ME)
         val second = sampleRecommendation(
@@ -121,6 +157,7 @@ class ResultViewModelTest {
                 "source" to "for_me",
                 "occasion" to "none",
                 "mood" to "none",
+                "colorId" to "none",
             ),
         )
         val viewModel = ResultViewModel(

@@ -9,12 +9,13 @@ plugins {
 tasks.register("verifyCi") {
     group = "verification"
     description =
-        "Roda o mesmo conjunto de verificações do CI (detekt, lint, unit tests, cobertura domain, assembleDebug)."
+        "Roda o mesmo conjunto de verificações do CI (detekt, lint, unit tests, cobertura domain, assembleDebug + release)."
     dependsOn(
         ":app:detekt",
         ":app:lintDebug",
         ":app:testDebugUnitTest",
         ":app:jacocoDomainCoverageVerification",
         ":app:assembleDebug",
+        ":app:assembleRelease",
     )
 }

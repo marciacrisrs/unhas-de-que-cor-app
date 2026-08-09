@@ -37,6 +37,7 @@ import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
 @Composable
 fun HistoryScreen(
+    onOpenResult: (HistoryRowUi) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,6 +62,7 @@ fun HistoryScreen(
             HistoryList(
                 state = state,
                 onToggleFavorite = viewModel::onToggleFavorite,
+                onOpenResult = onOpenResult,
             )
         }
     }
@@ -82,7 +84,7 @@ private fun HistoryHeader() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        NailPolishMark(markSize = 40.dp, decorative = true)
+        NailPolishMark(markSize = 44.dp, decorative = true)
     }
 }
 
@@ -134,6 +136,7 @@ private fun HistoryEmptyMessage(filter: HistoryFilter) {
 private fun HistoryList(
     state: HistoryUiState,
     onToggleFavorite: (HistoryRowUi) -> Unit,
+    onOpenResult: (HistoryRowUi) -> Unit,
 ) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         state.groups.forEach { group ->
@@ -146,7 +149,11 @@ private fun HistoryList(
                 )
             }
             item(key = "card-${group.monthLabel}") {
-                HistoryMonthCard(group = group, onToggleFavorite = onToggleFavorite)
+                HistoryMonthCard(
+                    group = group,
+                    onToggleFavorite = onToggleFavorite,
+                    onOpenResult = onOpenResult,
+                )
             }
         }
         item {
@@ -159,6 +166,7 @@ private fun HistoryList(
 private fun HistoryMonthCard(
     group: HistoryMonthGroupUi,
     onToggleFavorite: (HistoryRowUi) -> Unit,
+    onOpenResult: (HistoryRowUi) -> Unit,
 ) {
     Surface(
         shape = SoftSurfaceShape,
@@ -177,7 +185,7 @@ private fun HistoryMonthCard(
                     dateLabel = entry.dateLabel,
                     isFavorite = entry.isFavorite,
                     onFavoriteClick = { onToggleFavorite(entry) },
-                    onClick = {},
+                    onClick = { onOpenResult(entry) },
                 )
             }
         }

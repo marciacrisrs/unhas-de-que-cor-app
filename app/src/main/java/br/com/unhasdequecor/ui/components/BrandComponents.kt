@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -65,6 +67,10 @@ import br.com.unhasdequecor.ui.theme.FunChipShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import br.com.unhasdequecor.ui.theme.UnhasDeQueCorTheme
 
+/**
+ * Mark compacto para toolbars/listas: frasco + anel quebrado + sparkles em chip circular.
+ * O lockup oficial completo fica em [BrandLogoLockup] / [BrandHeader] (Home/Perfil).
+ */
 @Composable
 fun NailPolishMark(
     modifier: Modifier = Modifier,
@@ -72,6 +78,9 @@ fun NailPolishMark(
     polishColor: Color? = null,
     decorative: Boolean = false,
 ) {
+    val resolvedPolish = polishColor ?: BrandFun
+    val outline = MaterialTheme.colorScheme.onBackground
+    val framed = polishColor == null
     val markModifier = if (decorative) {
         modifier.size(markSize).clearAndSetSemantics { }
     } else {
@@ -79,17 +88,27 @@ fun NailPolishMark(
             .size(markSize)
             .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
     }
-    if (polishColor == null) {
-        Image(
-            painter = painterResource(R.drawable.logo_mark),
-            contentDescription = null,
-            modifier = markModifier,
-            contentScale = ContentScale.Fit,
-        )
-    } else {
-        val outline = MaterialTheme.colorScheme.onBackground
-        Canvas(modifier = markModifier) {
-            drawTintedPolishMark(polishColor = polishColor, outline = outline)
+
+    Box(
+        modifier = markModifier.then(
+            if (framed) {
+                Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f),
+                        shape = CircleShape,
+                    )
+                    .padding(4.dp)
+            } else {
+                Modifier
+            },
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawTintedPolishMark(polishColor = resolvedPolish, outline = outline)
         }
     }
 }
@@ -187,69 +206,30 @@ fun BrandLogoLockup(
         contentDescription = contentDescription,
         modifier = modifier
             .fillMaxWidth()
-            .height(96.dp),
+            .heightIn(min = 112.dp)
+            .height(128.dp),
         contentScale = ContentScale.Fit,
     )
 }
 
+/**
+ * Hero da marca: usa o lockup oficial (PNG/WebP) em vez de recompor tipografia.
+ * Claro/escuro via `drawable` / `drawable-night`.
+ */
 @Composable
 fun BrandHeader(
     modifier: Modifier = Modifier,
     showTagline: Boolean = true,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        NailPolishMark(markSize = 88.dp)
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "UNHAS",
-            style = MaterialTheme.typography.displayMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = "DE QUE COR?",
-            style = TextStyle(
-                brush = Brush.horizontalGradient(listOf(BrandFun, BrandAction)),
-                fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 26.sp,
-            ),
-        )
-        if (showTagline) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
-                )
-                Text(
-                    text = " ✦ ",
-                    color = BrandFun,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "SUA COR, SEU ESTILO, SEU MOMENTO",
-                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
+    // O asset oficial já inclui tipografia + tagline; showTagline mantém API estável.
+    BrandLogoLockup(
+        modifier = modifier.padding(horizontal = 8.dp),
+        contentDescription = if (showTagline) {
+            "Unhas de Que Cor? Sua cor, seu estilo, seu momento"
+        } else {
+            "Unhas de Que Cor?"
+        },
+    )
 }
 
 @Composable

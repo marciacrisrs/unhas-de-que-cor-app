@@ -8,23 +8,42 @@ object Routes {
     const val HOME = "home"
     const val CONTEXT = "context"
     const val STYLE = "style"
-    const val RESULT = "result/{source}/{occasion}/{mood}"
+    const val RESULT = "result/{source}/{occasion}/{mood}/{colorId}"
     const val HISTORY = "history"
     const val FAVORITES = "favorites"
     const val PROFILE = "profile"
 
-    private const val NONE = "none"
+    const val NONE = "none"
 
-    fun resultForMe(): String = "result/${ResultSources.FOR_ME}/$NONE/$NONE"
+    fun resultForMe(): String =
+        "result/${ResultSources.FOR_ME}/$NONE/$NONE/$NONE"
 
     fun resultByContext(occasion: Occasion, mood: Mood): String =
-        "result/${ResultSources.CONTEXT}/${occasion.name}/${mood.name}"
+        "result/${ResultSources.CONTEXT}/${occasion.name}/${mood.name}/$NONE"
+
+    fun resultFromHistory(
+        source: RecommendationSource,
+        occasion: Occasion?,
+        mood: Mood?,
+        colorId: String,
+    ): String {
+        val sourcePath = when (source) {
+            RecommendationSource.FOR_ME -> ResultSources.FOR_ME
+            RecommendationSource.CONTEXT -> ResultSources.CONTEXT
+        }
+        val occasionPath = occasion?.name ?: NONE
+        val moodPath = mood?.name ?: NONE
+        return "result/$sourcePath/$occasionPath/$moodPath/$colorId"
+    }
 
     fun parseOccasion(raw: String): Occasion? =
         raw.takeUnless { it == NONE }?.let { runCatching { Occasion.valueOf(it) }.getOrNull() }
 
     fun parseMood(raw: String): Mood? =
         raw.takeUnless { it == NONE }?.let { runCatching { Mood.valueOf(it) }.getOrNull() }
+
+    fun parseColorId(raw: String): String? =
+        raw.takeUnless { it == NONE || it.isBlank() }
 }
 
 object ResultSources {

@@ -47,11 +47,17 @@ class ResultViewModel @Inject constructor(
     val uiState: StateFlow<ResultUiState> = _uiState.asStateFlow()
 
     init {
-        val cachedColorId = savedStateHandle.get<String>(KEY_COLOR_ID)
-        if (cachedColorId != null) {
-            restoreCached(cachedColorId)
-        } else {
-            generateFresh()
+        val navColorId = Routes.parseColorId(savedStateHandle.get<String>("colorId") ?: Routes.NONE)
+        when {
+            navColorId != null -> {
+                // Entrada pelo histórico/favoritos: restaura sem gerar/salvar de novo.
+                savedStateHandle[KEY_COLOR_ID] = navColorId
+                restoreCached(navColorId)
+            }
+            savedStateHandle.get<String>(KEY_COLOR_ID) != null -> {
+                restoreCached(checkNotNull(savedStateHandle.get(KEY_COLOR_ID)))
+            }
+            else -> generateFresh()
         }
     }
 
@@ -74,7 +80,6 @@ class ResultViewModel @Inject constructor(
                     )
                 }
             }.onFailure {
-                // Cache inválido — limpa sessão e gera de novo.
                 clearSessionCache()
                 generateFresh()
             }
@@ -140,6 +145,7 @@ class ResultViewModel @Inject constructor(
     private fun clearSessionCache() {
         savedStateHandle.remove<String>(KEY_COLOR_ID)
         savedStateHandle.remove<String>(KEY_IDEMPOTENCY)
+        savedStateHandle["colorId"] = Routes.NONE
     }
 
     private companion object {

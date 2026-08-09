@@ -4,6 +4,8 @@ Fonte de verdade: `design/guia/` (boards, logos e mockups claro/escuro).
 
 Logos oficiais já estão no APK como `logo_mark` / `logo_horizontal` (tema claro/escuro) e no ícone do launcher.
 
+Resultado: ilustração vetorial (`NailHandIllustration`) até entrarem fotos oficiais da mão/outfit em `design/guia/`.
+
 ## Paleta
 
 ### Claro

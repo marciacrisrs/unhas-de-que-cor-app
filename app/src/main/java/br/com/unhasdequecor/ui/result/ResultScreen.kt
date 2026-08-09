@@ -86,7 +86,7 @@ fun ResultScreen(
                 }
             },
             actions = {
-                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp, decorative = true)
+                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 40.dp, decorative = true)
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background,
