@@ -16,6 +16,7 @@ import androidx.navigation.navArgument
 import br.com.unhasdequecor.ui.context.ContextChoiceScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceViewModel
 import br.com.unhasdequecor.ui.favorites.FavoritesScreen
+import br.com.unhasdequecor.ui.history.HistoryRowUi
 import br.com.unhasdequecor.ui.history.HistoryScreen
 import br.com.unhasdequecor.ui.home.HomeScreen
 import br.com.unhasdequecor.ui.profile.ProfileScreen
@@ -34,6 +35,17 @@ fun AppNavHost() {
         Routes.PROFILE,
         Routes.CONTEXT,
     )
+
+    fun openResultFromHistory(entry: HistoryRowUi) {
+        navController.navigate(
+            Routes.resultFromHistory(
+                source = entry.source,
+                occasion = entry.occasion,
+                mood = entry.mood,
+                colorId = entry.colorId,
+            ),
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -88,6 +100,7 @@ fun AppNavHost() {
                     navArgument("source") { type = NavType.StringType },
                     navArgument("occasion") { type = NavType.StringType },
                     navArgument("mood") { type = NavType.StringType },
+                    navArgument("colorId") { type = NavType.StringType },
                 ),
             ) {
                 ResultScreen(
@@ -100,10 +113,10 @@ fun AppNavHost() {
                 )
             }
             composable(Routes.HISTORY) {
-                HistoryScreen()
+                HistoryScreen(onOpenResult = ::openResultFromHistory)
             }
             composable(Routes.FAVORITES) {
-                FavoritesScreen()
+                FavoritesScreen(onOpenResult = ::openResultFromHistory)
             }
             composable(Routes.PROFILE) {
                 ProfileScreen(onOpenStyle = { navController.navigate(Routes.STYLE) })

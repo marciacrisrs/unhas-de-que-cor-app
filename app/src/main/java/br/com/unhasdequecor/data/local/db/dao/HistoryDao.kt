@@ -9,8 +9,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface HistoryDao {
-    @Query("SELECT * FROM history ORDER BY createdAtEpochMs DESC")
-    fun observeAll(): Flow<List<HistoryEntity>>
+    @Query("SELECT * FROM history ORDER BY createdAtEpochMs DESC LIMIT :limit")
+    fun observeRecent(limit: Int): Flow<List<HistoryEntity>>
+
+    @Query(
+        """
+        SELECT * FROM history
+        WHERE colorId IN (SELECT colorId FROM favorites)
+        ORDER BY createdAtEpochMs DESC
+        """,
+    )
+    fun observeForFavorites(): Flow<List<HistoryEntity>>
 
     /**
      * IGNORE: se [HistoryEntity.idempotencyKey] já existir, não duplica a linha.
