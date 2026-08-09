@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.data.repository
 
+import br.com.unhasdequecor.data.local.db.HISTORY_LIST_LIMIT
 import br.com.unhasdequecor.data.local.db.dao.FavoriteDao
 import br.com.unhasdequecor.data.local.db.dao.HistoryDao
 import br.com.unhasdequecor.data.local.db.entity.FavoriteEntity
@@ -10,6 +11,7 @@ import br.com.unhasdequecor.domain.repository.HistoryRepository
 import br.com.unhasdequecor.domain.time.Clock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,7 +29,7 @@ class HistoryRepositoryImpl @Inject constructor(
 
     override fun observeHistory(): Flow<List<HistoryEntry>> =
         combine(
-            historyDao.observeAll(),
+            historyDao.observeRecent(HISTORY_LIST_LIMIT),
             favoriteDao.observeFavoriteIds(),
         ) { history, favoriteIds ->
             val favorites = favoriteIds.toSet()
@@ -37,17 +39,10 @@ class HistoryRepositoryImpl @Inject constructor(
         }
 
     override fun observeFavorites(): Flow<List<HistoryEntry>> =
-        combine(
-            historyDao.observeAll(),
-            favoriteDao.observeFavoriteIds(),
-        ) { history, favoriteIds ->
-            val favorites = favoriteIds.toSet()
+        historyDao.observeForFavorites().map { history ->
             history
-                .filter { it.colorId in favorites }
                 .distinctBy { it.colorId }
-                .map { entity ->
-                    entity.toDomain().copy(isFavorite = true)
-                }
+                .map { entity -> entity.toDomain().copy(isFavorite = true) }
         }
 
     override suspend fun save(entry: HistoryEntry): Long {

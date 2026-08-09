@@ -3,7 +3,10 @@ package br.com.unhasdequecor.ui.history
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.HistoryEntry
+import br.com.unhasdequecor.domain.model.Mood
 import br.com.unhasdequecor.domain.model.NailStyle
+import br.com.unhasdequecor.domain.model.Occasion
+import br.com.unhasdequecor.domain.model.RecommendationSource
 import br.com.unhasdequecor.domain.usecase.ObserveHistoryUseCase
 import br.com.unhasdequecor.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +35,9 @@ data class HistoryRowUi(
     val tags: List<NailStyle>,
     val dateLabel: String,
     val isFavorite: Boolean,
+    val source: RecommendationSource,
+    val occasion: Occasion?,
+    val mood: Mood?,
 )
 
 data class HistoryMonthGroupUi(
@@ -107,6 +113,9 @@ internal fun List<HistoryEntry>.toHistoryUiState(
                                 .atZone(ZoneId.systemDefault()),
                         ),
                         isFavorite = entry.isFavorite,
+                        source = entry.source,
+                        occasion = entry.occasion,
+                        mood = entry.mood,
                     )
                 },
             )

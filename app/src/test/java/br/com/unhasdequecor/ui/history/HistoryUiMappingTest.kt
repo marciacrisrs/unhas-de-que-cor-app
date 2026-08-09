@@ -1,7 +1,9 @@
 package br.com.unhasdequecor.ui.history
 
 import br.com.unhasdequecor.domain.model.HistoryEntry
+import br.com.unhasdequecor.domain.model.Mood
 import br.com.unhasdequecor.domain.model.NailStyle
+import br.com.unhasdequecor.domain.model.Occasion
 import br.com.unhasdequecor.domain.model.RecommendationSource
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -25,6 +27,10 @@ class HistoryUiMappingTest {
         assertThat(ui.groups).hasSize(2)
         assertThat(ui.groups.first().entries).hasSize(2)
         assertThat(ui.isEmpty).isFalse()
+        assertThat(ui.groups.first().entries.first().source)
+            .isEqualTo(RecommendationSource.CONTEXT)
+        assertThat(ui.groups.first().entries.first().occasion).isEqualTo(Occasion.ENCONTRO)
+        assertThat(ui.groups.first().entries.first().mood).isEqualTo(Mood.ROMANTICA)
     }
 
     private fun history(
@@ -39,8 +45,8 @@ class HistoryUiMappingTest {
         colorHex = 0xFF000000,
         tags = listOf(NailStyle.ELEGANTE),
         source = RecommendationSource.CONTEXT,
-        occasion = null,
-        mood = null,
+        occasion = Occasion.ENCONTRO,
+        mood = Mood.ROMANTICA,
         createdAtEpochMs = epoch,
         isFavorite = favorite,
     )
