@@ -33,5 +33,6 @@ class NailOverlayAnchorsTest {
         assertThat(NailOverlayAnchors.hasMaskAsset("media_rosa")).isTrue()
         assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isFalse()
         assertThat(NailOverlayAnchors.hasMaskAsset(null)).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset("unknown")).isFalse()
     }
 }

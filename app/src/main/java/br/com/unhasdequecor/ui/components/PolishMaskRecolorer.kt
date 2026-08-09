@@ -6,9 +6,14 @@ import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import kotlin.math.pow
 
 /**
- * Recolore pixels da máscara de unha preservando luminância/brilho do esmalte original.
+ * Recolore a região da máscara de unha como esmalte:
+ * - usa alpha da máscara (bordas suaves)
+ * - preserva sombreamento da foto (luminância)
+ * - preserva brilho especular
+ * - não mistura o tom do esmalte original (evita “lama”)
  */
 object PolishMaskRecolorer {
     fun loadMask(context: Context, sampleId: String): Bitmap? = runCatching {
@@ -29,7 +34,7 @@ object PolishMaskRecolorer {
         val tr = AndroidColor.red(target)
         val tg = AndroidColor.green(target)
         val tb = AndroidColor.blue(target)
-        val targetLum = luminance(tr, tg, tb).coerceAtLeast(1f)
+        val targetLum = luminance(tr, tg, tb).coerceAtLeast(8f)
 
         val width = out.width
         val height = out.height
@@ -38,26 +43,62 @@ object PolishMaskRecolorer {
         out.getPixels(pixels, 0, width, 0, 0, width, height)
         scaledMask.getPixels(maskPixels, 0, width, 0, 0, width, height)
 
+        var maskWeightSum = 0f
+        var maskedLumSum = 0f
         for (i in pixels.indices) {
-            if (AndroidColor.alpha(maskPixels[i]) < MASK_ALPHA_THRESHOLD &&
-                AndroidColor.red(maskPixels[i]) < MASK_ALPHA_THRESHOLD
-            ) {
-                continue
-            }
+            val coverage = maskCoverage(maskPixels[i])
+            if (coverage < 0.02f) continue
+            val src = pixels[i]
+            val lum = luminance(
+                AndroidColor.red(src),
+                AndroidColor.green(src),
+                AndroidColor.blue(src),
+            )
+            maskWeightSum += coverage
+            maskedLumSum += lum * coverage
+        }
+        val meanNailLum = if (maskWeightSum > 0f) {
+            (maskedLumSum / maskWeightSum).coerceAtLeast(1f)
+        } else {
+            targetLum
+        }
+
+        for (i in pixels.indices) {
+            val coverage = maskCoverage(maskPixels[i])
+            if (coverage < 0.02f) continue
+
             val src = pixels[i]
             val sr = AndroidColor.red(src)
             val sg = AndroidColor.green(src)
             val sb = AndroidColor.blue(src)
+            val sa = AndroidColor.alpha(src)
             val lum = luminance(sr, sg, sb)
-            val factor = (lum / targetLum).coerceIn(MIN_FACTOR, MAX_FACTOR)
-            val nr = (tr * factor).toInt().coerceIn(0, 255)
-            val ng = (tg * factor).toInt().coerceIn(0, 255)
-            val nb = (tb * factor).toInt().coerceIn(0, 255)
-            // Mantém um pouco do highlight original.
-            val mixR = (nr * POLISH_WEIGHT + sr * HIGHLIGHT_WEIGHT).toInt().coerceIn(0, 255)
-            val mixG = (ng * POLISH_WEIGHT + sg * HIGHLIGHT_WEIGHT).toInt().coerceIn(0, 255)
-            val mixB = (nb * POLISH_WEIGHT + sb * HIGHLIGHT_WEIGHT).toInt().coerceIn(0, 255)
-            pixels[i] = AndroidColor.argb(255, mixR, mixG, mixB)
+
+            // Sombreamento relativo ao brilho médio da unha na foto.
+            val shade = (lum / meanNailLum).coerceIn(MIN_SHADE, MAX_SHADE)
+            var nr = (tr * shade).toInt().coerceIn(0, 255)
+            var ng = (tg * shade).toInt().coerceIn(0, 255)
+            var nb = (tb * shade).toInt().coerceIn(0, 255)
+
+            // Specular: pixels claros viram brilho de esmalte (quase branco).
+            val specular = specularAmount(lum, meanNailLum)
+            if (specular > 0f) {
+                nr = mixChannel(nr, 255, specular)
+                ng = mixChannel(ng, 255, specular)
+                nb = mixChannel(nb, 255, specular)
+            }
+
+            // Leve saturação do tom alvo para parecer camada de esmalte.
+            val vivid = vividize(nr, ng, nb, tr, tg, tb, 0.18f)
+            nr = vivid[0]
+            ng = vivid[1]
+            nb = vivid[2]
+
+            val blend = coverage.pow(0.85f).coerceIn(0f, 1f)
+            val outR = mixChannel(sr, nr, blend)
+            val outG = mixChannel(sg, ng, blend)
+            val outB = mixChannel(sb, nb, blend)
+            pixels[i] = AndroidColor.argb(sa, outR, outG, outB)
         }
         out.setPixels(pixels, 0, width, 0, 0, width, height)
         if (scaledMask !== mask) {
@@ -66,12 +107,44 @@ object PolishMaskRecolorer {
         return out
     }
 
+    private fun maskCoverage(maskPixel: Int): Float {
+        val alpha = AndroidColor.alpha(maskPixel)
+        val gray = AndroidColor.red(maskPixel)
+            .coerceAtLeast(AndroidColor.green(maskPixel))
+            .coerceAtLeast(AndroidColor.blue(maskPixel))
+        val strength = maxOf(alpha, gray)
+        return (strength / 255f).coerceIn(0f, 1f)
+    }
+
+    private fun specularAmount(lum: Float, meanNailLum: Float): Float {
+        val absolute = ((lum - SPECULAR_LUMA_START) / SPECULAR_LUMA_RANGE).coerceIn(0f, 1f)
+        val relative = (((lum / meanNailLum) - 1.12f) / 0.55f).coerceIn(0f, 1f)
+        return maxOf(absolute, relative * 0.75f)
+    }
+
+    private fun vividize(
+        r: Int,
+        g: Int,
+        b: Int,
+        tr: Int,
+        tg: Int,
+        tb: Int,
+        amount: Float,
+    ): IntArray {
+        val mixedR = mixChannel(r, tr, amount * 0.35f)
+        val mixedG = mixChannel(g, tg, amount * 0.35f)
+        val mixedB = mixChannel(b, tb, amount * 0.35f)
+        return intArrayOf(mixedR, mixedG, mixedB)
+    }
+
+    private fun mixChannel(from: Int, to: Int, t: Float): Int =
+        (from + (to - from) * t).toInt().coerceIn(0, 255)
+
     private fun luminance(r: Int, g: Int, b: Int): Float =
         0.299f * r + 0.587f * g + 0.114f * b
 
-    private const val MASK_ALPHA_THRESHOLD = 40
-    private const val MIN_FACTOR = 0.4f
-    private const val MAX_FACTOR = 1.8f
-    private const val POLISH_WEIGHT = 0.82f
-    private const val HIGHLIGHT_WEIGHT = 0.18f
+    private const val MIN_SHADE = 0.42f
+    private const val MAX_SHADE = 1.65f
+    private const val SPECULAR_LUMA_START = 188f
+    private const val SPECULAR_LUMA_RANGE = 67f
 }

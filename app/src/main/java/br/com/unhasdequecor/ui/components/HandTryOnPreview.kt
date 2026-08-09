@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -115,8 +116,11 @@ fun HandTryOnPreview(
             }
         }
         Text(
-            text = when (preview?.mode) {
-                TryOnMode.MASK, TryOnMode.DETECTED -> "Prévia na sua mão"
+            text = when {
+                preview?.mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
+                preview?.mode == TryOnMode.DETECTED -> "Prévia na sua mão"
+                preview?.mode == TryOnMode.APPROXIMATE && sampleId == null ->
+                    "Não detectamos as unhas — tente outra foto"
                 else -> "Prévia aproximada"
             },
             style = MaterialTheme.typography.labelMedium,
@@ -141,39 +145,55 @@ private fun resolvePreview(
     val isUserPhoto = sampleId == null
     return when {
         // Foto da usuária: sempre roda MediaPipe nesta foto (a cada load/troca).
+        // Sem detecção: não inventa ovais no lugar errado.
         isUserPhoto -> {
             val detected = detector.detect(bitmap)
             TryOnPreviewData(
                 bitmap = bitmap,
-                anchors = detected ?: NailOverlayAnchors.DEFAULT,
+                anchors = detected.orEmpty(),
                 mode = if (detected != null) TryOnMode.DETECTED else TryOnMode.APPROXIMATE,
             )
         }
-        // Amostra com máscara calibrada: recoloração pixel a pixel.
-        NailOverlayAnchors.hasMaskAsset(sampleId) -> {
-            val mask = PolishMaskRecolorer.loadMask(context, checkNotNull(sampleId))
-            val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
-            if (recolored != null) {
-                TryOnPreviewData(
-                    bitmap = recolored,
-                    anchors = emptyList(),
-                    mode = TryOnMode.MASK,
-                )
-            } else {
-                TryOnPreviewData(
-                    bitmap = bitmap,
-                    anchors = NailOverlayAnchors.forSample(sampleId),
-                    mode = TryOnMode.APPROXIMATE,
-                )
-            }
-        }
-        // Demais amostras: âncoras calibradas (MediaPipe costuma falhar nessa pose).
-        else -> TryOnPreviewData(
+        // Amostra: máscara calibrada > recolor pelo esmalte da foto > âncoras.
+        else -> resolveSamplePreview(
+            context = context,
             bitmap = bitmap,
-            anchors = NailOverlayAnchors.forSample(sampleId),
-            mode = TryOnMode.APPROXIMATE,
+            polishColor = polishColor,
+            sampleId = checkNotNull(sampleId),
         )
     }
+}
+
+private fun resolveSamplePreview(
+    context: android.content.Context,
+    bitmap: android.graphics.Bitmap,
+    polishColor: Color,
+    sampleId: String,
+): TryOnPreviewData {
+    if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
+        val mask = PolishMaskRecolorer.loadMask(context, sampleId)
+        val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
+        if (recolored != null) {
+            return TryOnPreviewData(
+                bitmap = recolored,
+                anchors = emptyList(),
+                mode = TryOnMode.MASK,
+            )
+        }
+    }
+    val seeded = PolishSeedRecolorer.recolor(bitmap, sampleId, polishColor)
+    if (seeded != null) {
+        return TryOnPreviewData(
+            bitmap = seeded,
+            anchors = emptyList(),
+            mode = TryOnMode.MASK,
+        )
+    }
+    return TryOnPreviewData(
+        bitmap = bitmap,
+        anchors = NailOverlayAnchors.forSample(sampleId),
+        mode = TryOnMode.APPROXIMATE,
+    )
 }
 
 private fun DrawScope.drawPolishNail(
@@ -183,26 +203,58 @@ private fun DrawScope.drawPolishNail(
     val nailWidth = size.width * anchor.width
     val nailHeight = size.height * anchor.height
     val center = Offset(size.width * anchor.centerX, size.height * anchor.centerY)
+    val topLeft = Offset(center.x - nailWidth / 2f, center.y - nailHeight / 2f)
+    val nailSize = Size(nailWidth, nailHeight)
+    val radius = CornerRadius(nailWidth * 0.48f, nailHeight * 0.42f)
     rotate(degrees = anchor.rotationDegrees, pivot = center) {
+        // Base: multiplica a textura da unha (menos “adesivo”).
+        drawRoundRect(
+            color = polishColor.copy(alpha = 0.55f),
+            topLeft = topLeft,
+            size = nailSize,
+            cornerRadius = radius,
+            blendMode = BlendMode.Multiply,
+        )
+        // Camada de cor do esmalte.
         drawRoundRect(
             brush = Brush.verticalGradient(
-                listOf(
-                    polishColor.copy(alpha = 0.82f),
-                    polishColor.copy(alpha = 0.97f),
+                colors = listOf(
+                    polishColor.copy(alpha = 0.58f),
+                    polishColor.copy(alpha = 0.86f),
+                    polishColor.copy(alpha = 0.72f),
                 ),
             ),
-            topLeft = Offset(center.x - nailWidth / 2f, center.y - nailHeight / 2f),
-            size = Size(nailWidth, nailHeight),
-            cornerRadius = CornerRadius(nailWidth / 2f, nailHeight / 2.2f),
+            topLeft = topLeft,
+            size = nailSize,
+            cornerRadius = radius,
         )
+        // Specular along the nail curve.
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.28f),
-            topLeft = Offset(
-                center.x - nailWidth * 0.14f,
-                center.y - nailHeight * 0.30f,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.34f),
+                    Color.White.copy(alpha = 0.05f),
+                    Color.Transparent,
+                ),
             ),
-            size = Size(nailWidth * 0.24f, nailHeight * 0.38f),
-            cornerRadius = CornerRadius(nailWidth * 0.2f, nailHeight * 0.2f),
+            topLeft = Offset(
+                center.x - nailWidth * 0.12f,
+                center.y - nailHeight * 0.42f,
+            ),
+            size = Size(nailWidth * 0.22f, nailHeight * 0.72f),
+            cornerRadius = CornerRadius(nailWidth * 0.16f, nailHeight * 0.2f),
+            blendMode = BlendMode.Screen,
+        )
+        // Sombra suave na cutícula.
+        drawRoundRect(
+            color = Color.Black.copy(alpha = 0.12f),
+            topLeft = Offset(
+                center.x - nailWidth * 0.42f,
+                center.y + nailHeight * 0.18f,
+            ),
+            size = Size(nailWidth * 0.84f, nailHeight * 0.28f),
+            cornerRadius = CornerRadius(nailWidth * 0.3f, nailHeight * 0.2f),
+            blendMode = BlendMode.Multiply,
         )
     }
 }

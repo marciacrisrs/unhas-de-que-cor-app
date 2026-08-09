@@ -6,14 +6,17 @@ import kotlin.math.hypot
 /**
  * Converte landmarks normalizados da mão (espaço da imagem) em âncoras de unha.
  * Usado com ContentScale.FillBounds + aspect da bitmap (sem crop).
+ *
+ * Heurística: a placa da unha fica entre DIP e TIP, mais perto da ponta,
+ * com tamanho menor que o segmento do dedo.
  */
 object NailLandmarkMapper {
     private val FINGER_PAIRS = listOf(
-        TipDip(tipIndex = 4, dipIndex = 3, pipIndex = 2, widthFactor = 0.58f, lengthFactor = 0.72f),
-        TipDip(tipIndex = 8, dipIndex = 7, pipIndex = 6, widthFactor = 0.50f, lengthFactor = 0.80f),
-        TipDip(tipIndex = 12, dipIndex = 11, pipIndex = 10, widthFactor = 0.50f, lengthFactor = 0.84f),
-        TipDip(tipIndex = 16, dipIndex = 15, pipIndex = 14, widthFactor = 0.48f, lengthFactor = 0.80f),
-        TipDip(tipIndex = 20, dipIndex = 19, pipIndex = 18, widthFactor = 0.46f, lengthFactor = 0.76f),
+        TipDip(tipIndex = 4, dipIndex = 3, pipIndex = 2, widthFactor = 0.72f, lengthFactor = 0.55f),
+        TipDip(tipIndex = 8, dipIndex = 7, pipIndex = 6, widthFactor = 0.62f, lengthFactor = 0.58f),
+        TipDip(tipIndex = 12, dipIndex = 11, pipIndex = 10, widthFactor = 0.62f, lengthFactor = 0.60f),
+        TipDip(tipIndex = 16, dipIndex = 15, pipIndex = 14, widthFactor = 0.60f, lengthFactor = 0.58f),
+        TipDip(tipIndex = 20, dipIndex = 19, pipIndex = 18, widthFactor = 0.58f, lengthFactor = 0.55f),
     )
 
     fun fromNormalizedLandmarks(
@@ -24,7 +27,6 @@ object NailLandmarkMapper {
         if (landmarks.size < MIN_LANDMARKS || imageWidth <= 0 || imageHeight <= 0) {
             return null
         }
-        // FillBounds: coords da imagem == coords da view.
         val anchors = FINGER_PAIRS.map { finger ->
             val tip = landmarks[finger.tipIndex]
             val dip = landmarks[finger.dipIndex]
@@ -37,22 +39,25 @@ object NailLandmarkMapper {
                 (tip.y - pip.y).toDouble(),
             ).toFloat()
             // Pose “unha de frente”: tip≈dip em 2D — usa tip-pip para tamanho.
-            val fingerLen = maxOf(tipDipLen, tipPipLen * 0.55f, MIN_FINGER_LEN)
-            val height = fingerLen * finger.lengthFactor
-            val width = height * finger.widthFactor
+            val fingerLen = maxOf(tipDipLen, tipPipLen * 0.48f, MIN_FINGER_LEN)
+            val height = (fingerLen * finger.lengthFactor).coerceIn(MIN_NAIL_HEIGHT, MAX_NAIL_HEIGHT)
+            val width = (height * finger.widthFactor).coerceIn(MIN_NAIL_WIDTH, MAX_NAIL_WIDTH)
             val along = if (tipDipLen < SHORT_TIP_DIP) {
                 NAIL_CENTER_FACING_CAMERA
             } else {
                 NAIL_CENTER_ALONG_FINGER
             }
-            val centerX = dip.x + dx * along
-            val centerY = dip.y + dy * along
+            // Empurra um pouco além do tip: a unha se estende da ponta do dedo.
+            val tipBiasX = tip.x + dx * TIP_OVERSHOOT
+            val tipBiasY = tip.y + dy * TIP_OVERSHOOT
+            val centerX = dip.x + (tipBiasX - dip.x) * along
+            val centerY = dip.y + (tipBiasY - dip.y) * along
             val rotation = Math.toDegrees(atan2(dx.toDouble(), -dy.toDouble())).toFloat()
             NailOverlayAnchor(
                 centerX = centerX,
                 centerY = centerY,
-                width = width.coerceIn(MIN_NAIL_WIDTH, MAX_NAIL_WIDTH),
-                height = height.coerceIn(MIN_NAIL_HEIGHT, MAX_NAIL_HEIGHT),
+                width = width,
+                height = height,
                 rotationDegrees = rotation,
             )
         }
@@ -75,12 +80,13 @@ object NailLandmarkMapper {
 
     const val PREVIEW_ASPECT = 3f / 4f
     private const val MIN_LANDMARKS = 21
-    private const val MIN_FINGER_LEN = 0.02f
-    private const val SHORT_TIP_DIP = 0.035f
-    private const val NAIL_CENTER_ALONG_FINGER = 0.78f
-    private const val NAIL_CENTER_FACING_CAMERA = 0.92f
-    private const val MIN_NAIL_WIDTH = 0.04f
-    private const val MAX_NAIL_WIDTH = 0.16f
-    private const val MIN_NAIL_HEIGHT = 0.035f
-    private const val MAX_NAIL_HEIGHT = 0.14f
+    private const val MIN_FINGER_LEN = 0.018f
+    private const val SHORT_TIP_DIP = 0.030f
+    private const val NAIL_CENTER_ALONG_FINGER = 0.88f
+    private const val NAIL_CENTER_FACING_CAMERA = 0.96f
+    private const val TIP_OVERSHOOT = 0.12f
+    private const val MIN_NAIL_WIDTH = 0.035f
+    private const val MAX_NAIL_WIDTH = 0.13f
+    private const val MIN_NAIL_HEIGHT = 0.030f
+    private const val MAX_NAIL_HEIGHT = 0.11f
 }
