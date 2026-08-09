@@ -23,6 +23,7 @@ mockk = "1.14.5"
 truth = "1.4.4"
 turbine = "1.2.1"
 sqliteJdbc = "3.49.1.0"
+mediapipeTasksVision = "0.10.21"
 
 
 [libraries]
@@ -65,6 +66,7 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqliteJdbc" }
+mediapipe-tasks-vision = { group = "com.google.mediapipe", name = "tasks-vision", version.ref = "mediapipeTasksVision" }
 
 
 [plugins]

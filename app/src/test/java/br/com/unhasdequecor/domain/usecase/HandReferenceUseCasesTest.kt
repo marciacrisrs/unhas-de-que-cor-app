@@ -72,4 +72,13 @@ class HandReferenceUseCasesTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `ensure default sample when missing`() = runTest {
+        val ensure = EnsureDefaultHandReferenceUseCase(repository)
+        val reference = ensure()
+        assertThat(reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(reference?.sampleId).isEqualTo("morena_nude")
+        assertThat(ensure()?.localPath).isEqualTo(reference?.localPath)
+    }
 }

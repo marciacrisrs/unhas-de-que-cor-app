@@ -16,4 +16,10 @@ interface HandReferenceRepository {
     ): HandReferenceSaveOutcome
 
     suspend fun clear()
+
+    /**
+     * Garante uma mão de referência (amostra padrão) quando não há foto válida.
+     * @return a referência vigente após o ensure, ou null se falhar ao materializar a amostra.
+     */
+    suspend fun ensureDefaultSample(): HandReference?
 }

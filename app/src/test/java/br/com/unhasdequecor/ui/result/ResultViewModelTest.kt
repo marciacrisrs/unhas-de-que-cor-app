@@ -10,6 +10,7 @@ import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.model.RecommendationSource
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceSource
+import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.GenerateAndSaveRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.GeneratedRecommendation
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
@@ -38,6 +39,7 @@ class ResultViewModelTest {
     private val toggleFavorite = mockk<ToggleFavoriteUseCase>(relaxed = true)
     private val handRepository = FakeHandReferenceRepository()
     private val observeHandReference = ObserveHandReferenceUseCase(handRepository)
+    private val ensureDefaultHandReference = EnsureDefaultHandReferenceUseCase(handRepository)
 
     private fun viewModel(handle: SavedStateHandle) = ResultViewModel(
         savedStateHandle = handle,
@@ -45,6 +47,7 @@ class ResultViewModelTest {
         restoreRecommendation = restoreRecommendation,
         toggleFavorite = toggleFavorite,
         observeHandReference = observeHandReference,
+        ensureDefaultHandReference = ensureDefaultHandReference,
     )
 
     @Test
@@ -113,7 +116,7 @@ class ResultViewModelTest {
     }
 
     @Test
-    fun `observes hand reference for try-on preview`() = runTest {
+    fun `ensures default sample hand for try-on preview`() = runTest {
         coEvery {
             generateAndSave(any(), any(), any())
         } returns GeneratedRecommendation(
@@ -131,22 +134,23 @@ class ResultViewModelTest {
             ),
         )
         advanceUntilIdle()
-        assertThat(viewModel.uiState.value.hasHandReference).isFalse()
+        assertThat(viewModel.uiState.value.hasHandReference).isTrue()
+        assertThat(viewModel.uiState.value.isSampleHand).isTrue()
+        assertThat(viewModel.uiState.value.handSampleId).isEqualTo("morena_nude")
 
         val capturedAt = 1_700_000_000_000L
         handRepository.emit(
             HandReference(
                 localPath = "/files/hand_reference/hand_1.jpg",
                 capturedAtEpochMs = capturedAt,
-                source = HandReferenceSource.SAMPLE,
-                sampleId = "media_rosa",
+                source = HandReferenceSource.USER,
+                sampleId = null,
             ),
         )
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.hasHandReference).isTrue()
-        assertThat(viewModel.uiState.value.isSampleHand).isTrue()
-        assertThat(viewModel.uiState.value.handSampleId).isEqualTo("media_rosa")
+        assertThat(viewModel.uiState.value.isSampleHand).isFalse()
         assertThat(viewModel.uiState.value.handRevision).isEqualTo(capturedAt)
     }
 

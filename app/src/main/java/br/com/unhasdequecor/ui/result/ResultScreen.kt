@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,7 +50,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.ui.components.HandTryOnPreview
 import br.com.unhasdequecor.ui.components.InfoTag
-import br.com.unhasdequecor.ui.components.NailHandIllustration
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
@@ -62,6 +62,7 @@ import android.content.Intent
 
 private const val FAVORITE_BUTTON_WEIGHT = 1.2f
 private const val SHARE_BUTTON_WEIGHT = 1f
+private const val TRY_ON_PLACEHOLDER_HEX = 0xFFE8D5DC
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,12 +152,14 @@ fun ResultScreen(
                                                 .padding(horizontal = 4.dp),
                                         )
                                     } else {
-                                        NailHandIllustration(
-                                            polishColor = Color(color.hex),
-                                            colorName = color.name,
+                                        // Enquanto a amostra padrão ainda carrega.
+                                        Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 4.dp),
+                                                .padding(horizontal = 4.dp)
+                                                .aspectRatio(3f / 4f)
+                                                .clip(SoftSurfaceShape)
+                                                .background(Color(TRY_ON_PLACEHOLDER_HEX)),
                                         )
                                     }
                                     IconButton(
@@ -184,16 +187,10 @@ fun ResultScreen(
                                         )
                                     }
                                 }
-                                if (!state.hasHandReference) {
+                                if (!state.hasHandReference || state.isSampleHand) {
                                     Spacer(modifier = Modifier.height(12.dp))
                                     SecondaryCtaButton(
-                                        text = "Cadastrar minha mão",
-                                        onClick = onOpenHandReference,
-                                    )
-                                } else if (state.isSampleHand) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    SecondaryCtaButton(
-                                        text = "Trocar pela minha mão",
+                                        text = "Usar minha mão",
                                         onClick = onOpenHandReference,
                                     )
                                 }

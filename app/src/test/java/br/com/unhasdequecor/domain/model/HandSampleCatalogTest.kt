@@ -24,4 +24,10 @@ class HandSampleCatalogTest {
         assertThat(option?.detailLabel).isEqualTo("Referência")
         assertThat(option?.assetPath).endsWith("hand_sample_clara_vermelho.webp")
     }
+
+    @Test
+    fun `default sample is curated catalog option`() {
+        assertThat(HandSampleCatalog.DEFAULT_ID).isEqualTo("morena_nude")
+        assertThat(HandSampleCatalog.defaultOption.id).isEqualTo("morena_nude")
+    }
 }

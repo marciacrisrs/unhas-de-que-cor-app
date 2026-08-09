@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,14 +24,24 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import br.com.unhasdequecor.data.vision.HandNailDetector
+import br.com.unhasdequecor.data.vision.MediaPipeHandNailDetector
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private data class TryOnPreviewData(
+    val bitmap: android.graphics.Bitmap,
+    val anchors: List<NailOverlayAnchor>,
+    val detected: Boolean,
+)
 
 @Composable
 fun HandTryOnPreview(
@@ -40,44 +51,60 @@ fun HandTryOnPreview(
     colorName: String,
     sampleId: String?,
     modifier: Modifier = Modifier,
+    nailDetector: HandNailDetector? = null,
 ) {
-    val bitmap by produceState(
-        initialValue = null as android.graphics.Bitmap?,
+    val context = LocalContext.current
+    val detector = nailDetector ?: remember(context) {
+        MediaPipeHandNailDetector(context.applicationContext)
+    }
+    val preview by produceState<TryOnPreviewData?>(
+        initialValue = null,
         imagePath,
         revision,
+        sampleId,
+        detector,
     ) {
-        value = withContext(Dispatchers.IO) {
-            BitmapFactory.decodeFile(imagePath)
+        value = withContext(Dispatchers.Default) {
+            val bitmap = BitmapFactory.decodeFile(imagePath) ?: return@withContext null
+            val detectedAnchors = detector.detect(bitmap)
+            TryOnPreviewData(
+                bitmap = bitmap,
+                anchors = detectedAnchors ?: NailOverlayAnchors.forSample(sampleId),
+                detected = detectedAnchors != null,
+            )
         }
     }
-    val anchors = NailOverlayAnchors.forSample(sampleId)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(3f / 4f)
+            .aspectRatio(NailLandmarkMapper.PREVIEW_ASPECT)
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .semantics {
                 contentDescription = "Prévia da cor $colorName na sua mão"
             },
     ) {
-        val preview = bitmap
-        if (preview != null) {
+        val data = preview
+        if (data != null) {
             Image(
-                bitmap = preview.asImageBitmap(),
+                bitmap = data.bitmap.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
             Canvas(modifier = Modifier.fillMaxSize()) {
-                anchors.forEach { anchor ->
+                data.anchors.forEach { anchor ->
                     drawPolishNail(anchor = anchor, polishColor = polishColor)
                 }
             }
         }
         Text(
-            text = "Prévia aproximada",
+            text = if (preview?.detected == true) {
+                "Prévia na sua mão"
+            } else {
+                "Prévia aproximada"
+            },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
@@ -90,7 +117,7 @@ fun HandTryOnPreview(
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolishNail(
+private fun DrawScope.drawPolishNail(
     anchor: NailOverlayAnchor,
     polishColor: Color,
 ) {
@@ -101,22 +128,22 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolishNail(
         drawRoundRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    polishColor.copy(alpha = 0.72f),
-                    polishColor.copy(alpha = 0.95f),
+                    polishColor.copy(alpha = 0.78f),
+                    polishColor.copy(alpha = 0.96f),
                 ),
             ),
             topLeft = Offset(center.x - nailWidth / 2f, center.y - nailHeight / 2f),
             size = Size(nailWidth, nailHeight),
-            cornerRadius = CornerRadius(nailWidth / 2f, nailHeight / 2f),
+            cornerRadius = CornerRadius(nailWidth / 2f, nailHeight / 2.2f),
         )
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.32f),
+            color = Color.White.copy(alpha = 0.28f),
             topLeft = Offset(
-                center.x - nailWidth * 0.12f,
-                center.y - nailHeight * 0.28f,
+                center.x - nailWidth * 0.14f,
+                center.y - nailHeight * 0.30f,
             ),
-            size = Size(nailWidth * 0.22f, nailHeight * 0.42f),
-            cornerRadius = CornerRadius(8f, 8f),
+            size = Size(nailWidth * 0.24f, nailHeight * 0.38f),
+            cornerRadius = CornerRadius(nailWidth * 0.2f, nailHeight * 0.2f),
         )
     }
 }

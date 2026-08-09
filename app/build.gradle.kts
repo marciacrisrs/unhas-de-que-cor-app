@@ -104,6 +104,24 @@ detekt {
     ignoredBuildTypes = listOf("release")
 }
 
+val handLandmarkerAsset = layout.projectDirectory.file("src/main/assets/hand_landmarker.task")
+tasks.register("downloadHandLandmarker") {
+    group = "setup"
+    description = "Baixa o modelo MediaPipe Hand Landmarker para assets."
+    outputs.file(handLandmarkerAsset)
+    onlyIf { !handLandmarkerAsset.asFile.exists() }
+    doLast {
+        val destination = handLandmarkerAsset.asFile
+        destination.parentFile.mkdirs()
+        val url =
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+        java.net.URI(url).toURL().openStream().use { input ->
+            destination.outputStream().use { output -> input.copyTo(output) }
+        }
+    }
+}
+tasks.named("preBuild").configure { dependsOn("downloadHandLandmarker") }
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -129,6 +147,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.mediapipe.tasks.vision)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

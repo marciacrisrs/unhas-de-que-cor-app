@@ -11,6 +11,12 @@ data class HandSampleOption(
 }
 
 object HandSampleCatalog {
+    /** Amostra usada quando a usuária ainda não cadastrou a própria mão. */
+    const val DEFAULT_ID = "morena_nude"
+
+    val defaultOption: HandSampleOption
+        get() = checkNotNull(findById(DEFAULT_ID))
+
     val options: List<HandSampleOption> = listOf(
         HandSampleOption(
             id = "retinta_vinho",

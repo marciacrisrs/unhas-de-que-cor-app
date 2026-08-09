@@ -7,6 +7,7 @@ import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
 import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
+import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
@@ -38,6 +39,7 @@ class HandReferenceViewModelTest {
         saveHandReference = SaveHandReferenceUseCase(repository) { FIXED_NOW_MS },
         useSampleHandReference = UseSampleHandReferenceUseCase(repository) { FIXED_NOW_MS },
         clearHandReference = ClearHandReferenceUseCase(repository),
+        ensureDefaultHandReference = EnsureDefaultHandReferenceUseCase(repository),
         fileStore = fileStore,
     )
 
@@ -129,11 +131,12 @@ class HandReferenceViewModelTest {
     }
 
     @Test
-    fun `confirm remove clears reference`() = runTest {
+    fun `confirm remove restores default sample reference`() = runTest {
         repository.emit(
             HandReference(
                 localPath = "/files/hand_reference/hand.jpg",
                 capturedAtEpochMs = 1L,
+                source = HandReferenceSource.USER,
             ),
         )
         val viewModel = viewModel()
@@ -143,8 +146,9 @@ class HandReferenceViewModelTest {
         viewModel.confirmRemove()
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.reference).isNull()
-        assertThat(viewModel.uiState.value.message).contains("removida")
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(viewModel.uiState.value.reference?.sampleId).isEqualTo("morena_nude")
+        assertThat(viewModel.uiState.value.message).contains("referência")
         assertThat(viewModel.uiState.value.showRemoveConfirm).isFalse()
     }
 

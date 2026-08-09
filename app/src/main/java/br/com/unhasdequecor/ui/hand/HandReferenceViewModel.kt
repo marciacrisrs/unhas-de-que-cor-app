@@ -12,6 +12,7 @@ import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.HandSampleCatalog
 import br.com.unhasdequecor.domain.model.HandSampleOption
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
+import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
@@ -50,6 +51,7 @@ class HandReferenceViewModel @Inject constructor(
     private val saveHandReference: SaveHandReferenceUseCase,
     private val useSampleHandReference: UseSampleHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
+    private val ensureDefaultHandReference: EnsureDefaultHandReferenceUseCase,
     private val fileStore: HandReferenceFileStore,
 ) : ViewModel() {
 
@@ -112,7 +114,10 @@ class HandReferenceViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(showRemoveConfirm = false) }
             clearHandReference()
-            _uiState.update { it.copy(message = "Foto da mão removida.") }
+            ensureDefaultHandReference()
+            _uiState.update {
+                it.copy(message = "Voltamos para a mão de referência.")
+            }
         }
     }
 
