@@ -136,7 +136,7 @@ class ResultViewModelTest {
         advanceUntilIdle()
         assertThat(viewModel.uiState.value.hasHandReference).isTrue()
         assertThat(viewModel.uiState.value.isSampleHand).isTrue()
-        assertThat(viewModel.uiState.value.handSampleId).isEqualTo("morena_nude")
+        assertThat(viewModel.uiState.value.handSampleId).isEqualTo("clara_vermelho")
 
         val capturedAt = 1_700_000_000_000L
         handRepository.emit(

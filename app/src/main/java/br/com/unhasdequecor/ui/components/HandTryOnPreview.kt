@@ -40,8 +40,14 @@ import kotlinx.coroutines.withContext
 private data class TryOnPreviewData(
     val bitmap: android.graphics.Bitmap,
     val anchors: List<NailOverlayAnchor>,
-    val detected: Boolean,
+    val mode: TryOnMode,
 )
+
+private enum class TryOnMode {
+    MASK,
+    DETECTED,
+    APPROXIMATE,
+}
 
 @Composable
 fun HandTryOnPreview(
@@ -62,23 +68,29 @@ fun HandTryOnPreview(
         imagePath,
         revision,
         sampleId,
+        polishColor,
         detector,
     ) {
         value = withContext(Dispatchers.Default) {
             val bitmap = BitmapFactory.decodeFile(imagePath) ?: return@withContext null
-            val detectedAnchors = detector.detect(bitmap)
-            TryOnPreviewData(
+            resolvePreview(
+                context = context.applicationContext,
                 bitmap = bitmap,
-                anchors = detectedAnchors ?: NailOverlayAnchors.forSample(sampleId),
-                detected = detectedAnchors != null,
+                polishColor = polishColor,
+                sampleId = sampleId,
+                detector = detector,
             )
         }
     }
 
+    val aspect = preview?.bitmap?.let { bmp ->
+        if (bmp.height > 0) bmp.width.toFloat() / bmp.height.toFloat() else NailLandmarkMapper.PREVIEW_ASPECT
+    } ?: NailLandmarkMapper.PREVIEW_ASPECT
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(NailLandmarkMapper.PREVIEW_ASPECT)
+            .aspectRatio(aspect)
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .semantics {
@@ -90,20 +102,22 @@ fun HandTryOnPreview(
             Image(
                 bitmap = data.bitmap.asImageBitmap(),
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                // FillBounds + aspect da bitmap: coords da imagem == coords do canvas.
+                contentScale = ContentScale.FillBounds,
                 modifier = Modifier.fillMaxSize(),
             )
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                data.anchors.forEach { anchor ->
-                    drawPolishNail(anchor = anchor, polishColor = polishColor)
+            if (data.mode != TryOnMode.MASK) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    data.anchors.forEach { anchor ->
+                        drawPolishNail(anchor = anchor, polishColor = polishColor)
+                    }
                 }
             }
         }
         Text(
-            text = if (preview?.detected == true) {
-                "Prévia na sua mão"
-            } else {
-                "Prévia aproximada"
+            text = when (preview?.mode) {
+                TryOnMode.MASK, TryOnMode.DETECTED -> "Prévia na sua mão"
+                else -> "Prévia aproximada"
             },
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimary,
@@ -117,6 +131,47 @@ fun HandTryOnPreview(
     }
 }
 
+private fun resolvePreview(
+    context: android.content.Context,
+    bitmap: android.graphics.Bitmap,
+    polishColor: Color,
+    sampleId: String?,
+    detector: HandNailDetector,
+): TryOnPreviewData {
+    // 1) Amostra com máscara calibrada: recoloração pixel a pixel (mais fiel).
+    if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
+        val mask = PolishMaskRecolorer.loadMask(context, checkNotNull(sampleId))
+        val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
+        if (recolored != null) {
+            return TryOnPreviewData(
+                bitmap = recolored,
+                anchors = emptyList(),
+                mode = TryOnMode.MASK,
+            )
+        }
+    }
+
+    // 2) Foto própria: tenta MediaPipe.
+    if (sampleId == null) {
+        val detected = detector.detect(bitmap)
+        if (detected != null) {
+            return TryOnPreviewData(
+                bitmap = bitmap,
+                anchors = detected,
+                mode = TryOnMode.DETECTED,
+            )
+        }
+    }
+
+    // 3) Âncoras calibradas por sample (ou default). Não usa MediaPipe em amostras:
+    // landmarks falham com frequência nessa pose e deslocam o esmalte para longe da unha.
+    return TryOnPreviewData(
+        bitmap = bitmap,
+        anchors = NailOverlayAnchors.forSample(sampleId),
+        mode = TryOnMode.APPROXIMATE,
+    )
+}
+
 private fun DrawScope.drawPolishNail(
     anchor: NailOverlayAnchor,
     polishColor: Color,
@@ -128,8 +183,8 @@ private fun DrawScope.drawPolishNail(
         drawRoundRect(
             brush = Brush.verticalGradient(
                 listOf(
-                    polishColor.copy(alpha = 0.78f),
-                    polishColor.copy(alpha = 0.96f),
+                    polishColor.copy(alpha = 0.82f),
+                    polishColor.copy(alpha = 0.97f),
                 ),
             ),
             topLeft = Offset(center.x - nailWidth / 2f, center.y - nailHeight / 2f),

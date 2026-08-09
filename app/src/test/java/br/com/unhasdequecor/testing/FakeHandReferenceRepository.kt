@@ -54,11 +54,11 @@ class FakeHandReferenceRepository(
             localPath = "/files/hand_reference/hand_default.jpg",
             capturedAtEpochMs = 1L,
             source = HandReferenceSource.SAMPLE,
-            sampleId = "morena_nude",
+            sampleId = "clara_vermelho",
         )
         state.value = sample
         lastSource = HandReferenceSource.SAMPLE
-        lastSampleId = "morena_nude"
+        lastSampleId = "clara_vermelho"
         return sample
     }
 

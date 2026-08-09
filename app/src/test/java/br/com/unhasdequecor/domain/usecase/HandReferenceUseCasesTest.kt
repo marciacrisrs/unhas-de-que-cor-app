@@ -78,7 +78,7 @@ class HandReferenceUseCasesTest {
         val ensure = EnsureDefaultHandReferenceUseCase(repository)
         val reference = ensure()
         assertThat(reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
-        assertThat(reference?.sampleId).isEqualTo("morena_nude")
+        assertThat(reference?.sampleId).isEqualTo("clara_vermelho")
         assertThat(ensure()?.localPath).isEqualTo(reference?.localPath)
     }
 }

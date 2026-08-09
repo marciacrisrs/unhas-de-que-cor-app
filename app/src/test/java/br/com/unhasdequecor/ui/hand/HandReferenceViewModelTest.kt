@@ -147,7 +147,7 @@ class HandReferenceViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
-        assertThat(viewModel.uiState.value.reference?.sampleId).isEqualTo("morena_nude")
+        assertThat(viewModel.uiState.value.reference?.sampleId).isEqualTo("clara_vermelho")
         assertThat(viewModel.uiState.value.message).contains("referência")
         assertThat(viewModel.uiState.value.showRemoveConfirm).isFalse()
     }

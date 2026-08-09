@@ -20,10 +20,18 @@ class NailOverlayAnchorsTest {
 
     @Test
     fun `known sample ids resolve dedicated layouts`() {
-        val media = NailOverlayAnchors.forSample("media_rosa")
-        assertThat(media).isNotEqualTo(NailOverlayAnchors.DEFAULT)
-        assertThat(media).hasSize(5)
+        val clara = NailOverlayAnchors.forSample("clara_vermelho")
+        assertThat(clara).isNotEqualTo(NailOverlayAnchors.DEFAULT)
+        assertThat(clara).hasSize(5)
         assertThat(NailOverlayAnchors.forSample(null)).isEqualTo(NailOverlayAnchors.DEFAULT)
         assertThat(NailOverlayAnchors.forSample("unknown")).isEqualTo(NailOverlayAnchors.DEFAULT)
+    }
+
+    @Test
+    fun `mask assets exist for calibrated samples`() {
+        assertThat(NailOverlayAnchors.hasMaskAsset("clara_vermelho")).isTrue()
+        assertThat(NailOverlayAnchors.hasMaskAsset("media_rosa")).isTrue()
+        assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset(null)).isFalse()
     }
 }

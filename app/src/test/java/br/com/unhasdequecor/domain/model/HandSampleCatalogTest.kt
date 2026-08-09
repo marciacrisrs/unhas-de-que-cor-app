@@ -27,7 +27,7 @@ class HandSampleCatalogTest {
 
     @Test
     fun `default sample is curated catalog option`() {
-        assertThat(HandSampleCatalog.DEFAULT_ID).isEqualTo("morena_nude")
-        assertThat(HandSampleCatalog.defaultOption.id).isEqualTo("morena_nude")
+        assertThat(HandSampleCatalog.DEFAULT_ID).isEqualTo("clara_vermelho")
+        assertThat(HandSampleCatalog.defaultOption.id).isEqualTo("clara_vermelho")
     }
 }
