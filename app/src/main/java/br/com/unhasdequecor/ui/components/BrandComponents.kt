@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -187,69 +188,30 @@ fun BrandLogoLockup(
         contentDescription = contentDescription,
         modifier = modifier
             .fillMaxWidth()
-            .height(96.dp),
+            .heightIn(min = 112.dp)
+            .height(128.dp),
         contentScale = ContentScale.Fit,
     )
 }
 
+/**
+ * Hero da marca: usa o lockup oficial (PNG/WebP) em vez de recompor tipografia.
+ * Claro/escuro via `drawable` / `drawable-night`.
+ */
 @Composable
 fun BrandHeader(
     modifier: Modifier = Modifier,
     showTagline: Boolean = true,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        NailPolishMark(markSize = 88.dp)
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "UNHAS",
-            style = MaterialTheme.typography.displayMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = "DE QUE COR?",
-            style = TextStyle(
-                brush = Brush.horizontalGradient(listOf(BrandFun, BrandAction)),
-                fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 26.sp,
-            ),
-        )
-        if (showTagline) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
-                )
-                Text(
-                    text = " ✦ ",
-                    color = BrandFun,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Box(
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "SUA COR, SEU ESTILO, SEU MOMENTO",
-                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
+    // O asset oficial já inclui tipografia + tagline; showTagline mantém API estável.
+    BrandLogoLockup(
+        modifier = modifier.padding(horizontal = 8.dp),
+        contentDescription = if (showTagline) {
+            "Unhas de Que Cor? Sua cor, seu estilo, seu momento"
+        } else {
+            "Unhas de Que Cor?"
+        },
+    )
 }
 
 @Composable
