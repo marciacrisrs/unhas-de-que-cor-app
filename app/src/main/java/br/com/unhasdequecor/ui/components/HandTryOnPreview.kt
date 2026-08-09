@@ -138,7 +138,26 @@ private fun resolvePreview(
     sampleId: String?,
     detector: HandNailDetector,
 ): TryOnPreviewData {
-    // 1) Amostra com máscara calibrada: recoloração pixel a pixel (mais fiel).
+    val isUserPhoto = sampleId == null
+
+    // Foto da usuária: sempre roda MediaPipe nesta foto (a cada load/troca).
+    if (isUserPhoto) {
+        val detected = detector.detect(bitmap)
+        if (detected != null) {
+            return TryOnPreviewData(
+                bitmap = bitmap,
+                anchors = detected,
+                mode = TryOnMode.DETECTED,
+            )
+        }
+        return TryOnPreviewData(
+            bitmap = bitmap,
+            anchors = NailOverlayAnchors.DEFAULT,
+            mode = TryOnMode.APPROXIMATE,
+        )
+    }
+
+    // Amostra com máscara calibrada: recoloração pixel a pixel.
     if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
         val mask = PolishMaskRecolorer.loadMask(context, checkNotNull(sampleId))
         val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
@@ -151,20 +170,7 @@ private fun resolvePreview(
         }
     }
 
-    // 2) Foto própria: tenta MediaPipe.
-    if (sampleId == null) {
-        val detected = detector.detect(bitmap)
-        if (detected != null) {
-            return TryOnPreviewData(
-                bitmap = bitmap,
-                anchors = detected,
-                mode = TryOnMode.DETECTED,
-            )
-        }
-    }
-
-    // 3) Âncoras calibradas por sample (ou default). Não usa MediaPipe em amostras:
-    // landmarks falham com frequência nessa pose e deslocam o esmalte para longe da unha.
+    // Demais amostras: âncoras calibradas (MediaPipe costuma falhar nessa pose).
     return TryOnPreviewData(
         bitmap = bitmap,
         anchors = NailOverlayAnchors.forSample(sampleId),

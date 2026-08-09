@@ -54,7 +54,7 @@ class HandReferenceUseCasesTest {
     }
 
     @Test
-    fun `observe and clear hand reference`() = runTest {
+    fun `observe and clear restores default sample`() = runTest {
         val observe = ObserveHandReferenceUseCase(repository)
         val clear = ClearHandReferenceUseCase(repository)
 
@@ -64,11 +64,14 @@ class HandReferenceUseCasesTest {
                 HandReference(
                     localPath = "/files/hand_reference/hand.jpg",
                     capturedAtEpochMs = fixedNowMs,
+                    source = HandReferenceSource.USER,
                 ),
             )
             assertThat(awaitItem()?.localPath).endsWith("hand.jpg")
             clear()
-            assertThat(awaitItem()).isNull()
+            val restored = awaitItem()
+            assertThat(restored?.source).isEqualTo(HandReferenceSource.SAMPLE)
+            assertThat(restored?.sampleId).isEqualTo("clara_vermelho")
             cancelAndIgnoreRemainingEvents()
         }
     }

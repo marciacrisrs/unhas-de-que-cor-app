@@ -63,9 +63,18 @@ class HandReferenceRepositoryImpl @Inject constructor(
         if (current != null) {
             return@withContext current
         }
+        persistDefaultSample()
+    }
+
+    override suspend fun resetToDefaultSample(): HandReference? = withContext(Dispatchers.IO) {
+        // Salva a amostra diretamente (sem preferences.clear) para o Flow não emitir null.
+        persistDefaultSample()
+    }
+
+    private suspend fun persistDefaultSample(): HandReference? {
         val sample = HandSampleCatalog.defaultOption
         val prepared = fileStore.copySampleAssetToCache(sample.assetPath)
-        when (
+        return when (
             val outcome = save(
                 sourceAbsolutePath = prepared.absolutePath,
                 capturedAtEpochMs = clock.now(),

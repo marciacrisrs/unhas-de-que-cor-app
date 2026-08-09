@@ -60,6 +60,9 @@ class HandReferenceViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            ensureDefaultHandReference()
+        }
+        viewModelScope.launch {
             observeHandReference().collect { reference ->
                 _uiState.update { it.copy(reference = reference) }
             }
@@ -112,11 +115,17 @@ class HandReferenceViewModel @Inject constructor(
 
     fun confirmRemove() {
         viewModelScope.launch {
-            _uiState.update { it.copy(showRemoveConfirm = false) }
-            clearHandReference()
-            ensureDefaultHandReference()
+            _uiState.update { it.copy(showRemoveConfirm = false, isSaving = true) }
+            val restored = clearHandReference()
             _uiState.update {
-                it.copy(message = "Voltamos para a mão de referência.")
+                it.copy(
+                    isSaving = false,
+                    message = if (restored != null) {
+                        "Voltamos para a mão de referência."
+                    } else {
+                        "Não foi possível restaurar o exemplo. Tente de novo."
+                    },
+                )
             }
         }
     }

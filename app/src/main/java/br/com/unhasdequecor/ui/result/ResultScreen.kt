@@ -62,7 +62,6 @@ import android.content.Intent
 
 private const val FAVORITE_BUTTON_WEIGHT = 1.2f
 private const val SHARE_BUTTON_WEIGHT = 1f
-private const val TRY_ON_PLACEHOLDER_HEX = 0xFFE8D5DC
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,15 +151,20 @@ fun ResultScreen(
                                                 .padding(horizontal = 4.dp),
                                         )
                                     } else {
-                                        // Enquanto a amostra padrão ainda carrega.
+                                        // Nunca ilustração: só espera a amostra padrão materializar.
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 4.dp)
                                                 .aspectRatio(3f / 4f)
                                                 .clip(SoftSurfaceShape)
-                                                .background(Color(TRY_ON_PLACEHOLDER_HEX)),
-                                        )
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            CircularProgressIndicator(
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
                                     }
                                     IconButton(
                                         onClick = viewModel::onToggleFavorite,

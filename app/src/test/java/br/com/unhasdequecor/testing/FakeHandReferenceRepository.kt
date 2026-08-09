@@ -50,6 +50,10 @@ class FakeHandReferenceRepository(
 
     override suspend fun ensureDefaultSample(): HandReference? {
         state.value?.let { return it }
+        return resetToDefaultSample()
+    }
+
+    override suspend fun resetToDefaultSample(): HandReference? {
         val sample = HandReference(
             localPath = "/files/hand_reference/hand_default.jpg",
             capturedAtEpochMs = 1L,

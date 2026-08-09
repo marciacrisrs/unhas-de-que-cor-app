@@ -47,18 +47,18 @@ class HandReferenceViewModelTest {
     fun `camera stages photo until user confirms`() = runTest {
         val viewModel = viewModel()
         advanceUntilIdle()
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
 
         viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/capture.jpg")
-        assertThat(viewModel.uiState.value.reference).isNull()
-        assertThat(repository.lastSavedPath).isNull()
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
 
         viewModel.confirmPendingUserPhoto()
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.reference).isNotNull()
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.USER)
         assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
         assertThat(viewModel.uiState.value.message).contains("sucesso")
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
@@ -67,6 +67,7 @@ class HandReferenceViewModelTest {
     @Test
     fun `discard pending user photo does not persist`() = runTest {
         val viewModel = viewModel()
+        advanceUntilIdle()
         viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
         advanceUntilIdle()
 
@@ -74,8 +75,8 @@ class HandReferenceViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
-        assertThat(viewModel.uiState.value.reference).isNull()
-        assertThat(repository.lastSavedPath).isNull()
+        assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.SAMPLE)
     }
 
     @Test

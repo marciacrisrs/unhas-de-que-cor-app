@@ -22,4 +22,10 @@ interface HandReferenceRepository {
      * @return a referência vigente após o ensure, ou null se falhar ao materializar a amostra.
      */
     suspend fun ensureDefaultSample(): HandReference?
+
+    /**
+     * Substitui a foto atual pela amostra padrão sem passar por estado vazio.
+     * Usado ao “remover” a foto da usuária.
+     */
+    suspend fun resetToDefaultSample(): HandReference?
 }

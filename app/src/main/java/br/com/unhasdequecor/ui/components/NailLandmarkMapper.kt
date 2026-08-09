@@ -18,9 +18,8 @@ object NailLandmarkMapper {
 
     fun fromNormalizedLandmarks(
         landmarks: List<NormalizedPoint>,
-        imageWidth: Int,
-        imageHeight: Int,
-        viewAspect: Float = PREVIEW_ASPECT,
+        imageWidth: Int = 1,
+        imageHeight: Int = 1,
     ): List<NailOverlayAnchor>? {
         if (landmarks.size < MIN_LANDMARKS || imageWidth <= 0 || imageHeight <= 0) {
             return null

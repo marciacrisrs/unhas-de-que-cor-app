@@ -188,11 +188,13 @@ fun HandReferenceScreen(
     if (state.showRemoveConfirm) {
         AlertDialog(
             onDismissRequest = viewModel::dismissRemoveConfirm,
-            title = { Text("Remover foto da mão?") },
-            text = { Text("Você poderá cadastrar outra depois.") },
+            title = { Text("Voltar para a mão de exemplo?") },
+            text = {
+                Text("Sua foto sai e o try-on usa de novo uma das mãos de referência.")
+            },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmRemove) {
-                    Text("Remover")
+                    Text("Usar exemplo")
                 }
             },
             dismissButton = {
@@ -476,7 +478,10 @@ private fun HandReferenceActions(
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
-        SecondaryCtaButton(text = "Remover foto", onClick = onOpenRemoveConfirm)
+        SecondaryCtaButton(
+            text = if (isSample) "Restaurar exemplo padrão" else "Voltar para exemplo",
+            onClick = onOpenRemoveConfirm,
+        )
     }
 }
 

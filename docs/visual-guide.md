@@ -4,7 +4,7 @@ Fonte de verdade: `design/guia/` (boards, logos e mockups claro/escuro).
 
 Logos oficiais já estão no APK como `logo_mark` / `logo_horizontal` (tema claro/escuro) e no ícone do launcher.
 
-Resultado: try-on na foto da mão (amostra padrão se a usuária ainda não cadastrou a própria) com overlays posicionados via MediaPipe Hand Landmarker.
+Resultado: try-on sempre em foto real (amostra padrão se a usuária ainda não cadastrou a própria). Foto própria usa MediaPipe; amostras calibradas usam máscara/âncoras. Sem ilustração vetorial.
 
 ## Paleta
 
