@@ -7,13 +7,11 @@ import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.model.RecommendationSource
 import br.com.unhasdequecor.domain.model.UserPreferences
 import br.com.unhasdequecor.domain.recommendation.RecommendationEngine
-import br.com.unhasdequecor.domain.repository.PreferencesRepository
 import br.com.unhasdequecor.domain.time.Clock
 import br.com.unhasdequecor.testing.FakeColorCatalogRepository
 import br.com.unhasdequecor.testing.FakeHistoryRepository
+import br.com.unhasdequecor.testing.FakePreferencesRepository
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -61,15 +59,5 @@ class GenerateAndSaveRecommendationUseCaseTest {
         assertThat(generated.recommendation.source).isEqualTo(RecommendationSource.FOR_ME)
         assertThat(history.distinctColorCount()).isEqualTo(1)
         assertThat(generated.isFavorite).isFalse()
-    }
-}
-
-private class FakePreferencesRepository(
-    initial: UserPreferences,
-) : PreferencesRepository {
-    private val state = MutableStateFlow(initial)
-    override fun observePreferences(): Flow<UserPreferences> = state
-    override suspend fun updatePreferredStyles(styles: Set<br.com.unhasdequecor.domain.model.NailStyle>) {
-        state.value = state.value.copy(preferredStyles = styles)
     }
 }

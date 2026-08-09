@@ -49,10 +49,13 @@ Isso executa, em sequência:
 1. **Detekt** (`:app:detekt`) — análise estática Kotlin  
 2. **Android Lint** (`:app:lintDebug`)  
 3. **Testes unitários** (`:app:testDebugUnitTest`)  
-4. **Assemble debug** (`:app:assembleDebug`)
+4. **Cobertura do domínio** (`:app:jacocoDomainCoverageVerification`) — ≥80% linhas  
+5. **Assemble debug** (`:app:assembleDebug`)
+
+Relatório HTML local: `app/build/reports/jacoco/jacocoDomainReport/html/index.html`.
 
 Configurações em `config/detekt/detekt.yml` e `config/lint/lint.xml`.  
-Workflow: `.github/workflows/ci.yml` (roda em push/PR para `master`/`main`).
+Workflow: `.github/workflows/ci.yml` (roda em qualquer PR e em push para `master`/`main`).
 
 Para atualizar o baseline do Detekt após dívida conhecida:
 

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.detekt)
+    jacoco
 }
 
 android {
@@ -21,6 +22,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -124,4 +128,89 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
 tasks.withType<dev.detekt.gradle.DetektCreateBaselineTask>().configureEach {
     jvmTarget.set("17")
     exclude("**/build/**")
+}
+
+jacoco {
+    toolVersion = "0.8.13"
+}
+
+val domainCoverageIncludes = listOf(
+    "**/br/com/unhasdequecor/domain/**",
+)
+
+val jacocoExcludes = listOf(
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "**/*_Hilt*",
+    "**/Hilt_*.*",
+    "**/*_Factory*",
+    "**/*_MembersInjector*",
+    "**/*Module*",
+    "**/*Module$*",
+    "**/di/**",
+)
+
+fun Project.domainClassDirectories(): FileCollection {
+    val buildDirPath = layout.buildDirectory.get().asFile
+    val kotlinTree = fileTree(buildDirPath.resolve("tmp/kotlin-classes/debug")) {
+        include(domainCoverageIncludes)
+        exclude(jacocoExcludes)
+    }
+    val javaTree = fileTree(buildDirPath.resolve("intermediates/javac/debug")) {
+        include(domainCoverageIncludes)
+        exclude(jacocoExcludes)
+    }
+    return files(kotlinTree, javaTree)
+}
+
+tasks.register<JacocoReport>("jacocoDomainReport") {
+    group = "verification"
+    description = "Gera relatório JaCoCo focado no pacote domain."
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(domainClassDirectories())
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get().asFile) {
+            include(
+                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
+                "jacoco/testDebugUnitTest.exec",
+            )
+        },
+    )
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
+    group = "verification"
+    description = "Exige ≥80% de cobertura de linhas no pacote domain."
+    dependsOn("jacocoDomainReport")
+
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(domainClassDirectories())
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get().asFile) {
+            include(
+                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
+                "jacoco/testDebugUnitTest.exec",
+            )
+        },
+    )
+
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
 }

@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify (detekt, lint, unit tests, assemble)
+    name: Verify (detekt, lint, tests, coverage, assemble)
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -29,12 +29,25 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           validate-wrappers: true
+          cache-read-only: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/main' }}
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses >/dev/null || true
+      - name: Cache Android SDK platforms
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/platforms
+            ${{ env.ANDROID_HOME }}/build-tools
+          key: android-sdk-${{ runner.os }}-api36-v1
+          restore-keys: |
+            android-sdk-${{ runner.os }}-
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          yes | sdkmanager --licenses >/dev/null || true
 
       - name: Write local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
@@ -44,6 +57,16 @@ jobs:
 
       - name: Run CI verification
         run: ./gradlew verifyCi --stacktrace --no-configuration-cache
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            app/build/reports/jacoco/jacocoDomainReport/
+            app/build/reports/coverage/
+          if-no-files-found: ignore
 
       - name: Upload Detekt reports
         if: failure()
