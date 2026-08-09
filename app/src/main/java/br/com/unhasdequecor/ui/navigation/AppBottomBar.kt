@@ -112,7 +112,7 @@ fun AppBottomBar(
                 .offset(y = (-18).dp)
                 .semantics { contentDescription = "Escolher minha cor" },
             shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             elevation = FloatingActionButtonDefaults.elevation(6.dp),
         ) {

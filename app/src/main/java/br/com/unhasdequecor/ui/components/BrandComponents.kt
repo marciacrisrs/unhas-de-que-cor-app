@@ -38,17 +38,24 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import br.com.unhasdequecor.domain.model.NailStyle
+import br.com.unhasdequecor.ui.theme.BrandAction
+import br.com.unhasdequecor.ui.theme.BrandFun
 import br.com.unhasdequecor.ui.theme.FunChipShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import br.com.unhasdequecor.ui.theme.UnhasDeQueCorTheme
@@ -60,7 +67,7 @@ fun NailPolishMark(
     polishColor: Color? = null,
     decorative: Boolean = false,
 ) {
-    val resolvedPolish = polishColor ?: MaterialTheme.colorScheme.primary
+    val resolvedPolish = polishColor ?: BrandFun
     val outline = MaterialTheme.colorScheme.onBackground
     val canvasModifier = if (decorative) {
         modifier.size(markSize).clearAndSetSemantics { }
@@ -70,31 +77,43 @@ fun NailPolishMark(
             .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
     }
     Canvas(modifier = canvasModifier) {
-        val stroke = Stroke(width = markSize.toPx() * 0.045f)
-        val canvasSize = this.size
-        val cx = canvasSize.width / 2f
-        val cy = canvasSize.height / 2f
-        val radius = canvasSize.minDimension * 0.42f
+        val stroke = Stroke(width = markSize.toPx() * 0.04f, cap = StrokeCap.Round)
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val radius = size.minDimension * 0.42f
+        val ring = Brush.sweepGradient(listOf(BrandFun, BrandAction, BrandFun))
 
-        drawCircle(
-            color = outline.copy(alpha = 0.85f),
-            radius = radius,
-            center = Offset(cx, cy),
+        drawArc(
+            brush = ring,
+            startAngle = -35f,
+            sweepAngle = 250f,
+            useCenter = false,
+            topLeft = Offset(cx - radius, cy - radius),
+            size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
+            style = stroke,
+        )
+        drawArc(
+            color = outline.copy(alpha = 0.45f),
+            startAngle = 230f,
+            sweepAngle = 50f,
+            useCenter = false,
+            topLeft = Offset(cx - radius, cy - radius),
+            size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
             style = stroke,
         )
 
         val bottleTop = cy - radius * 0.55f
-        val bottleBottom = cy + radius * 0.55f
+        val bottleBottom = cy + radius * 0.52f
         val bottleHalf = radius * 0.28f
         val bottlePath = Path().apply {
             moveTo(cx - bottleHalf * 0.55f, bottleTop)
             lineTo(cx + bottleHalf * 0.55f, bottleTop)
-            lineTo(cx + bottleHalf * 0.7f, bottleTop + radius * 0.22f)
+            lineTo(cx + bottleHalf * 0.7f, bottleTop + radius * 0.2f)
             lineTo(cx + bottleHalf, bottleTop + radius * 0.28f)
             lineTo(cx + bottleHalf, bottleBottom)
             quadraticTo(cx, bottleBottom + radius * 0.12f, cx - bottleHalf, bottleBottom)
             lineTo(cx - bottleHalf, bottleTop + radius * 0.28f)
-            lineTo(cx - bottleHalf * 0.7f, bottleTop + radius * 0.22f)
+            lineTo(cx - bottleHalf * 0.7f, bottleTop + radius * 0.2f)
             close()
         }
         drawPath(
@@ -107,11 +126,11 @@ fun NailPolishMark(
         )
         drawPath(path = bottlePath, color = outline, style = stroke)
 
-        val sparkleColor = resolvedPolish
         listOf(
-            Offset(cx + radius * 0.55f, cy - radius * 0.35f) to radius * 0.12f,
-            Offset(cx - radius * 0.6f, cy + radius * 0.1f) to radius * 0.08f,
-            Offset(cx + radius * 0.15f, cy + radius * 0.55f) to radius * 0.07f,
+            Offset(cx + radius * 0.55f, cy - radius * 0.35f) to radius * 0.11f,
+            Offset(cx - radius * 0.58f, cy + radius * 0.08f) to radius * 0.08f,
+            Offset(cx + radius * 0.18f, cy + radius * 0.52f) to radius * 0.07f,
+            Offset(cx - radius * 0.18f, cy - radius * 0.52f) to radius * 0.06f,
         ).forEach { (center, s) ->
             val sparklePath = Path().apply {
                 moveTo(center.x, center.y - s)
@@ -124,7 +143,7 @@ fun NailPolishMark(
                 lineTo(center.x - s * 0.22f, center.y - s * 0.22f)
                 close()
             }
-            drawPath(path = sparklePath, color = sparkleColor)
+            drawPath(path = sparklePath, color = BrandFun)
         }
     }
 }
@@ -138,24 +157,52 @@ fun BrandHeader(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        NailPolishMark(markSize = 72.dp)
-        Spacer(modifier = Modifier.height(14.dp))
+        NailPolishMark(markSize = 78.dp)
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "UNHAS",
-            style = MaterialTheme.typography.displayMedium,
+            style = MaterialTheme.typography.displayMedium.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+            ),
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = "DE QUE COR?",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
+            style = TextStyle(
+                brush = Brush.horizontalGradient(listOf(BrandFun, BrandAction)),
+                fontFamily = MaterialTheme.typography.headlineMedium.fontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 26.sp,
+            ),
         )
         if (showTagline) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .width(44.dp)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
+                )
+                Text(
+                    text = " ✦ ",
+                    color = BrandFun,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Box(
+                    modifier = Modifier
+                        .width(44.dp)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)),
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Sua cor, seu estilo, seu momento.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "SUA COR, SEU ESTILO, SEU MOMENTO",
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -285,13 +332,56 @@ fun InfoTag(
     Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSecondary,
+        color = MaterialTheme.colorScheme.onBackground,
         modifier = modifier
             .clip(FunChipShape)
-            .background(MaterialTheme.colorScheme.secondary)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f), FunChipShape)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .semantics { contentDescription = label },
     )
+}
+
+@Composable
+fun FilterTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: (@Composable () -> Unit)? = null,
+) {
+    val shape = FunChipShape
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondary else Color.Transparent,
+            )
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.secondary,
+                shape = shape,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        leadingIcon?.invoke()
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) {
+                Color.White
+            } else {
+                MaterialTheme.colorScheme.secondary
+            },
+        )
+    }
 }
 
 @Composable
@@ -310,11 +400,11 @@ fun HistoryRow(
             .fillMaxWidth()
             .clip(SoftSurfaceShape)
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
         tonalElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NailSwatch(colorHex = colorHex, colorName = colorName)
