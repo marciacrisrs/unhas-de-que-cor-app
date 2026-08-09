@@ -63,6 +63,11 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.generateKotlin", "true")
+}
+
 detekt {
     toolVersion = libs.versions.detekt.get()
     buildUponDefaultConfig = true

@@ -33,7 +33,8 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "unhas_de_que_cor.db")
-            // MVP: schema ainda volátil. Trocar por migrations reais antes de release.
+            // Schema v1 exportado em app/schemas. Migrations versionadas entram
+            // antes do release; destructive permanece só enquanto o schema for MVP.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

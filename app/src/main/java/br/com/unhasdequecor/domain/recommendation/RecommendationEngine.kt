@@ -34,7 +34,7 @@ class RecommendationEngine @Inject constructor() {
             .ifEmpty { listOf(ranked.first().first) }
 
         val selected = topCandidates[random.nextInt(topCandidates.size)]
-        return buildRecommendation(
+        return compose(
             selected = selected,
             catalog = catalog,
             context = context,
@@ -60,7 +60,7 @@ class RecommendationEngine @Inject constructor() {
         }
 
         val selected = preferred[random.nextInt(preferred.size)]
-        return buildRecommendation(
+        return compose(
             selected = selected,
             catalog = catalog,
             context = context,
@@ -94,7 +94,11 @@ class RecommendationEngine @Inject constructor() {
         return total
     }
 
-    private fun buildRecommendation(
+    /**
+     * Reconstrói uma recomendação a partir de uma cor já escolhida
+     * (ex.: restaurar tela de resultado sem gerar/salvar de novo).
+     */
+    fun compose(
         selected: NailColor,
         catalog: List<NailColor>,
         context: RecommendationContext,

@@ -10,7 +10,7 @@ import br.com.unhasdequecor.data.local.db.entity.HistoryEntity
 @Database(
     entities = [HistoryEntity::class, FavoriteEntity::class],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao

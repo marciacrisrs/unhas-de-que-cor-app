@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.usecase.GenerateAndSaveRecommendationUseCase
+import br.com.unhasdequecor.domain.usecase.RestoreRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.ToggleFavoriteUseCase
 import br.com.unhasdequecor.ui.navigation.ResultSources
 import br.com.unhasdequecor.ui.navigation.Routes
@@ -27,34 +28,68 @@ data class ResultUiState(
 
 @HiltViewModel
 class ResultViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val generateAndSave: GenerateAndSaveRecommendationUseCase,
+    private val restoreRecommendation: RestoreRecommendationUseCase,
     private val toggleFavorite: ToggleFavoriteUseCase,
 ) : ViewModel() {
 
     private val source = ResultSources.toDomain(checkNotNull(savedStateHandle["source"]))
     private val occasion = Routes.parseOccasion(checkNotNull(savedStateHandle["occasion"]))
     private val mood = Routes.parseMood(checkNotNull(savedStateHandle["mood"]))
+    private val recommendationContext = RecommendationContext(
+        occasion = occasion,
+        mood = mood,
+    )
 
     private val _uiState = MutableStateFlow(ResultUiState())
     val uiState: StateFlow<ResultUiState> = _uiState.asStateFlow()
 
     init {
-        loadRecommendation()
+        val cachedColorId = savedStateHandle.get<String>(KEY_COLOR_ID)
+        if (cachedColorId != null) {
+            restoreCached(cachedColorId)
+        } else {
+            generateFresh()
+        }
     }
 
-    private fun loadRecommendation() {
+    private fun restoreCached(colorId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            runCatching {
+                restoreRecommendation(
+                    colorId = colorId,
+                    source = source,
+                    context = recommendationContext,
+                ) ?: error("Recomendação não encontrada.")
+            }.onSuccess { generated ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        recommendation = generated.recommendation,
+                        isFavorite = generated.isFavorite,
+                        savedToHistory = true,
+                    )
+                }
+            }.onFailure {
+                // Cache inválido — gera de novo.
+                savedStateHandle.remove<String>(KEY_COLOR_ID)
+                generateFresh()
+            }
+        }
+    }
+
+    private fun generateFresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             runCatching {
                 generateAndSave(
                     source = source,
-                    context = RecommendationContext(
-                        occasion = occasion,
-                        mood = mood,
-                    ),
+                    context = recommendationContext,
                 )
             }.onSuccess { generated ->
+                savedStateHandle[KEY_COLOR_ID] = generated.recommendation.color.id
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -86,5 +121,12 @@ class ResultViewModel @Inject constructor(
         }
     }
 
-    fun recommendAgain() = loadRecommendation()
+    fun recommendAgain() {
+        savedStateHandle.remove<String>(KEY_COLOR_ID)
+        generateFresh()
+    }
+
+    private companion object {
+        const val KEY_COLOR_ID = "result_cached_color_id"
+    }
 }
