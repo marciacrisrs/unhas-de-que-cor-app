@@ -9,7 +9,7 @@ import br.com.unhasdequecor.data.local.db.entity.HistoryEntity
 
 @Database(
     entities = [HistoryEntity::class, FavoriteEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

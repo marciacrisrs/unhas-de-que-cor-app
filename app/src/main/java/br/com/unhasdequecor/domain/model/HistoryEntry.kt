@@ -11,4 +11,5 @@ data class HistoryEntry(
     val mood: Mood?,
     val createdAtEpochMs: Long,
     val isFavorite: Boolean = false,
+    val idempotencyKey: String? = null,
 )

@@ -17,6 +17,11 @@ class FakeHistoryRepository : HistoryRepository {
         entries.map { list -> list.filter { it.colorId in favorites }.distinctBy { it.colorId } }
 
     override suspend fun save(entry: HistoryEntry): Long {
+        val key = entry.idempotencyKey
+        if (key != null) {
+            val existing = entries.value.firstOrNull { it.idempotencyKey == key }
+            if (existing != null) return existing.id
+        }
         val id = if (entry.id == 0L) nextId++ else entry.id
         val saved = entry.copy(id = id, isFavorite = entry.colorId in favorites)
         entries.value = listOf(saved) + entries.value.filterNot { it.id == id }
