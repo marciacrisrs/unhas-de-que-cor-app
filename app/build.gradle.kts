@@ -154,11 +154,16 @@ val jacocoExcludes = listOf(
 
 fun Project.domainClassDirectories(): FileCollection {
     val buildDirPath = layout.buildDirectory.get().asFile
-    val kotlinTree = fileTree(buildDirPath.resolve("tmp/kotlin-classes/debug")) {
+    // AGP 9 (built-in Kotlin compiler): classes live under intermediates/, not tmp/kotlin-classes.
+    val kotlinTree = fileTree(
+        buildDirPath.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+    ) {
         include(domainCoverageIncludes)
         exclude(jacocoExcludes)
     }
-    val javaTree = fileTree(buildDirPath.resolve("intermediates/javac/debug")) {
+    val javaTree = fileTree(
+        buildDirPath.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
+    ) {
         include(domainCoverageIncludes)
         exclude(jacocoExcludes)
     }
