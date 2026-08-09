@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Falha o CI em problemas críticos; avisos comuns de Compose ficam informativos. -->
+    <issue id="UnusedResources" severity="warning" />
+    <issue id="IconMissingDensityFolder" severity="ignore" />
+    <issue id="VectorPath" severity="warning" />
+    <issue id="TypographyQuotes" severity="ignore" />
+
+    <!-- Acessibilidade: manter visível no relatório. -->
+    <issue id="ContentDescription" severity="error" />
+    <issue id="TouchTargetSizeCheck" severity="warning" />
+</lint>
