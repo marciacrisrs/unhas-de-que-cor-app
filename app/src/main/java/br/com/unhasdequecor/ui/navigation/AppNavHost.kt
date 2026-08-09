@@ -62,7 +62,7 @@ fun AppNavHost() {
                 HomeScreen(
                     onChooseByContext = { navController.navigate(Routes.CONTEXT) },
                     onChooseForMe = {
-                        navController.navigate(Routes.result(ResultSources.FOR_ME))
+                        navController.navigate(Routes.resultForMe())
                     },
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
                     onOpenHistory = { navController.navigate(Routes.HISTORY) },
@@ -73,8 +73,8 @@ fun AppNavHost() {
                 val viewModel: ContextChoiceViewModel = hiltViewModel()
                 ContextChoiceScreen(
                     viewModel = viewModel,
-                    onContinue = {
-                        navController.navigate(Routes.result(ResultSources.CONTEXT))
+                    onContinue = { occasion, mood ->
+                        navController.navigate(Routes.resultByContext(occasion, mood))
                     },
                     onBack = { navController.popBackStack() },
                 )
@@ -84,7 +84,11 @@ fun AppNavHost() {
             }
             composable(
                 route = Routes.RESULT,
-                arguments = listOf(navArgument("source") { type = NavType.StringType }),
+                arguments = listOf(
+                    navArgument("source") { type = NavType.StringType },
+                    navArgument("occasion") { type = NavType.StringType },
+                    navArgument("mood") { type = NavType.StringType },
+                ),
             ) {
                 ResultScreen(
                     onBack = { navController.popBackStack() },

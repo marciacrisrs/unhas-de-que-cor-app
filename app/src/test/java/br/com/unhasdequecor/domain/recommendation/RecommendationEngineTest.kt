@@ -1,11 +1,11 @@
 package br.com.unhasdequecor.domain.recommendation
 
-import br.com.unhasdequecor.data.catalog.DefaultColorCatalog
 import br.com.unhasdequecor.domain.model.Mood
 import br.com.unhasdequecor.domain.model.NailStyle
 import br.com.unhasdequecor.domain.model.Occasion
 import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.model.RecommendationSource
+import br.com.unhasdequecor.testing.TestColorCatalog
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import kotlin.random.Random
@@ -13,7 +13,7 @@ import kotlin.random.Random
 class RecommendationEngineTest {
 
     private val engine = RecommendationEngine()
-    private val catalog = DefaultColorCatalog.colors
+    private val catalog = TestColorCatalog.colors
 
     @Test
     fun `recommendByContext prefers matching occasion and mood`() {

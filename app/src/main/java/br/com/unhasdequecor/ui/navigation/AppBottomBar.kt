@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -51,9 +52,9 @@ fun AppBottomBar(
         ) {
             mainDestinations.forEachIndexed { index, destination ->
                 if (index == 2) {
-                    // Espaço para o FAB central
+                    // Placeholder visual sob o FAB — oculto do TalkBack para evitar duplicata.
                     NavigationBarItem(
-                        selected = false,
+                        selected = currentRoute == Routes.CONTEXT,
                         onClick = { onNavigate(Routes.CONTEXT) },
                         icon = { Box(modifier = Modifier.size(24.dp)) },
                         label = {
@@ -62,6 +63,7 @@ fun AppBottomBar(
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         },
+                        modifier = Modifier.clearAndSetSemantics { },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -81,7 +83,7 @@ fun AppBottomBar(
                                     Routes.FAVORITES -> Icons.Outlined.FavoriteBorder
                                     else -> Icons.Outlined.Person
                                 },
-                                contentDescription = destination.contentDescription,
+                                contentDescription = null,
                             )
                         },
                         label = {
@@ -89,6 +91,9 @@ fun AppBottomBar(
                                 text = destination.label,
                                 style = MaterialTheme.typography.labelSmall,
                             )
+                        },
+                        modifier = Modifier.semantics {
+                            contentDescription = destination.contentDescription
                         },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,

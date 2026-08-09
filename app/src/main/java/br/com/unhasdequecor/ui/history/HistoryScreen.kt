@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,78 +54,65 @@ fun HistoryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            NailPolishMark(markSize = 40.dp)
+            NailPolishMark(markSize = 40.dp, decorative = true)
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = !state.favoritesOnly,
-                onClick = { viewModel.setFavoritesOnly(false) },
-                label = { Text("Todas") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
-            FilterChip(
-                selected = state.favoritesOnly,
-                onClick = { viewModel.setFavoritesOnly(true) },
-                label = { Text("Favoritas") },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            state.groups.forEach { group ->
-                item(key = "header-${group.monthLabel}") {
-                    Text(
-                        text = group.monthLabel,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-                    )
-                }
-                items(group.entries, key = { it.id }) { entry ->
-                    HistoryRow(
-                        colorName = entry.colorName,
-                        colorHex = entry.colorHex,
-                        tags = entry.tags,
-                        dateLabel = viewModel.formatDate(entry.createdAtEpochMs),
-                        isFavorite = entry.isFavorite,
-                        onFavoriteClick = { viewModel.onToggleFavorite(entry) },
-                        onClick = {},
-                    )
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(
-                            Icons.Outlined.BarChart,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
+        if (state.isEmpty) {
+            Text(
+                text = "Seu histórico aparece aqui depois da primeira recomendação.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                state.groups.forEach { group ->
+                    item(key = "header-${group.monthLabel}") {
                         Text(
-                            text = "Você já explorou ${state.distinctColorCount} cores diferentes. Continue explorando e descubra novas combinações!",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = group.monthLabel,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                        )
+                    }
+                    items(group.entries, key = { it.id }) { entry ->
+                        HistoryRow(
+                            colorName = entry.colorName,
+                            colorHex = entry.colorHex,
+                            tags = entry.tags,
+                            dateLabel = entry.dateLabel,
+                            isFavorite = entry.isFavorite,
+                            onFavoriteClick = { viewModel.onToggleFavorite(entry) },
+                            onClick = {},
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(88.dp))
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 1.dp,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.BarChart,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = "Você já explorou ${state.distinctColorCount} cores diferentes. Continue explorando e descubra novas combinações!",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(88.dp))
+                }
             }
         }
     }

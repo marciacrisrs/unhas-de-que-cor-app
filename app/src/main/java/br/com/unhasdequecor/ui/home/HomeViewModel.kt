@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 data class HomeUiState(
-    val displayName: String = "Márcia",
+    val displayName: String = "",
     val recentColors: List<HistoryEntry> = emptyList(),
 )
 

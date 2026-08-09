@@ -12,20 +12,6 @@ interface HistoryDao {
     @Query("SELECT * FROM history ORDER BY createdAtEpochMs DESC")
     fun observeAll(): Flow<List<HistoryEntity>>
 
-    @Query(
-        """
-        SELECT h.* FROM history h
-        INNER JOIN (
-            SELECT colorId, MAX(createdAtEpochMs) AS maxCreated
-            FROM history
-            GROUP BY colorId
-        ) latest ON h.colorId = latest.colorId AND h.createdAtEpochMs = latest.maxCreated
-        WHERE h.isFavorite = 1
-        ORDER BY h.createdAtEpochMs DESC
-        """,
-    )
-    fun observeFavorites(): Flow<List<HistoryEntity>>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: HistoryEntity): Long
 

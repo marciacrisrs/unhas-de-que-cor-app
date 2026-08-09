@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -55,14 +56,18 @@ fun NailPolishMark(
     modifier: Modifier = Modifier,
     markSize: Dp = 48.dp,
     polishColor: Color? = null,
+    decorative: Boolean = false,
 ) {
     val resolvedPolish = polishColor ?: MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.onBackground
-    Canvas(
-        modifier = modifier
+    val canvasModifier = if (decorative) {
+        modifier.size(markSize).clearAndSetSemantics { }
+    } else {
+        modifier
             .size(markSize)
-            .semantics { contentDescription = "Ícone do app Unhas de Que Cor" },
-    ) {
+            .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
+    }
+    Canvas(modifier = canvasModifier) {
         val stroke = Stroke(width = markSize.toPx() * 0.045f)
         val canvasSize = this.size
         val cx = canvasSize.width / 2f
@@ -258,7 +263,9 @@ fun NailSwatch(
     modifier: Modifier = Modifier,
     width: Dp = 36.dp,
     height: Dp = 56.dp,
+    colorName: String? = null,
 ) {
+    val description = colorName?.let { "Amostra da cor $it" } ?: "Amostra da cor"
     Box(
         modifier = modifier
             .width(width)
@@ -270,7 +277,24 @@ fun NailSwatch(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                 shape = RoundedCornerShape(50),
             )
-            .semantics { contentDescription = "Amostra da cor" },
+            .semantics { contentDescription = description },
+    )
+}
+
+@Composable
+fun InfoTag(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onPrimary,
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .semantics { contentDescription = label },
     )
 }
 
@@ -297,7 +321,7 @@ fun HistoryRow(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            NailSwatch(colorHex = colorHex)
+            NailSwatch(colorHex = colorHex, colorName = colorName)
             Box(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

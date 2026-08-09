@@ -23,7 +23,7 @@ class PreferencesDataSource @Inject constructor(
             .toSet()
         UserPreferences(
             preferredStyles = styles,
-            displayName = prefs[KEY_DISPLAY_NAME] ?: "Márcia",
+            displayName = prefs[KEY_DISPLAY_NAME].orEmpty(),
         )
     }
 

@@ -52,7 +52,7 @@ import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.ProgressSteps
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
-import br.com.unhasdequecor.ui.components.StyleChip
+import br.com.unhasdequecor.ui.components.InfoTag
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,7 +78,7 @@ fun ResultScreen(
                 }
             },
             actions = {
-                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp)
+                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp, decorative = true)
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background,
@@ -117,7 +117,7 @@ fun ResultScreen(
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 20.dp),
                     ) {
-                        ProgressSteps(current = 3, total = 3)
+                        ProgressSteps(current = 2, total = 2)
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Surface(
@@ -147,7 +147,13 @@ fun ResultScreen(
                                     ) {
                                         IconButton(
                                             onClick = viewModel::onToggleFavorite,
-                                            modifier = Modifier.align(Alignment.BottomEnd),
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(6.dp)
+                                                .background(
+                                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                                ),
                                         ) {
                                             Icon(
                                                 imageVector = if (state.isFavorite) {
@@ -160,7 +166,7 @@ fun ResultScreen(
                                                 } else {
                                                     "Salvar nos favoritos"
                                                 },
-                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                tint = MaterialTheme.colorScheme.primary,
                                             )
                                         }
                                     }
@@ -182,11 +188,7 @@ fun ResultScreen(
                                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                                         ) {
                                             color.tags.take(3).forEach { tag ->
-                                                StyleChip(
-                                                    label = tag.displayName,
-                                                    selected = true,
-                                                    onClick = {},
-                                                )
+                                                InfoTag(label = tag.displayName)
                                             }
                                         }
                                         Spacer(modifier = Modifier.height(12.dp))
@@ -233,6 +235,7 @@ fun ResultScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     NailSwatch(
                                         colorHex = item.hex,
+                                        colorName = item.name,
                                         width = 44.dp,
                                         height = 64.dp,
                                         modifier = Modifier.border(

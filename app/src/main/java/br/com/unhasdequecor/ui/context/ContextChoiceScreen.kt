@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,7 +62,7 @@ import br.com.unhasdequecor.ui.components.ProgressSteps
 @Composable
 fun ContextChoiceScreen(
     viewModel: ContextChoiceViewModel,
-    onContinue: () -> Unit,
+    onContinue: (Occasion, Mood) -> Unit,
     onBack: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -83,7 +85,7 @@ fun ContextChoiceScreen(
                 }
             },
             actions = {
-                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp)
+                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp, decorative = true)
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background,
@@ -102,7 +104,7 @@ fun ContextChoiceScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(16.dp))
-            ProgressSteps(current = 1, total = 3)
+            ProgressSteps(current = 1, total = 2)
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
@@ -130,7 +132,13 @@ fun ContextChoiceScreen(
 
         PrimaryCtaButton(
             text = "Continuar",
-            onClick = onContinue,
+            onClick = {
+                val occasion = state.selectedOccasion
+                val mood = state.selectedMood
+                if (occasion != null && mood != null) {
+                    onContinue(occasion, mood)
+                }
+            },
             enabled = state.canContinue,
             modifier = Modifier.padding(20.dp),
         )
@@ -209,6 +217,7 @@ private fun SelectableCard(
     val shape = RoundedCornerShape(18.dp)
     Box(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .border(
@@ -221,10 +230,11 @@ private fun SelectableCard(
                 shape = shape,
             )
             .clickable(onClick = onClick)
-            .padding(if (compact) 10.dp else 14.dp)
+            .padding(if (compact) 12.dp else 14.dp)
             .semantics {
                 role = Role.RadioButton
-                contentDescription = if (selected) "$label selecionado" else label
+                this.selected = selected
+                contentDescription = label
             },
     ) {
         if (selected) {

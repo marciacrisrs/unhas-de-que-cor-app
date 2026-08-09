@@ -90,7 +90,7 @@ fun HomeScreen(
         BrandHeader()
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Olá, ${state.displayName}!",
+            text = if (state.displayName.isBlank()) "Olá!" else "Olá, ${state.displayName}!",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )

@@ -3,14 +3,16 @@ package br.com.unhasdequecor.domain.usecase
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.HistoryEntry
 import br.com.unhasdequecor.domain.repository.HistoryRepository
+import br.com.unhasdequecor.domain.time.Clock
 import javax.inject.Inject
 
 class SaveRecommendationUseCase @Inject constructor(
     private val historyRepository: HistoryRepository,
+    private val clock: Clock,
 ) {
     suspend operator fun invoke(
         recommendation: ColorRecommendation,
-        createdAtEpochMs: Long = System.currentTimeMillis(),
+        createdAtEpochMs: Long = clock.now(),
     ): Long {
         val color = recommendation.color
         return historyRepository.save(

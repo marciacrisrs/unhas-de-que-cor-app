@@ -14,6 +14,7 @@ import br.com.unhasdequecor.data.repository.PreferencesRepositoryImpl
 import br.com.unhasdequecor.domain.repository.ColorCatalogRepository
 import br.com.unhasdequecor.domain.repository.HistoryRepository
 import br.com.unhasdequecor.domain.repository.PreferencesRepository
+import br.com.unhasdequecor.domain.time.Clock
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -32,6 +33,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "unhas_de_que_cor.db")
+            // MVP: schema ainda volátil. Trocar por migrations reais antes de release.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
@@ -45,6 +47,10 @@ object DatabaseModule {
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
         context.dataStore
+
+    @Provides
+    @Singleton
+    fun provideClock(): Clock = Clock { System.currentTimeMillis() }
 }
 
 @Module
