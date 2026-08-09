@@ -104,33 +104,6 @@ detekt {
     ignoredBuildTypes = listOf("release")
 }
 
-tasks.register("downloadHandLandmarker") {
-    group = "setup"
-    description = "Baixa o modelo MediaPipe Hand Landmarker para assets."
-    notCompatibleWithConfigurationCache("Download externo do modelo MediaPipe")
-    val destinationPath = "src/main/assets/hand_landmarker.task"
-    outputs.file(destinationPath)
-    onlyIf { !file(destinationPath).exists() }
-    doLast {
-        val destination = file(destinationPath)
-        destination.parentFile.mkdirs()
-        val url =
-            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-        val exit = ProcessBuilder(
-            "curl",
-            "-fsSL",
-            "-o",
-            destination.absolutePath,
-            url,
-        ).inheritIO().start().waitFor()
-        check(exit == 0) { "Falha ao baixar hand_landmarker.task (exit=$exit)" }
-        check(destination.isFile && destination.length() > 0L) {
-            "Arquivo hand_landmarker.task inválido após download"
-        }
-    }
-}
-tasks.named("preBuild").configure { dependsOn("downloadHandLandmarker") }
-
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
