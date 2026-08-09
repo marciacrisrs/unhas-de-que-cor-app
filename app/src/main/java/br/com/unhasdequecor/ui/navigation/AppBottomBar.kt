@@ -47,8 +47,8 @@ fun AppBottomBar(
 ) {
     Box {
         NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            tonalElevation = 0.dp,
         ) {
             mainDestinations.forEachIndexed { index, destination ->
                 if (index == 2) {

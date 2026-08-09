@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -51,7 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.ui.components.BrandHeader
-import br.com.unhasdequecor.ui.components.NailSwatch
+import br.com.unhasdequecor.ui.theme.RecommendationCardShape
+import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
 @Composable
 fun HomeScreen(
@@ -67,120 +67,119 @@ fun HomeScreen(
     LaunchedEffect(Unit) { visible = true }
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(500),
+        animationSpec = tween(600),
         label = "homeFade",
     )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                        MaterialTheme.colorScheme.background,
-                    ),
-                ),
-            )
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp, vertical = 28.dp)
             .alpha(alpha),
     ) {
         BrandHeader()
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(36.dp))
+
         Text(
-            text = if (state.displayName.isBlank()) "Olá!" else "Olá, ${state.displayName}!",
-            style = MaterialTheme.typography.titleLarge,
+            text = if (state.displayName.isBlank()) {
+                "Qual cor combina com você hoje?"
+            } else {
+                "Qual cor combina com você hoje, ${state.displayName}?"
+            },
+            style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
+        Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = "Menos dúvida. Mais unha bonita.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(20.dp))
 
+        Spacer(modifier = Modifier.height(32.dp))
+
+        HeroActionCard(
+            title = "Escolher minha cor",
+            subtitle = "Ocasião e humor em poucos toques — a sugestão respira com você.",
+            icon = Icons.Outlined.Palette,
+            emphasized = true,
+            onClick = onChooseByContext,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        HeroActionCard(
+            title = "Escolha por mim",
+            subtitle = "Surpresa com personalidade. Uma cor, sem julgamento.",
+            icon = Icons.Outlined.AutoAwesome,
+            emphasized = false,
+            onClick = onChooseForMe,
+        )
+
+        Spacer(modifier = Modifier.height(40.dp))
+        Text(
+            text = "Continue explorando",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            HeroActionCard(
-                title = "Escolher minha cor",
-                subtitle = "Receba a cor ideal para o seu momento",
-                icon = Icons.Outlined.Palette,
-                emphasized = true,
-                onClick = onChooseByContext,
-                modifier = Modifier.weight(1f),
-            )
-            HeroActionCard(
-                title = "Escolha por mim",
-                subtitle = "Surpreenda-se com uma cor incrível",
-                icon = Icons.Outlined.AutoAwesome,
-                emphasized = false,
-                onClick = onChooseForMe,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = "CONTINUE EXPLORANDO",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ExploreTile("Estilo", Icons.Outlined.Style, onOpenStyle, Modifier.weight(1f))
             ExploreTile("Favoritos", Icons.Outlined.FavoriteBorder, onOpenFavorites, Modifier.weight(1f))
             ExploreTile("Histórico", Icons.Outlined.History, onOpenHistory, Modifier.weight(1f))
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 1.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenHistory)
-                .semantics {
-                    role = Role.Button
-                    contentDescription = "Ver suas últimas escolhas"
-                },
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        if (state.recentColors.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(40.dp))
+            Surface(
+                shape = SoftSurfaceShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenHistory)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Ver suas últimas escolhas"
+                    },
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Suas últimas escolhas",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "Veja e inspire-se novamente.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
-                    state.recentColors.forEach { entry ->
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Color(entry.colorHex))
-                                .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                Row(
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Suas últimas escolhas",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Veja e inspire-se novamente.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+                        state.recentColors.forEach { entry ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(entry.colorHex))
+                                    .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                    .semantics {
+                                        contentDescription = "Cor recente ${entry.colorName}"
+                                    },
+                            )
+                        }
                     }
                 }
             }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -191,44 +190,38 @@ private fun HeroActionCard(
     icon: ImageVector,
     emphasized: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RecommendationCardShape
     val background = if (emphasized) {
-        Brush.verticalGradient(
+        Brush.linearGradient(
             listOf(
                 MaterialTheme.colorScheme.primary,
-                MaterialTheme.colorScheme.secondary,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
+                MaterialTheme.colorScheme.secondary.copy(alpha = 0.95f),
             ),
         )
     } else {
-        Brush.verticalGradient(
+        Brush.linearGradient(
             listOf(
-                MaterialTheme.colorScheme.surface,
-                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.surfaceVariant,
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
             ),
         )
     }
     val contentColor = if (emphasized) {
         MaterialTheme.colorScheme.onPrimary
     } else {
-        MaterialTheme.colorScheme.primary
+        MaterialTheme.colorScheme.onBackground
     }
 
     Column(
-        modifier = modifier
-            .height(190.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(168.dp)
             .clip(shape)
             .background(background)
-            .then(
-                if (!emphasized) {
-                    Modifier.border(1.dp, MaterialTheme.colorScheme.primary, shape)
-                } else {
-                    Modifier
-                },
-            )
             .clickable(onClick = onClick)
-            .padding(16.dp)
+            .padding(horizontal = 24.dp, vertical = 22.dp)
             .semantics {
                 role = Role.Button
                 contentDescription = title
@@ -237,31 +230,31 @@ private fun HeroActionCard(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(contentColor.copy(alpha = 0.15f)),
+                .background(contentColor.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = contentColor)
         }
         Column {
             Text(
-                text = title.uppercase(),
-                style = MaterialTheme.typography.titleSmall,
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
                 color = contentColor,
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = contentColor.copy(alpha = 0.9f),
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -276,18 +269,22 @@ private fun ExploreTile(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
-            .padding(vertical = 14.dp)
+            .padding(vertical = 20.dp)
             .semantics {
                 role = Role.Button
                 contentDescription = label
             },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
     }
 }

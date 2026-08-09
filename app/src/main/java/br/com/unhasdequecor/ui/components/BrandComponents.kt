@@ -49,6 +49,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import br.com.unhasdequecor.domain.model.NailStyle
+import br.com.unhasdequecor.ui.theme.FunChipShape
+import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import br.com.unhasdequecor.ui.theme.UnhasDeQueCorTheme
 
 @Composable
@@ -90,7 +92,7 @@ fun NailPolishMark(
             lineTo(cx + bottleHalf * 0.7f, bottleTop + radius * 0.22f)
             lineTo(cx + bottleHalf, bottleTop + radius * 0.28f)
             lineTo(cx + bottleHalf, bottleBottom)
-            quadraticBezierTo(cx, bottleBottom + radius * 0.12f, cx - bottleHalf, bottleBottom)
+            quadraticTo(cx, bottleBottom + radius * 0.12f, cx - bottleHalf, bottleBottom)
             lineTo(cx - bottleHalf, bottleTop + radius * 0.28f)
             lineTo(cx - bottleHalf * 0.7f, bottleTop + radius * 0.22f)
             close()
@@ -178,7 +180,7 @@ fun PrimaryCtaButton(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp),
-        shape = RoundedCornerShape(28.dp),
+        shape = SoftSurfaceShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -201,7 +203,7 @@ fun SecondaryCtaButton(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp),
-        shape = RoundedCornerShape(28.dp),
+        shape = SoftSurfaceShape,
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = MaterialTheme.colorScheme.primary,
         ),
@@ -220,7 +222,7 @@ fun StyleChip(
     val background = if (selected) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.surface
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
     }
     val content = if (selected) {
         MaterialTheme.colorScheme.onPrimary
@@ -229,12 +231,12 @@ fun StyleChip(
     }
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(FunChipShape)
             .background(background)
             .border(
                 width = 1.dp,
                 color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outline,
-                shape = RoundedCornerShape(24.dp),
+                shape = FunChipShape,
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -289,10 +291,10 @@ fun InfoTag(
     Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onPrimary,
+        color = MaterialTheme.colorScheme.onSecondary,
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(MaterialTheme.colorScheme.primary)
+            .clip(FunChipShape)
+            .background(MaterialTheme.colorScheme.secondary)
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .semantics { contentDescription = label },
     )
@@ -312,13 +314,13 @@ fun HistoryRow(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(SoftSurfaceShape)
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        tonalElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NailSwatch(colorHex = colorHex, colorName = colorName)

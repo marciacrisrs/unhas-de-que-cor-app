@@ -15,16 +15,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,19 +39,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.ui.components.InfoTag
+import br.com.unhasdequecor.ui.components.NailHandIllustration
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.ProgressSteps
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
-import br.com.unhasdequecor.ui.components.InfoTag
+import br.com.unhasdequecor.ui.theme.FunChipShape
+import br.com.unhasdequecor.ui.theme.RecommendationCardShape
+import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +70,7 @@ fun ResultScreen(
     ) {
         TopAppBar(
             title = {
-                Text("Sua cor ideal", style = MaterialTheme.typography.headlineSmall)
+                Text("Sua cor", style = MaterialTheme.typography.headlineSmall)
             },
             navigationIcon = {
                 IconButton(onClick = onBack) {
@@ -95,12 +95,16 @@ fun ResultScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(28.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(state.errorMessage.orEmpty())
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = state.errorMessage.orEmpty(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
                     PrimaryCtaButton(text = "Tentar de novo", onClick = viewModel::recommendAgain)
                 }
             }
@@ -109,126 +113,112 @@ fun ResultScreen(
                 val color = recommendation.color
                 AnimatedVisibility(
                     visible = true,
-                    enter = fadeIn() + slideInVertically { it / 4 },
+                    enter = fadeIn() + slideInVertically { it / 5 },
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp),
+                            .padding(horizontal = 24.dp),
                     ) {
                         ProgressSteps(current = 2, total = 2)
+                        Spacer(modifier = Modifier.height(28.dp))
+
+                        Text(
+                            text = "Qual cor combina com você hoje?",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Surface(
-                            shape = RoundedCornerShape(28.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 2.dp,
+                            shape = RecommendationCardShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Box(
+                            Column(
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    NailHandIllustration(
+                                        polishColor = Color(color.hex),
+                                        colorName = color.name,
                                         modifier = Modifier
-                                            .width(120.dp)
-                                            .height(180.dp)
-                                            .clip(RoundedCornerShape(24.dp))
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp),
+                                    )
+                                    IconButton(
+                                        onClick = viewModel::onToggleFavorite,
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
                                             .background(
-                                                Brush.verticalGradient(
-                                                    listOf(
-                                                        Color(color.hex).copy(alpha = 0.55f),
-                                                        Color(color.hex),
-                                                    ),
-                                                ),
-                                            )
-                                            .semantics {
-                                                contentDescription = "Visualização da cor ${color.name}"
-                                            },
+                                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                                shape = CircleShape,
+                                            ),
                                     ) {
-                                        IconButton(
-                                            onClick = viewModel::onToggleFavorite,
-                                            modifier = Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(6.dp)
-                                                .background(
-                                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                                    shape = androidx.compose.foundation.shape.CircleShape,
-                                                ),
-                                        ) {
-                                            Icon(
-                                                imageVector = if (state.isFavorite) {
-                                                    Icons.Filled.Favorite
-                                                } else {
-                                                    Icons.Filled.FavoriteBorder
-                                                },
-                                                contentDescription = if (state.isFavorite) {
-                                                    "Remover dos favoritos"
-                                                } else {
-                                                    "Salvar nos favoritos"
-                                                },
-                                                tint = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Sua cor do momento é",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        Text(
-                                            text = color.name,
-                                            style = MaterialTheme.typography.displayMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                        ) {
-                                            color.tags.take(3).forEach { tag ->
-                                                InfoTag(label = tag.displayName)
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text(
-                                            text = recommendation.rationale,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
+                                        Icon(
+                                            imageVector = if (state.isFavorite) {
+                                                Icons.Filled.Favorite
+                                            } else {
+                                                Icons.Filled.FavoriteBorder
+                                            },
+                                            contentDescription = if (state.isFavorite) {
+                                                "Remover dos favoritos"
+                                            } else {
+                                                "Salvar nos favoritos"
+                                            },
+                                            tint = MaterialTheme.colorScheme.primary,
                                         )
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Text(
+                                    text = color.name,
+                                    style = MaterialTheme.typography.displayMedium,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                ) {
+                                    color.tags.take(3).forEach { tag ->
+                                        InfoTag(label = tag.displayName)
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(16.dp))
-                                NailPolishMark(
-                                    markSize = 72.dp,
-                                    polishColor = Color(color.hex),
-                                    modifier = Modifier.align(Alignment.End),
+                                Text(
+                                    text = recommendation.rationale,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
                         Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                            shape = SoftSurfaceShape,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.22f),
                         ) {
                             Text(
                                 text = "Dica: ${color.tip}",
-                                modifier = Modifier.padding(14.dp),
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                                 style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(36.dp))
                         Text(
-                            text = "CORES PARECIDAS",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            text = "Cores parecidas",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                         ) {
                             (listOf(color) + recommendation.similarColors).forEach { item ->
@@ -236,29 +226,30 @@ fun ResultScreen(
                                     NailSwatch(
                                         colorHex = item.hex,
                                         colorName = item.name,
-                                        width = 44.dp,
-                                        height = 64.dp,
+                                        width = 48.dp,
+                                        height = 72.dp,
                                         modifier = Modifier.border(
                                             width = if (item.id == color.id) 2.dp else 0.dp,
                                             color = MaterialTheme.colorScheme.primary,
-                                            shape = RoundedCornerShape(50),
+                                            shape = FunChipShape,
                                         ),
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = item.name,
                                         style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onBackground,
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(32.dp))
                         PrimaryCtaButton(
                             text = if (state.isFavorite) "Salvo nos favoritos" else "Salvar nos favoritos",
                             onClick = viewModel::onToggleFavorite,
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         SecondaryCtaButton(
                             text = "Ver histórico",
                             onClick = onOpenHistory,
@@ -267,11 +258,18 @@ fun ResultScreen(
                             onClick = viewModel::recommendAgain,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
-                            Icon(Icons.Filled.Bookmark, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Quero outra sugestão")
+                            Icon(
+                                Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Quero outra sugestão",
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(28.dp))
                     }
                 }
             }

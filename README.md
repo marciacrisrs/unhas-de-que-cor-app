@@ -20,6 +20,20 @@ O app recomenda cores considerando ocasião, humor e estilo — ou escolhe por v
 - Tela de resultado visual
 - Histórico e favoritos locais (Room + DataStore)
 
+## Identidade visual
+
+Paleta (contraste em pontos estratégicos):
+
+| Token | Hex | Uso |
+|-------|-----|-----|
+| Base | `#FCF1EE` | Fundo |
+| Superfície suave | `#ECB2C8` | Cards e áreas calmas |
+| Diversão | `#F590B6` | Tags e acentos |
+| Ação | `#A4082B` | CTAs e FAB |
+| Identidade | `#400113` | Texto forte / marca |
+
+Princípios de UI: cards grandes e arredondados, muito respiro no `#FCF1EE`, ilustração de unhas na recomendação. Tipografia: **Playfair Display** (títulos) + **Poppins** (UI).
+
 ## Stack
 
 - Kotlin + Jetpack Compose (Material 3)
