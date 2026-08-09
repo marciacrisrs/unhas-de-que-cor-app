@@ -14,55 +14,17 @@ import javax.inject.Singleton
 
 @Singleton
 class HandReferenceFileStore @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     fun persist(
         sourceAbsolutePath: String,
         capturedAtEpochMs: Long,
     ): HandReferenceSaveOutcome {
-        val source = File(sourceAbsolutePath)
-        if (!source.isFile) {
-            return HandReferenceSaveOutcome.Rejected(HandReferenceRejection.INVALID_IMAGE)
-        }
-        if (source.length() > MAX_BYTES) {
-            return HandReferenceSaveOutcome.Rejected(HandReferenceRejection.TOO_LARGE)
-        }
-
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(source.absolutePath, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            return HandReferenceSaveOutcome.Rejected(HandReferenceRejection.INVALID_IMAGE)
-        }
-        if (bounds.outWidth < MIN_DIMENSION || bounds.outHeight < MIN_DIMENSION) {
-            return HandReferenceSaveOutcome.Rejected(HandReferenceRejection.TOO_SMALL)
-        }
-
-        return try {
-            val directory = File(context.filesDir, DIRECTORY).also { it.mkdirs() }
-            val destination = File(directory, FILE_NAME)
-            val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, TARGET_MAX_EDGE)
-            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            val bitmap = BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
-                ?: return HandReferenceSaveOutcome.Rejected(HandReferenceRejection.INVALID_IMAGE)
-
-            FileOutputStream(destination).use { output ->
-                val compressed = bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
-                if (!compressed) {
-                    return HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
-                }
-            }
-            if (!bitmap.isRecycled) {
-                bitmap.recycle()
-            }
-
-            HandReferenceSaveOutcome.Saved(
-                HandReference(
-                    localPath = destination.absolutePath,
-                    capturedAtEpochMs = capturedAtEpochMs,
-                ),
-            )
-        } catch (_: Exception) {
-            HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
+        val validationError = validateSource(File(sourceAbsolutePath))
+        return if (validationError != null) {
+            HandReferenceSaveOutcome.Rejected(validationError)
+        } else {
+            writeHandJpeg(File(sourceAbsolutePath), capturedAtEpochMs)
         }
     }
 
@@ -88,10 +50,74 @@ class HandReferenceFileStore @Inject constructor(
 
     fun fileExists(path: String): Boolean = File(path).isFile
 
+    private fun validateSource(source: File): HandReferenceRejection? {
+        if (!source.isFile) {
+            return HandReferenceRejection.INVALID_IMAGE
+        }
+        if (source.length() > MAX_BYTES) {
+            return HandReferenceRejection.TOO_LARGE
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(source.absolutePath, bounds)
+        return when {
+            bounds.outWidth <= 0 || bounds.outHeight <= 0 -> HandReferenceRejection.INVALID_IMAGE
+            bounds.outWidth < MIN_DIMENSION || bounds.outHeight < MIN_DIMENSION ->
+                HandReferenceRejection.TOO_SMALL
+            else -> null
+        }
+    }
+
+    private fun writeHandJpeg(
+        source: File,
+        capturedAtEpochMs: Long,
+    ): HandReferenceSaveOutcome = try {
+        val bitmap = decodeSampledBitmap(source)
+        if (bitmap == null) {
+            HandReferenceSaveOutcome.Rejected(HandReferenceRejection.INVALID_IMAGE)
+        } else {
+            storeJpeg(bitmap, capturedAtEpochMs).also {
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+            }
+        }
+    } catch (_: Exception) {
+        HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
+    }
+
+    private fun decodeSampledBitmap(source: File): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(source.absolutePath, bounds)
+        val sampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, TARGET_MAX_EDGE)
+        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        return BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
+    }
+
+    private fun storeJpeg(
+        bitmap: Bitmap,
+        capturedAtEpochMs: Long,
+    ): HandReferenceSaveOutcome {
+        val directory = File(context.filesDir, DIRECTORY).also { it.mkdirs() }
+        val destination = File(directory, FILE_NAME)
+        val compressed = FileOutputStream(destination).use { output ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+        }
+        return if (compressed) {
+            HandReferenceSaveOutcome.Saved(
+                HandReference(
+                    localPath = destination.absolutePath,
+                    capturedAtEpochMs = capturedAtEpochMs,
+                ),
+            )
+        } else {
+            HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
+        }
+    }
+
     private fun calculateInSampleSize(width: Int, height: Int, maxEdge: Int): Int {
         var inSampleSize = 1
-        var halfWidth = width / 2
-        var halfHeight = height / 2
+        val halfWidth = width / 2
+        val halfHeight = height / 2
         while (halfWidth / inSampleSize >= maxEdge && halfHeight / inSampleSize >= maxEdge) {
             inSampleSize *= 2
         }

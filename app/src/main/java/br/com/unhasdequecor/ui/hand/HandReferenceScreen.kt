@@ -89,22 +89,19 @@ fun HandReferenceScreen(
         }
     }
 
-    fun openCameraCapture() {
-        val file = viewModel.createCameraCaptureFile()
-        pendingCameraFile = file
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
-        cameraLauncher.launch(uri)
-    }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            openCameraCapture()
+            val file = viewModel.createCameraCaptureFile()
+            pendingCameraFile = file
+            cameraLauncher.launch(
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                ),
+            )
         } else {
             cameraPermissionDenied = true
         }
@@ -116,27 +113,75 @@ fun HandReferenceScreen(
             Manifest.permission.CAMERA,
         ) == PackageManager.PERMISSION_GRANTED
         if (granted) {
-            openCameraCapture()
+            val file = viewModel.createCameraCaptureFile()
+            pendingCameraFile = file
+            cameraLauncher.launch(
+                FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                ),
+            )
         } else {
             permissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    LaunchedEffect(state.message) {
-        val text = state.message ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(text)
-        viewModel.consumeMessage()
-    }
+    HandReferenceMessageEffects(
+        message = state.message,
+        cameraPermissionDenied = cameraPermissionDenied,
+        snackbarHostState = snackbarHostState,
+        onMessageConsumed = viewModel::consumeMessage,
+        onPermissionDeniedConsumed = { cameraPermissionDenied = false },
+    )
 
+    HandReferenceScaffold(
+        state = state,
+        snackbarHostState = snackbarHostState,
+        onBack = onBack,
+        onPickGallery = {
+            galleryLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+        },
+        onOpenCamera = ::requestOrOpenCamera,
+        onClear = viewModel::clear,
+    )
+}
+
+@Composable
+private fun HandReferenceMessageEffects(
+    message: String?,
+    cameraPermissionDenied: Boolean,
+    snackbarHostState: SnackbarHostState,
+    onMessageConsumed: () -> Unit,
+    onPermissionDeniedConsumed: () -> Unit,
+) {
+    LaunchedEffect(message) {
+        val text = message ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(text)
+        onMessageConsumed()
+    }
     LaunchedEffect(cameraPermissionDenied) {
         if (cameraPermissionDenied) {
             snackbarHostState.showSnackbar(
                 "Permissão de câmera necessária para tirar a foto.",
             )
-            cameraPermissionDenied = false
+            onPermissionDeniedConsumed()
         }
     }
+}
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HandReferenceScaffold(
+    state: HandReferenceUiState,
+    snackbarHostState: SnackbarHostState,
+    onBack: () -> Unit,
+    onPickGallery: () -> Unit,
+    onOpenCamera: () -> Unit,
+    onClear: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -156,73 +201,12 @@ fun HandReferenceScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
             )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 28.dp),
-            ) {
-                Text(
-                    text = "Cadastre uma foto da sua mão para o try-on virtual.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Dica: fundo claro, boa luz e unhas à mostra. Sem segmentação ainda — " +
-                        "só salvamos a referência no aparelho.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-
-                HandPreview(path = state.reference?.localPath)
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                if (state.reference == null) {
-                    PrimaryCtaButton(
-                        text = "Escolher da galeria",
-                        onClick = {
-                            galleryLauncher.launch(
-                                PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                ),
-                            )
-                        },
-                        enabled = !state.isSaving,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    SecondaryCtaButton(
-                        text = "Tirar foto",
-                        onClick = ::requestOrOpenCamera,
-                    )
-                } else {
-                    PrimaryCtaButton(
-                        text = "Substituir foto",
-                        onClick = {
-                            galleryLauncher.launch(
-                                PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                ),
-                            )
-                        },
-                        enabled = !state.isSaving,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    SecondaryCtaButton(
-                        text = "Tirar nova foto",
-                        onClick = ::requestOrOpenCamera,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    SecondaryCtaButton(
-                        text = "Remover foto",
-                        onClick = viewModel::clear,
-                    )
-                }
-            }
+            HandReferenceContent(
+                state = state,
+                onPickGallery = onPickGallery,
+                onOpenCamera = onOpenCamera,
+                onClear = onClear,
+            )
         }
 
         if (state.isSaving) {
@@ -242,6 +226,74 @@ fun HandReferenceScreen(
                 .align(Alignment.BottomCenter)
                 .padding(16.dp),
         )
+    }
+}
+
+@Composable
+private fun HandReferenceContent(
+    state: HandReferenceUiState,
+    onPickGallery: () -> Unit,
+    onOpenCamera: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 28.dp),
+    ) {
+        Text(
+            text = "Cadastre uma foto da sua mão para o try-on virtual.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Dica: fundo claro, boa luz e unhas à mostra. Sem segmentação ainda — " +
+                "só salvamos a referência no aparelho.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        HandPreview(path = state.reference?.localPath)
+        Spacer(modifier = Modifier.height(20.dp))
+        HandReferenceActions(
+            hasReference = state.reference != null,
+            enabled = !state.isSaving,
+            onPickGallery = onPickGallery,
+            onOpenCamera = onOpenCamera,
+            onClear = onClear,
+        )
+    }
+}
+
+@Composable
+private fun HandReferenceActions(
+    hasReference: Boolean,
+    enabled: Boolean,
+    onPickGallery: () -> Unit,
+    onOpenCamera: () -> Unit,
+    onClear: () -> Unit,
+) {
+    if (!hasReference) {
+        PrimaryCtaButton(
+            text = "Escolher da galeria",
+            onClick = onPickGallery,
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SecondaryCtaButton(text = "Tirar foto", onClick = onOpenCamera)
+    } else {
+        PrimaryCtaButton(
+            text = "Substituir foto",
+            onClick = onPickGallery,
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SecondaryCtaButton(text = "Tirar nova foto", onClick = onOpenCamera)
+        Spacer(modifier = Modifier.height(12.dp))
+        SecondaryCtaButton(text = "Remover foto", onClick = onClear)
     }
 }
 

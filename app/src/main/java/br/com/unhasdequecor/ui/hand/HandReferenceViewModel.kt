@@ -14,10 +14,9 @@ import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -30,46 +29,41 @@ data class HandReferenceUiState(
 
 @HiltViewModel
 class HandReferenceViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     observeHandReference: ObserveHandReferenceUseCase,
     private val saveHandReference: SaveHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
     private val fileStore: HandReferenceFileStore,
 ) : ViewModel() {
 
-    private val isSaving = MutableStateFlow(false)
-    private val message = MutableStateFlow<String?>(null)
+    private val _uiState = MutableStateFlow(HandReferenceUiState())
+    val uiState: StateFlow<HandReferenceUiState> = _uiState.asStateFlow()
 
-    val uiState: StateFlow<HandReferenceUiState> = combine(
-        observeHandReference(),
-        isSaving,
-        message,
-    ) { reference, saving, msg ->
-        HandReferenceUiState(
-            reference = reference,
-            isSaving = saving,
-            message = msg,
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = HandReferenceUiState(),
-    )
+    init {
+        viewModelScope.launch {
+            observeHandReference().collect { reference ->
+                _uiState.update { it.copy(reference = reference) }
+            }
+        }
+    }
 
     fun createCameraCaptureFile(): File = fileStore.createCameraCaptureFile()
 
     fun importFromGallery(uri: Uri) {
         viewModelScope.launch {
-            isSaving.value = true
-            message.value = null
+            _uiState.update { it.copy(isSaving = true, message = null) }
             val prepared = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     fileStore.copyUriStreamToCache(input)
                 }
             }.getOrNull()
             if (prepared == null) {
-                isSaving.value = false
-                message.value = messageFor(HandReferenceRejection.IO_ERROR)
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        message = messageFor(HandReferenceRejection.IO_ERROR),
+                    )
+                }
                 return@launch
             }
             persist(prepared.absolutePath)
@@ -78,8 +72,7 @@ class HandReferenceViewModel @Inject constructor(
 
     fun importFromCameraCapture(file: File) {
         viewModelScope.launch {
-            isSaving.value = true
-            message.value = null
+            _uiState.update { it.copy(isSaving = true, message = null) }
             persist(file.absolutePath)
         }
     }
@@ -87,24 +80,33 @@ class HandReferenceViewModel @Inject constructor(
     fun clear() {
         viewModelScope.launch {
             clearHandReference()
-            message.value = "Foto da mão removida."
+            _uiState.update { it.copy(message = "Foto da mão removida.") }
         }
     }
 
     fun consumeMessage() {
-        message.value = null
+        _uiState.update { it.copy(message = null) }
     }
 
     private suspend fun persist(path: String) {
         when (val outcome = saveHandReference(path)) {
             is HandReferenceSaveOutcome.Saved -> {
-                message.value = "Mão cadastrada com sucesso."
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        message = "Mão cadastrada com sucesso.",
+                    )
+                }
             }
             is HandReferenceSaveOutcome.Rejected -> {
-                message.value = messageFor(outcome.reason)
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        message = messageFor(outcome.reason),
+                    )
+                }
             }
         }
-        isSaving.value = false
     }
 
     private fun messageFor(reason: HandReferenceRejection): String = when (reason) {

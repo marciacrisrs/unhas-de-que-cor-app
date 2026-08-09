@@ -139,29 +139,7 @@ fun HomeScreen(
 
         if (!state.hasHandReference) {
             Spacer(modifier = Modifier.height(20.dp))
-            Surface(
-                shape = SoftSurfaceShape,
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenHandReference)
-                    .semantics {
-                        role = Role.Button
-                        contentDescription = "Cadastrar minha mão"
-                    },
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-                    Text(
-                        text = "Cadastrar minha mão",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "Salve uma foto da sua mão para o try-on virtual.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            HandReferenceInviteCard(onClick = onOpenHandReference)
         }
 
         if (state.recentColors.isNotEmpty()) {
@@ -363,6 +341,33 @@ private fun InspirationCard(
                 )
             }
             NailPolishMark(markSize = 72.dp, polishColor = polishColor, decorative = true)
+        }
+    }
+}
+
+@Composable
+private fun HandReferenceInviteCard(onClick: () -> Unit) {
+    Surface(
+        shape = SoftSurfaceShape,
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Cadastrar minha mão"
+            },
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Text(
+                text = "Cadastrar minha mão",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Salve uma foto da sua mão para o try-on virtual.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

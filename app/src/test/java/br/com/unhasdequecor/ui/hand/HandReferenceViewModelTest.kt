@@ -33,7 +33,7 @@ class HandReferenceViewModelTest {
     private fun viewModel(): HandReferenceViewModel = HandReferenceViewModel(
         context = context,
         observeHandReference = ObserveHandReferenceUseCase(repository),
-        saveHandReference = SaveHandReferenceUseCase(repository) { 99L },
+        saveHandReference = SaveHandReferenceUseCase(repository) { FIXED_NOW_MS },
         clearHandReference = ClearHandReferenceUseCase(repository),
         fileStore = fileStore,
     )
@@ -104,5 +104,9 @@ class HandReferenceViewModelTest {
         advanceUntilIdle()
 
         assertThat(viewModel.uiState.value.message).isNull()
+    }
+
+    private companion object {
+        const val FIXED_NOW_MS = 99L
     }
 }
