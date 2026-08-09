@@ -45,9 +45,11 @@ object PolishMaskRecolorer {
 
         var maskWeightSum = 0f
         var maskedLumSum = 0f
+        var coveredCount = 0
         for (i in pixels.indices) {
             val coverage = maskCoverage(maskPixels[i])
-            if (coverage < 0.02f) continue
+            if (coverage < MIN_COVERAGE) continue
+            coveredCount += 1
             val src = pixels[i]
             val lum = luminance(
                 AndroidColor.red(src),
@@ -57,15 +59,19 @@ object PolishMaskRecolorer {
             maskWeightSum += coverage
             maskedLumSum += lum * coverage
         }
-        val meanNailLum = if (maskWeightSum > 0f) {
-            (maskedLumSum / maskWeightSum).coerceAtLeast(1f)
-        } else {
-            targetLum
+        // Guarda: máscara inválida / alpha opaco em tudo → não pinta a foto inteira.
+        val coverageRatio = coveredCount.toFloat() / pixels.size.toFloat()
+        if (maskWeightSum <= 0f || coverageRatio > MAX_MASK_COVERAGE_RATIO) {
+            if (scaledMask !== mask) {
+                scaledMask.recycle()
+            }
+            return null
         }
+        val meanNailLum = (maskedLumSum / maskWeightSum).coerceAtLeast(1f)
 
         for (i in pixels.indices) {
             val coverage = maskCoverage(maskPixels[i])
-            if (coverage < 0.02f) continue
+            if (coverage < MIN_COVERAGE) continue
 
             val src = pixels[i]
             val sr = AndroidColor.red(src)
@@ -112,8 +118,9 @@ object PolishMaskRecolorer {
         val gray = AndroidColor.red(maskPixel)
             .coerceAtLeast(AndroidColor.green(maskPixel))
             .coerceAtLeast(AndroidColor.blue(maskPixel))
-        val strength = maxOf(alpha, gray)
-        return (strength / 255f).coerceIn(0f, 1f)
+        // PNG L (cinza): BitmapFactory costuma devolver alpha=255 em TODOS os pixels.
+        // Usar max(alpha, gray) pintava a imagem inteira. min() trata preto como 0.
+        return (minOf(alpha, gray) / 255f).coerceIn(0f, 1f)
     }
 
     private fun specularAmount(lum: Float, meanNailLum: Float): Float {
@@ -143,6 +150,8 @@ object PolishMaskRecolorer {
     private fun luminance(r: Int, g: Int, b: Int): Float =
         0.299f * r + 0.587f * g + 0.114f * b
 
+    private const val MIN_COVERAGE = 0.08f
+    private const val MAX_MASK_COVERAGE_RATIO = 0.18f
     private const val MIN_SHADE = 0.42f
     private const val MAX_SHADE = 1.65f
     private const val SPECULAR_LUMA_START = 188f

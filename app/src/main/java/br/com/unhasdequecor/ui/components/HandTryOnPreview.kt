@@ -170,6 +170,7 @@ private fun resolveSamplePreview(
     polishColor: Color,
     sampleId: String,
 ): TryOnPreviewData {
+    // Só máscara calibrada recolorre pixels. Nunca “seed” por cor (pintava a pele).
     if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
         val mask = PolishMaskRecolorer.loadMask(context, sampleId)
         val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
@@ -180,14 +181,6 @@ private fun resolveSamplePreview(
                 mode = TryOnMode.MASK,
             )
         }
-    }
-    val seeded = PolishSeedRecolorer.recolor(bitmap, sampleId, polishColor)
-    if (seeded != null) {
-        return TryOnPreviewData(
-            bitmap = seeded,
-            anchors = emptyList(),
-            mode = TryOnMode.MASK,
-        )
     }
     return TryOnPreviewData(
         bitmap = bitmap,
