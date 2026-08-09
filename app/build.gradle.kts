@@ -115,8 +115,11 @@ tasks.register("downloadHandLandmarker") {
         destination.parentFile.mkdirs()
         val url =
             "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-        java.net.URI(url).toURL().openStream().use { input ->
-            destination.outputStream().use { output -> input.copyTo(output) }
+        val result = providers.exec {
+            commandLine("curl", "-fsSL", "-o", destination.absolutePath, url)
+        }.result.get()
+        check(result.exitValue == 0) {
+            "Falha ao baixar hand_landmarker.task (exit=${result.exitValue})"
         }
     }
 }
