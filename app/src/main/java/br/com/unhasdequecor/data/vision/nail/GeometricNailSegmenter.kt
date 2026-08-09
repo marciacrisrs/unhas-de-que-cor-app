@@ -6,17 +6,19 @@ import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Segmentação geométrica + refinamento por cor (sem OpenCV):
- * 1) rasteriza o polígono almond;
- * 2) estima pele ao redor da ROI;
- * 3) remove pixels “pele demais” / mantém placa;
- * 4) opening/closing simples + feather controlado.
+ * Segmentação geométrica conservadora (sem OpenCV):
+ * 1) rasteriza almond suave (distance field);
+ * 2) só remove pele óbvia na **borda** da placa (miolo sempre preservado);
+ * 3) se o refinamento apagar demais, volta ao almond suave.
+ *
+ * Unhas naturais ≈ pele: trim agressivo no interior pintava buracos / nada.
  */
 @Singleton
 class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
@@ -38,50 +40,83 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val polyLocal = roi.polygon.map { p ->
             PixelPoint(p.x - bounds.left, p.y - bounds.top)
         }
-        val geo = ByteArray(rw * rh)
-        rasterizePolygon(polyLocal, rw, rh, geo)
-
-        val skin = estimateSkinColor(pixels, geo, rw, rh)
-        val refined = ByteArray(rw * rh)
-        for (i in pixels.indices) {
-            if (geo[i] == 0.toByte()) {
-                refined[i] = 0
-                continue
-            }
-            val c = pixels[i]
-            val r = Color.red(c)
-            val g = Color.green(c)
-            val b = Color.blue(c)
-            val skinDist = colorDistance(r, g, b, skin)
-            val sat = saturation(r, g, b)
-            val lum = luminance(r, g, b)
-            // Dentro do polígono: rejeita pele típica (baixa distância + sat baixa).
-            val keep = when {
-                skinDist > SKIN_REJECT_DIST -> true
-                skinDist > SKIN_SOFT_DIST && (sat > 0.12f || lum > skin.lum + 18f) -> true
-                lum > skin.lum + 28f -> true // highlight da unha
-                else -> false
-            }
-            refined[i] = if (keep) 255.toByte() else 0
+        val softGeo = softRasterize(polyLocal, rw, rh)
+        val solidGeo = ByteArray(rw * rh)
+        for (i in softGeo.indices) {
+            solidGeo[i] = if ((softGeo[i].toInt() and 0xFF) >= MASK_SOLID) 255.toByte() else 0
         }
 
-        // Se o refinamento apagou demais, volta ao polígono (com feather).
-        val kept = refined.count { (it.toInt() and 0xFF) > 0 }
-        val geoCount = geo.count { (it.toInt() and 0xFF) > 0 }.coerceAtLeast(1)
-        val binary = if (kept.toFloat() / geoCount < MIN_KEEP_RATIO) {
-            geo
+        val skin = estimateSkinColor(pixels, solidGeo, rw, rh)
+        val trimmed = trimBorderSkin(pixels, softGeo, solidGeo, skin, rw, rh)
+
+        val kept = trimmed.count { (it.toInt() and 0xFF) >= MASK_SOLID }
+        val geoCount = softGeo.count { (it.toInt() and 0xFF) >= MASK_SOLID }.coerceAtLeast(1)
+        val alpha = if (kept.toFloat() / geoCount < MIN_KEEP_RATIO) {
+            softGeo
         } else {
-            morphologicalOpenClose(refined, rw, rh)
+            feather(binarize(trimmed), rw, rh, radius = FEATHER_RADIUS)
         }
 
-        val feathered = feather(binary, rw, rh, radius = FEATHER_RADIUS)
         return NailMask(
             width = rw,
             height = rh,
-            alpha = feathered,
+            alpha = alpha,
             originX = bounds.left,
             originY = bounds.top,
         )
+    }
+
+    /**
+     * Mantém o miolo (~70% interno) intacto; só na coroa externa rejeita pele tipicamente igual.
+     */
+    private fun trimBorderSkin(
+        pixels: IntArray,
+        softGeo: ByteArray,
+        solidGeo: ByteArray,
+        skin: SkinStats,
+        w: Int,
+        h: Int,
+    ): ByteArray {
+        val out = softGeo.copyOf()
+        val dist = interiorDistance(solidGeo, w, h)
+        var maxDist = 1f
+        for (d in dist) maxDist = max(maxDist, d)
+        val coreRadius = maxDist * CORE_FRACTION
+
+        for (i in pixels.indices) {
+            val onBorder = (softGeo[i].toInt() and 0xFF) > 0 && dist[i] < coreRadius
+            if (onBorder && isObviousSkin(pixels[i], skin)) {
+                out[i] = 0
+            }
+        }
+        return out
+    }
+
+    private fun isObviousSkin(pixel: Int, skin: SkinStats): Boolean {
+        val r = Color.red(pixel)
+        val g = Color.green(pixel)
+        val b = Color.blue(pixel)
+        val skinDist = colorDistance(r, g, b, skin)
+        val sat = saturation(r, g, b)
+        val lum = luminance(r, g, b)
+        val looksLikePlate = skinDist > SKIN_SOFT_DIST ||
+            sat > 0.14f ||
+            lum > skin.lum + 22f
+        return !looksLikePlate && skinDist < SKIN_REJECT_DIST
+    }
+
+    private fun softRasterize(poly: List<PixelPoint>, width: Int, height: Int): ByteArray {
+        val solid = ByteArray(width * height)
+        rasterizePolygon(poly, width, height, solid)
+        return feather(solid, width, height, radius = FEATHER_RADIUS)
+    }
+
+    private fun binarize(src: ByteArray): ByteArray {
+        val out = ByteArray(src.size)
+        for (i in src.indices) {
+            out[i] = if ((src[i].toInt() and 0xFF) >= MASK_SOLID) 255.toByte() else 0
+        }
+        return out
     }
 
     private fun rasterizePolygon(
@@ -123,7 +158,6 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         var sg = 0.0
         var sb = 0.0
         var n = 0
-        // Amostra anel ao redor do polígono (dentro da ROI, fora da geo).
         for (y in 0 until h) {
             for (x in 0 until w) {
                 val i = y * w + x
@@ -138,7 +172,6 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
             }
         }
         if (n < 8) {
-            // Fallback: borda da ROI
             for (x in 0 until w) {
                 val c1 = pixels[x]
                 val c2 = pixels[(h - 1) * w + x]
@@ -167,43 +200,44 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         return false
     }
 
-    private fun morphologicalOpenClose(src: ByteArray, w: Int, h: Int): ByteArray {
-        val eroded = erode(src, w, h)
-        val opened = dilate(eroded, w, h)
-        val dilated = dilate(opened, w, h)
-        return erode(dilated, w, h)
-    }
-
-    private fun erode(src: ByteArray, w: Int, h: Int): ByteArray {
-        val out = ByteArray(src.size)
-        for (y in 1 until h - 1) {
-            for (x in 1 until w - 1) {
-                var minV = 255
-                for (dy in -1..1) {
-                    for (dx in -1..1) {
-                        minV = min(minV, src[(y + dy) * w + (x + dx)].toInt() and 0xFF)
-                    }
+    /** Distância aproximada ao exterior (maior = mais interno). */
+    private fun interiorDistance(solid: ByteArray, w: Int, h: Int): FloatArray {
+        val dist = FloatArray(solid.size)
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val i = y * w + x
+                dist[i] = if (solid[i] == 0.toByte()) {
+                    0f
+                } else {
+                    nearestOutsideDistance(solid, w, h, x, y, search = EDGE_SEARCH)
                 }
-                out[y * w + x] = minV.toByte()
             }
         }
-        return out
+        return dist
     }
 
-    private fun dilate(src: ByteArray, w: Int, h: Int): ByteArray {
-        val out = ByteArray(src.size)
-        for (y in 1 until h - 1) {
-            for (x in 1 until w - 1) {
-                var maxV = 0
-                for (dy in -1..1) {
-                    for (dx in -1..1) {
-                        maxV = max(maxV, src[(y + dy) * w + (x + dx)].toInt() and 0xFF)
-                    }
+    private fun nearestOutsideDistance(
+        solid: ByteArray,
+        w: Int,
+        h: Int,
+        x: Int,
+        y: Int,
+        search: Int,
+    ): Float {
+        var best = search.toFloat()
+        for (dy in -search..search) {
+            for (dx in -search..search) {
+                val nx = x + dx
+                val ny = y + dy
+                val outside = nx !in 0 until w ||
+                    ny !in 0 until h ||
+                    solid[ny * w + nx] == 0.toByte()
+                if (outside) {
+                    best = min(best, hypot(dx.toDouble(), dy.toDouble()).toFloat())
                 }
-                out[y * w + x] = maxV.toByte()
             }
         }
-        return out
+        return best
     }
 
     private fun feather(src: ByteArray, w: Int, h: Int, radius: Int): ByteArray {
@@ -213,7 +247,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         for (y in 0 until h) {
             for (x in 0 until w) {
                 val i = y * w + x
-                if ((src[i].toInt() and 0xFF) >= 128) {
+                if ((src[i].toInt() and 0xFF) >= MASK_SOLID) {
                     out[i] = 255.toByte()
                     continue
                 }
@@ -258,11 +292,13 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         0.299f * r + 0.587f * g + 0.114f * b
 
     private companion object {
-        const val SKIN_REJECT_DIST = 42f
-        const val SKIN_SOFT_DIST = 28f
+        const val SKIN_REJECT_DIST = 36f
+        const val SKIN_SOFT_DIST = 24f
         const val RING_RADIUS = 3
         const val MASK_SOLID = 128
-        const val MIN_KEEP_RATIO = 0.22f
+        const val MIN_KEEP_RATIO = 0.40f
         const val FEATHER_RADIUS = 2
+        const val CORE_FRACTION = 0.55f
+        const val EDGE_SEARCH = 6
     }
 }

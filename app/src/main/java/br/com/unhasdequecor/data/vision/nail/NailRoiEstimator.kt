@@ -12,7 +12,9 @@ import javax.inject.Singleton
 
 /**
  * Estima ROI + polígono almond da unha a partir de MCP/PIP/DIP/TIP.
- * Tudo em pixels da imagem (independente de resolução/aspect).
+ *
+ * Largura alinhada ao [br.com.unhasdequecor.ui.components.NailLandmarkMapper]
+ * (proporcional ao comprimento tip–DIP), não a uma heurística estreita de falange.
  */
 @Singleton
 class NailRoiEstimator @Inject constructor() {
@@ -23,22 +25,22 @@ class NailRoiEstimator @Inject constructor() {
     fun estimate(hand: HandLandmarks, finger: Finger): NailRoi? {
         val w = hand.imageWidth
         val h = hand.imageHeight
-        val mcp = ImageCoordinates.toPixel(hand.point(finger.mcpIndex), w, h)
         val pip = ImageCoordinates.toPixel(hand.point(finger.pipIndex), w, h)
         val dip = ImageCoordinates.toPixel(hand.point(finger.dipIndex), w, h)
         val tip = ImageCoordinates.toPixel(hand.point(finger.tipIndex), w, h)
 
         val tipDip = ImageCoordinates.distancePx(tip, dip)
         val tipPip = ImageCoordinates.distancePx(tip, pip)
-        val pipMcp = ImageCoordinates.distancePx(pip, mcp)
         val facing = tipDip < SHORT_TIP_DIP_PX
+        val scales = scalesFor(finger)
 
-        val axisLen = if (facing) tipPip.coerceAtLeast(1f) else tipDip.coerceAtLeast(1f)
-        val nailLen = (if (facing) tipPip * 0.40f else tipDip * LENGTH_SCALE)
-            .coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
-        // Largura do dedo ≈ escala da falange média; unha um pouco mais estreita.
-        val fingerWidth = (pipMcp * 0.28f + axisLen * 0.22f).coerceIn(MIN_FINGER_W, MAX_FINGER_W)
-        val nailWidth = (fingerWidth * WIDTH_SCALE).coerceIn(MIN_NAIL_W, MAX_NAIL_W)
+        val nailLen = if (facing) {
+            (tipPip * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
+        } else {
+            (tipDip * scales.lengthScale).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
+        }
+        // Largura ≈ proporção da placa (mapper histórico). Evita heurística estreita de falange.
+        val nailWidth = (nailLen * scales.widthScale).coerceIn(MIN_NAIL_W, MAX_NAIL_W)
 
         val axisStart = if (facing) pip else dip
         val dirX = tip.x - axisStart.x
@@ -49,32 +51,32 @@ class NailRoiEstimator @Inject constructor() {
         val px = -uy
         val py = ux
 
-        // Centro da placa: 72% do caminho DIP/PIP → TIP (não ultrapassa a tip).
-        val centerT = if (facing) 0.90f else CENTER_ALONG
-        val cx = axisStart.x + (tip.x - axisStart.x) * centerT
-        val cy = axisStart.y + (tip.y - axisStart.y) * centerT
+        // Centro proximal à ponta; leve overshoot da tip landmark (placa real passa um pouco).
+        val centerT = if (facing) FACING_CENTER else CENTER_ALONG
+        val cx = axisStart.x + (tip.x - axisStart.x) * centerT + ux * tipDip * TIP_OVERSHOOT
+        val cy = axisStart.y + (tip.y - axisStart.y) * centerT + uy * tipDip * TIP_OVERSHOOT
 
         val halfLen = nailLen * 0.50f
         val halfWBase = nailWidth * 0.50f
-        // Almond: mais estreito na tip e cutícula.
-        val tipHalfW = halfWBase * 0.55f
-        val midHalfW = halfWBase * 1.05f
-        val cuticleHalfW = halfWBase * 0.75f
+        // Almond suave (não pontiagudo): cobre a placa sem invadir tanto a pele.
+        val tipHalfW = halfWBase * TIP_WIDTH_FACTOR
+        val midHalfW = halfWBase * MID_WIDTH_FACTOR
+        val cuticleHalfW = halfWBase * CUTICLE_WIDTH_FACTOR
 
         val tipPt = PixelPoint(cx + ux * halfLen, cy + uy * halfLen)
-        val cuticlePt = PixelPoint(cx - ux * halfLen * 0.85f, cy - uy * halfLen * 0.85f)
-        val mid = PixelPoint(cx + ux * halfLen * 0.15f, cy + uy * halfLen * 0.15f)
+        val cuticlePt = PixelPoint(cx - ux * halfLen * CUTICLE_BACK, cy - uy * halfLen * CUTICLE_BACK)
+        val mid = PixelPoint(cx + ux * halfLen * MID_FORWARD, cy + uy * halfLen * MID_FORWARD)
 
         val polygon = listOf(
-            PixelPoint(tipPt.x + px * tipHalfW * 0.15f, tipPt.y + py * tipHalfW * 0.15f),
+            PixelPoint(tipPt.x + px * tipHalfW * TIP_POINT_FACTOR, tipPt.y + py * tipHalfW * TIP_POINT_FACTOR),
             PixelPoint(mid.x + px * midHalfW, mid.y + py * midHalfW),
             PixelPoint(cuticlePt.x + px * cuticleHalfW, cuticlePt.y + py * cuticleHalfW),
             PixelPoint(cuticlePt.x - px * cuticleHalfW, cuticlePt.y - py * cuticleHalfW),
             PixelPoint(mid.x - px * midHalfW, mid.y - py * midHalfW),
-            PixelPoint(tipPt.x - px * tipHalfW * 0.15f, tipPt.y - py * tipHalfW * 0.15f),
+            PixelPoint(tipPt.x - px * tipHalfW * TIP_POINT_FACTOR, tipPt.y - py * tipHalfW * TIP_POINT_FACTOR),
         )
 
-        val pad = max(nailWidth, nailLen) * 0.35f + 4f
+        val pad = max(nailWidth, nailLen) * PAD_SCALE + PAD_EXTRA
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
         var maxX = -Float.MAX_VALUE
@@ -116,6 +118,14 @@ class NailRoiEstimator @Inject constructor() {
         )
     }
 
+    private fun scalesFor(finger: Finger): FingerScale = when (finger) {
+        Finger.THUMB -> FingerScale(widthScale = 0.78f, lengthScale = 0.88f)
+        Finger.INDEX -> FingerScale(widthScale = 0.70f, lengthScale = 0.90f)
+        Finger.MIDDLE -> FingerScale(widthScale = 0.72f, lengthScale = 0.92f)
+        Finger.RING -> FingerScale(widthScale = 0.68f, lengthScale = 0.90f)
+        Finger.PINKY -> FingerScale(widthScale = 0.64f, lengthScale = 0.86f)
+    }
+
     private fun geometricConfidence(
         tipDip: Float,
         tipPip: Float,
@@ -128,9 +138,9 @@ class NailRoiEstimator @Inject constructor() {
         if (!axisOk) return 0.15f
         val aspect = nailLen / nailWidth.coerceAtLeast(1f)
         val aspectScore = when {
-            aspect in 1.1f..2.8f -> 1f
-            aspect in 0.8f..3.5f -> 0.7f
-            else -> 0.35f
+            aspect in 1.15f..2.2f -> 1f
+            aspect in 0.9f..2.8f -> 0.75f
+            else -> 0.4f
         }
         val sizeScore = when {
             nailLen in 16f..140f -> 1f
@@ -144,17 +154,26 @@ class NailRoiEstimator @Inject constructor() {
             ).coerceIn(0f, 1f)
     }
 
+    private data class FingerScale(val widthScale: Float, val lengthScale: Float)
+
     private companion object {
         const val SHORT_TIP_DIP_PX = 18f
-        const val LENGTH_SCALE = 0.90f
-        const val WIDTH_SCALE = 0.72f
-        const val CENTER_ALONG = 0.72f
-        const val MIN_NAIL_LEN = 12f
+        const val FACING_LENGTH_SCALE = 0.42f
+        const val FACING_CENTER = 0.92f
+        const val CENTER_ALONG = 0.78f
+        const val TIP_OVERSHOOT = 0.06f
+        const val TIP_WIDTH_FACTOR = 0.78f
+        const val MID_WIDTH_FACTOR = 1.08f
+        const val CUTICLE_WIDTH_FACTOR = 0.82f
+        const val TIP_POINT_FACTOR = 0.62f
+        const val CUTICLE_BACK = 0.88f
+        const val MID_FORWARD = 0.18f
+        const val PAD_SCALE = 0.28f
+        const val PAD_EXTRA = 3f
+        const val MIN_NAIL_LEN = 14f
         const val MAX_NAIL_LEN = 160f
-        const val MIN_NAIL_W = 8f
-        const val MAX_NAIL_W = 100f
-        const val MIN_FINGER_W = 10f
-        const val MAX_FINGER_W = 120f
+        const val MIN_NAIL_W = 10f
+        const val MAX_NAIL_W = 110f
         const val PRESENCE_WEIGHT = 0.35f
         const val ASPECT_WEIGHT = 0.35f
         const val SIZE_WEIGHT = 0.30f

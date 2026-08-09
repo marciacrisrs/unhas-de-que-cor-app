@@ -82,8 +82,8 @@ class NailColorApplier @Inject constructor() {
     }
 
     companion object {
-        const val MIN_CONFIDENCE = 0.42f
-        private const val MIN_MASK_ALPHA = 20
+        const val MIN_CONFIDENCE = 0.36f
+        private const val MIN_MASK_ALPHA = 16
         private const val MIN_WEIGHT = 8f
         private const val FULL_ALPHA = 255f
         private const val SHADE_MIN = 0.42f
@@ -94,6 +94,7 @@ class NailColorApplier @Inject constructor() {
         private const val SPECULAR_REL_RANGE = 0.55f
         private const val SPECULAR_REL_WEIGHT = 0.75f
         private const val BLEND_GAMMA = 0.85f
+        private const val VIVID_AMOUNT = 0.12f
         private const val LUMA_R = 0.299f
         private const val LUMA_G = 0.587f
         private const val LUMA_B = 0.114f
@@ -131,6 +132,10 @@ class NailColorApplier @Inject constructor() {
                 ng = mix(ng, 255, specular)
                 nb = mix(nb, 255, specular)
             }
+            // Mesmo “punch” das máscaras de amostra (PolishMaskRecolorer.vividize).
+            nr = mix(nr, targetR, VIVID_AMOUNT)
+            ng = mix(ng, targetG, VIVID_AMOUNT)
+            nb = mix(nb, targetB, VIVID_AMOUNT)
             val blend = (maskAlpha / FULL_ALPHA).pow(BLEND_GAMMA)
             return argb(
                 sa,

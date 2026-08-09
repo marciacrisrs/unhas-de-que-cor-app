@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.HandLandmarks
+import br.com.unhasdequecor.ui.components.DetectedNailPolishApplier
+import br.com.unhasdequecor.ui.components.NailLandmarkMapper
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -62,21 +64,31 @@ class NailTryOnPipeline @Inject constructor(
             tracker.reset()
             detected
         }
-        if (nails.isEmpty()) {
-            return NailTryOnResult(
-                bitmap = working,
-                nails = emptyList(),
-                landmarks = landmarks,
-                debugEnabled = debugEnabled,
-            )
-        }
-        val painted = colorApplier.apply(working, nails, polishColor) ?: working
+        // Almond suave (ROI alargada) primeiro; elipse+Recolorer se a geo falhar.
+        val painted = colorApplier.apply(working, nails, polishColor)
+            ?: ellipseFallback(working, landmarks, polishColor)
+            ?: working
         return NailTryOnResult(
             bitmap = painted,
             nails = nails,
             landmarks = landmarks,
             debugEnabled = debugEnabled,
         )
+    }
+
+    private fun ellipseFallback(
+        image: Bitmap,
+        landmarks: HandLandmarks,
+        polishColor: Color,
+    ): Bitmap? {
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks.points.map {
+                NailLandmarkMapper.NormalizedPoint(it.x, it.y)
+            },
+            imageWidth = landmarks.imageWidth,
+            imageHeight = landmarks.imageHeight,
+        ) ?: return null
+        return DetectedNailPolishApplier.apply(image, anchors, polishColor)
     }
 
     private fun segmentationConfidence(mask: NailMask, roi: NailRoi): Float {
@@ -94,18 +106,19 @@ class NailTryOnPipeline @Inject constructor(
     }
 
     private companion object {
-        const val MIN_ROI_CONFIDENCE = 0.30f
-        const val GEO_WEIGHT = 0.55f
-        const val SEG_WEIGHT = 0.45f
+        const val MIN_ROI_CONFIDENCE = 0.28f
+        // Prioriza geometria: unhas naturais falham em heurística de pele.
+        const val GEO_WEIGHT = 0.70f
+        const val SEG_WEIGHT = 0.30f
         const val COVERAGE_CLAMP = 1.5f
-        const val FILL_TOO_LOW = 0.05f
-        const val FILL_TOO_HIGH = 0.85f
-        const val SCORE_VERY_LOW = 0.1f
-        const val SCORE_SKIN_RISK = 0.45f
+        const val FILL_TOO_LOW = 0.04f
+        const val FILL_TOO_HIGH = 0.90f
+        const val SCORE_VERY_LOW = 0.15f
+        const val SCORE_SKIN_RISK = 0.55f
         const val SCORE_HIGH = 0.9f
-        const val SCORE_MID = 0.65f
-        const val SCORE_LOW = 0.35f
-        val COVERAGE_GOOD = 0.25f..1.1f
-        val COVERAGE_OK = 0.15f..1.3f
+        const val SCORE_MID = 0.7f
+        const val SCORE_LOW = 0.45f
+        val COVERAGE_GOOD = 0.20f..1.2f
+        val COVERAGE_OK = 0.12f..1.4f
     }
 }

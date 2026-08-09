@@ -35,6 +35,10 @@ class NailRoiEstimatorTest {
         val smallIndex = small.first { it.finger == Finger.INDEX }
         val largeIndex = large.first { it.finger == Finger.INDEX }
         assertThat(largeIndex.lengthPx).isGreaterThan(smallIndex.lengthPx * 1.5f)
+        // Largura ~70% do comprimento (não “fio” fino).
+        val aspect = largeIndex.lengthPx / largeIndex.widthPx
+        assertThat(aspect).isLessThan(2.0f)
+        assertThat(aspect).isGreaterThan(1.1f)
     }
 
     @Test
