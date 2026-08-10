@@ -82,7 +82,8 @@ Com token configurado:
 ```
 
 No CI o passo Sonar só roda se o secret `SONAR_TOKEN` existir.  
-Setup completo: [`docs/sonar.md`](docs/sonar.md).
+Setup completo: [`docs/sonar.md`](docs/sonar.md).  
+Avaliação dos especialistas (painel + backlog): [`docs/avaliacao-especialistas.md`](docs/avaliacao-especialistas.md).
 
 Configurações em `config/detekt/detekt.yml` e `config/lint/lint.xml`.  
 Workflow: `.github/workflows/ci.yml` (roda em qualquer PR e em push para `master`/`main`).
