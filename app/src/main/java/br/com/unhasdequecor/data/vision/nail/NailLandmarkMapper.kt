@@ -1,4 +1,4 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 import kotlin.math.atan2
 import kotlin.math.hypot

@@ -1,11 +1,11 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color as AndroidColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.scale
 import kotlin.math.pow
 
 /**
@@ -27,9 +27,9 @@ object PolishMaskRecolorer {
         val scaledMask = scaledMaskOrSelf(mask, source.width, source.height)
         val out = source.copy(Bitmap.Config.ARGB_8888, true) ?: return null
         val target = polishColor.toArgb()
-        val tr = AndroidColor.red(target)
-        val tg = AndroidColor.green(target)
-        val tb = AndroidColor.blue(target)
+        val tr = channelRed(target)
+        val tg = channelGreen(target)
+        val tb = channelBlue(target)
 
         val width = out.width
         val height = out.height
@@ -40,6 +40,7 @@ object PolishMaskRecolorer {
 
         val meanNailLum = meanNailLuminance(pixels, maskPixels) ?: run {
             recycleIfScaled(scaledMask, mask)
+            if (!out.isRecycled) out.recycle()
             return null
         }
 
@@ -49,20 +50,21 @@ object PolishMaskRecolorer {
         return out
     }
 
-    private fun scaledMaskOrSelf(mask: Bitmap, width: Int, height: Int): Bitmap =
+    internal fun scaledMaskOrSelf(mask: Bitmap, width: Int, height: Int): Bitmap =
         if (mask.width == width && mask.height == height) {
             mask
         } else {
-            Bitmap.createScaledBitmap(mask, width, height, true)
+            mask.scale(width, height, filter = true)
         }
 
-    private fun recycleIfScaled(scaledMask: Bitmap, original: Bitmap) {
+    internal fun recycleIfScaled(scaledMask: Bitmap, original: Bitmap) {
         if (scaledMask !== original) {
             scaledMask.recycle()
         }
     }
 
-    private fun meanNailLuminance(pixels: IntArray, maskPixels: IntArray): Float? {
+    /** Luminância média ponderada; null se máscara vazia ou cobrindo demais a imagem. */
+    internal fun meanNailLuminance(pixels: IntArray, maskPixels: IntArray): Float? {
         var maskWeightSum = 0f
         var maskedLumSum = 0f
         var coveredCount = 0
@@ -71,11 +73,7 @@ object PolishMaskRecolorer {
             if (coverage < MIN_COVERAGE) continue
             coveredCount += 1
             val src = pixels[i]
-            val lum = luminance(
-                AndroidColor.red(src),
-                AndroidColor.green(src),
-                AndroidColor.blue(src),
-            )
+            val lum = luminance(channelRed(src), channelGreen(src), channelBlue(src))
             maskWeightSum += coverage
             maskedLumSum += lum * coverage
         }
@@ -86,7 +84,7 @@ object PolishMaskRecolorer {
         return (maskedLumSum / maskWeightSum).coerceAtLeast(1f)
     }
 
-    private fun applyPolish(
+    internal fun applyPolish(
         pixels: IntArray,
         maskPixels: IntArray,
         tr: Int,
@@ -150,11 +148,11 @@ object PolishMaskRecolorer {
     internal fun channelGreen(color: Int): Int = (color shr 8) and 0xFF
     internal fun channelBlue(color: Int): Int = color and 0xFF
 
-    private fun maskCoverage(maskPixel: Int): Float {
-        val alpha = AndroidColor.alpha(maskPixel)
-        val gray = AndroidColor.red(maskPixel)
-            .coerceAtLeast(AndroidColor.green(maskPixel))
-            .coerceAtLeast(AndroidColor.blue(maskPixel))
+    internal fun maskCoverage(maskPixel: Int): Float {
+        val alpha = channelAlpha(maskPixel)
+        val gray = channelRed(maskPixel)
+            .coerceAtLeast(channelGreen(maskPixel))
+            .coerceAtLeast(channelBlue(maskPixel))
         // PNG L (cinza): BitmapFactory costuma devolver alpha=255 em TODOS os pixels.
         // Usar max(alpha, gray) pintava a imagem inteira. min() trata preto como 0.
         return (minOf(alpha, gray) / 255f).coerceIn(0f, 1f)

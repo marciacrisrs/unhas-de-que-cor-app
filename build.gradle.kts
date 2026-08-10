@@ -24,16 +24,18 @@ sonar {
         )
 
         property("sonar.sourceEncoding", "UTF-8")
-        property("sonar.qualitygate.wait", envOrProp("SONAR_QUALITY_GATE_WAIT") ?: "false")
+        // Default true: CI/PR só fica verde com Quality Gate aprovado.
+        property("sonar.qualitygate.wait", envOrProp("SONAR_QUALITY_GATE_WAIT") ?: "true")
 
-        // Relatórios gerados pelo verifyCi / tarefas do módulo :app
+        // Paths absolutos: o scanner resolve relativos a partir de :app → `app/app/build/...`.
+        val appBuildDir = project(":app").layout.buildDirectory.get().asFile
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
-            "app/build/reports/jacoco/jacocoAppReport/jacocoAppReport.xml",
+            "${appBuildDir}/reports/jacoco/jacocoAppReport/jacocoAppReport.xml",
         )
-        property("sonar.androidLint.reportPaths", "app/build/reports/lint-results-debug.xml")
-        property("sonar.kotlin.detekt.reportPaths", "app/build/reports/detekt/detekt.xml")
-        property("sonar.junit.reportPaths", "app/build/test-results/testDebugUnitTest")
+        property("sonar.androidLint.reportPaths", "${appBuildDir}/reports/lint-results-debug.xml")
+        property("sonar.kotlin.detekt.reportPaths", "${appBuildDir}/reports/detekt/detekt.xml")
+        property("sonar.junit.reportPaths", "${appBuildDir}/test-results/testDebugUnitTest")
 
         property(
             "sonar.exclusions",
@@ -49,6 +51,13 @@ sonar {
                 "**/*_MembersInjector*",
                 "**/di/**",
                 "**/tmp/**",
+                "**/*.webp",
+                "**/*.ttf",
+                "**/*.otf",
+                "**/*.task",
+                "**/*.png",
+                "**/*.jpg",
+                "**/*.jpeg",
             ).joinToString(","),
         )
         property(
@@ -66,7 +75,7 @@ sonar {
                 "**/ui/navigation/BottomDestination*",
                 "**/data/vision/MediaPipe*",
                 "**/data/vision/nail/GeometricNailSegmenter*",
-                "**/data/vision/nail/NailTryOn*",
+                "**/data/vision/nail/DetectedNailPolishApplier*",
                 "**/data/vision/nail/NailTracker*",
                 "**/data/local/datastore/**",
                 "**/data/local/hand/**",
@@ -94,12 +103,13 @@ tasks.named("sonar") {
 tasks.register("verifyCi") {
     group = "verification"
     description =
-        "Roda o mesmo conjunto de verificações do CI (detekt, lint, unit tests, cobertura domain, assembleDebug + release)."
+        "Roda o mesmo conjunto de verificações do CI (detekt, lint, unit tests, cobertura domain/app, assembleDebug + release)."
     dependsOn(
         ":app:detekt",
         ":app:lintDebug",
         ":app:testDebugUnitTest",
         ":app:jacocoDomainCoverageVerification",
+        ":app:jacocoAppCoverageVerification",
         ":app:assembleDebug",
         ":app:assembleRelease",
     )

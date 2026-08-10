@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -109,9 +108,9 @@ private fun HistoryFilterTabs(
                     Icons.Outlined.FavoriteBorder,
                     contentDescription = null,
                     tint = if (filter == HistoryFilter.FAVORITES) {
-                        Color.White
+                        MaterialTheme.colorScheme.onSecondary
                     } else {
-                        MaterialTheme.colorScheme.secondary
+                        MaterialTheme.colorScheme.primary
                     },
                     modifier = Modifier.size(16.dp),
                 )
@@ -145,7 +144,7 @@ private fun HistoryList(
                 Text(
                     text = group.monthLabel,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
                 )
             }

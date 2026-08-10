@@ -4,8 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
 import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.HandLandmarks
-import br.com.unhasdequecor.ui.components.DetectedNailPolishApplier
-import br.com.unhasdequecor.ui.components.NailLandmarkMapper
 import javax.inject.Inject
 import javax.inject.Singleton
 

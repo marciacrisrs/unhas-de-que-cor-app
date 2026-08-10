@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -375,8 +376,10 @@ fun FilterTab(
     leadingIcon: (@Composable () -> Unit)? = null,
 ) {
     val shape = FunChipShape
+    val selectedLabel = if (selected) "$label, selecionado" else label
     Row(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(shape)
             .background(
                 if (selected) MaterialTheme.colorScheme.secondary else Color.Transparent,
@@ -387,10 +390,11 @@ fun FilterTab(
                 shape = shape,
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .semantics {
-                role = Role.Button
-                contentDescription = label
+                role = Role.Tab
+                this.selected = selected
+                contentDescription = selectedLabel
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -400,9 +404,9 @@ fun FilterTab(
             text = label,
             style = MaterialTheme.typography.labelLarge,
             color = if (selected) {
-                Color.White
+                MaterialTheme.colorScheme.onSecondary
             } else {
-                MaterialTheme.colorScheme.secondary
+                MaterialTheme.colorScheme.primary
             },
         )
     }

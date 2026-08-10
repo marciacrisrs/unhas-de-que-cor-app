@@ -3,6 +3,7 @@ package br.com.unhasdequecor.data.local.hand
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import br.com.unhasdequecor.di.IoDispatcher
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
@@ -12,10 +13,13 @@ import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 
 @Singleton
 class HandReferenceFileStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     fun persist(
         sourceAbsolutePath: String,
@@ -31,7 +35,7 @@ class HandReferenceFileStore @Inject constructor(
         }
     }
 
-    fun copySampleAssetToCache(assetPath: String): File {
+    suspend fun copySampleAssetToCache(assetPath: String): File = withContext(ioDispatcher) {
         val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
         val safeName = assetPath.substringAfterLast('/').ifBlank { "sample.webp" }
         val target = File(cacheDir, "sample_$safeName")
@@ -40,24 +44,27 @@ class HandReferenceFileStore @Inject constructor(
                 input.copyTo(output)
             }
         }
-        return target
+        target
     }
 
     fun deleteStoredImage() {
         val directory = File(context.filesDir, DIRECTORY)
         if (directory.isDirectory) {
-            directory.listFiles()?.forEach { it.delete() }
+            directory.listFiles()?.forEach(::deleteQuietly)
         }
-        directory.delete()
+        deleteQuietly(directory)
     }
 
-    fun copyUriStreamToCache(input: java.io.InputStream, fileName: String = "import.jpg"): File {
+    suspend fun copyUriStreamToCache(
+        input: java.io.InputStream,
+        fileName: String = "import.jpg",
+    ): File = withContext(ioDispatcher) {
         val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
         val target = File(cacheDir, fileName)
         FileOutputStream(target).use { output ->
             input.copyTo(output)
         }
-        return target
+        target
     }
 
     fun createCameraCaptureFile(): File {
@@ -71,6 +78,9 @@ class HandReferenceFileStore @Inject constructor(
         if (!source.isFile) {
             return HandReferenceRejection.INVALID_IMAGE
         }
+        if (!isAllowedSourcePath(source)) {
+            return HandReferenceRejection.INVALID_IMAGE
+        }
         if (source.length() > MAX_BYTES) {
             return HandReferenceRejection.TOO_LARGE
         }
@@ -81,6 +91,30 @@ class HandReferenceFileStore @Inject constructor(
             bounds.outWidth < MIN_DIMENSION || bounds.outHeight < MIN_DIMENSION ->
                 HandReferenceRejection.TOO_SMALL
             else -> null
+        }
+    }
+
+    /** Defesa em profundidade: só aceita arquivos sob cache de captura ou pasta da mão. */
+    private fun isAllowedSourcePath(source: File): Boolean {
+        val canonical = runCatching { source.canonicalFile }.getOrNull() ?: return false
+        val captureRoot = File(context.cacheDir, CACHE_DIR).canonicalFile
+        val handRoot = File(context.filesDir, DIRECTORY).canonicalFile
+        val path = canonical.path
+        return path.startsWith(captureRoot.path + File.separator) ||
+            path.startsWith(handRoot.path + File.separator) ||
+            path == handRoot.path
+    }
+
+    suspend fun clearCaptureCache() = withContext(ioDispatcher) {
+        val cacheDir = File(context.cacheDir, CACHE_DIR)
+        if (!cacheDir.isDirectory) return@withContext
+        cacheDir.listFiles()?.forEach(::deleteQuietly)
+    }
+
+    /** Best-effort delete: usa o Boolean de [File.delete] (Sonar S899). */
+    private fun deleteQuietly(file: File) {
+        if (file.exists() && !file.delete() && file.exists()) {
+            // Arquivo ainda presente (ex.: lock); limpeza fica para o próximo ciclo/OS.
         }
     }
 
@@ -144,7 +178,7 @@ class HandReferenceFileStore @Inject constructor(
             val isHandJpeg = file.name == LEGACY_FILE_NAME ||
                 (file.name.startsWith("hand_") && file.name.endsWith(".jpg"))
             if (isHandJpeg && file.absolutePath != keep.absolutePath) {
-                file.delete()
+                deleteQuietly(file)
             }
         }
     }

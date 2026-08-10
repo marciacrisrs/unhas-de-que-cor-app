@@ -1,4 +1,4 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test

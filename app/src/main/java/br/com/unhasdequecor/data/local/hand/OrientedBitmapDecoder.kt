@@ -57,9 +57,8 @@ object OrientedBitmapDecoder {
 
     private fun calculateInSampleSize(width: Int, height: Int, maxEdge: Int): Int {
         var inSampleSize = 1
-        val halfWidth = width / 2
-        val halfHeight = height / 2
-        while (halfWidth / inSampleSize >= maxEdge && halfHeight / inSampleSize >= maxEdge) {
+        // Usa a aresta maior para fotos panorâmicas/retangulares (antes exigia ambas ≥ maxEdge).
+        while (maxOf(width, height) / inSampleSize > maxEdge) {
             inSampleSize *= 2
         }
         return inSampleSize.coerceAtLeast(1)

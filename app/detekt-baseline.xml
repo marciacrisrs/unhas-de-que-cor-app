@@ -2,23 +2,28 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CognitiveComplexMethod:GeometricNailSegmenter.kt:GeometricNailSegmenter$private fun feather: ByteArray</ID>
-    <ID>CognitiveComplexMethod:ResultScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun ResultScreen</ID>
     <ID>ComplexCondition:GeometricNailSegmenter.kt:GeometricNailSegmenter$bounds.left &lt; 0 || bounds.top &lt; 0 || bounds.right &gt; image.width || bounds.bottom &gt; image.height</ID>
-    <ID>LongMethod:ResultScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable fun ResultScreen</ID>
+    <ID>MagicNumber:DetectedNailPolishApplier.kt:DetectedNailPolishApplier$0.70f</ID>
     <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$0.114f</ID>
     <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$0.299f</ID>
     <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$0.587f</ID>
     <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$0.5f</ID>
     <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$0xFF</ID>
-    <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$128</ID>
     <ID>MagicNumber:GeometricNailSegmenter.kt:GeometricNailSegmenter$255f</ID>
     <ID>MagicNumber:NailColorApplier.kt:NailColorApplier.Companion$0xFF</ID>
     <ID>MagicNumber:NailColorApplier.kt:NailColorApplier.Companion$16</ID>
     <ID>MagicNumber:NailColorApplier.kt:NailColorApplier.Companion$24</ID>
     <ID>MagicNumber:NailColorApplier.kt:NailColorApplier.Companion$255</ID>
     <ID>MagicNumber:NailMask.kt:NailMask$0xFF</ID>
-    <ID>NestedBlockDepth:GeometricNailSegmenter.kt:GeometricNailSegmenter$private fun feather: ByteArray</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$0.114f</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$0.299f</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$0.587f</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$0.75f</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$0xFF</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$16</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$24</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$255</ID>
+    <ID>MagicNumber:PolishMaskRecolorer.kt:PolishMaskRecolorer$255f</ID>
     <ID>ReturnCount:MediaPipeHandNailDetector.kt:MediaPipeHandNailDetector$private fun detectLandmarksOnBitmap: HandLandmarks?</ID>
   </CurrentIssues>
 </SmellBaseline>

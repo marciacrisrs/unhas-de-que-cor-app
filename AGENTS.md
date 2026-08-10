@@ -10,9 +10,10 @@ Single Gradle module Android app (`:app`) — "Unhas de Que Cor?" (Kotlin + Jetp
 - The build compiles/tests fine on the pre-installed JDK (targets JVM 17 bytecode). Do not assume JDK 17 specifically is present — just use `./gradlew`.
 
 ### Build / lint / test (all pass in this environment)
-- Full CI parity: `./gradlew verifyCi` (detekt → lintDebug → testDebugUnitTest → jacocoDomainCoverageVerification (domain ≥80% lines) → assembleDebug).
+- Full CI parity: `./gradlew verifyCi` (detekt → lintDebug → testDebugUnitTest → jacocoDomainCoverageVerification (domain ≥80%) → jacocoAppCoverageVerification (app report ≥80%) → assembleDebug → assembleRelease).
 - Unit tests only: `./gradlew :app:testDebugUnitTest` (JVM tests; Room DAO/migration tests run on JVM via the `sqlite-jdbc` dependency — no device needed).
-- Debug APK output: `app/build/outputs/apk/debug/app-debug.apk`.
+- Debug APK: `app/build/outputs/apk/debug/app-debug.apk`. Release APK: `app/build/outputs/apk/release/app-release.apk` (debug-signed se não houver keystore).
+- Especialistas / backlog: `docs/avaliacao-especialistas.md`.
 
 ### Non-obvious gotchas
 - `org.gradle.configuration-cache=true` is set in `gradle.properties`. CI (and this setup) run `verifyCi` with `--no-configuration-cache` for reliability; do the same if you hit cache-related errors.

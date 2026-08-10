@@ -1,4 +1,4 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -51,6 +51,33 @@ class NailLandmarkMapperTest {
                 imageHeight = 100,
             ),
         ).isNull()
+    }
+
+    @Test
+    fun `facing camera uses tip as center when tip and dip collapse`() {
+        // tip≈dip em pixels (< SHORT_TIP_DIP_PX) → ramo facingCamera.
+        val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }
+        fun finger(tip: Int, dip: Int, pip: Int, x: Float) {
+            landmarks[pip] = NailLandmarkMapper.NormalizedPoint(x, 0.40f)
+            landmarks[dip] = NailLandmarkMapper.NormalizedPoint(x, 0.30f)
+            landmarks[tip] = NailLandmarkMapper.NormalizedPoint(x, 0.295f) // ~6px em h=1200
+        }
+        finger(4, 3, 2, 0.30f)
+        finger(8, 7, 6, 0.40f)
+        finger(12, 11, 10, 0.50f)
+        finger(16, 15, 14, 0.60f)
+        finger(20, 19, 18, 0.70f)
+
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks,
+            imageWidth = 800,
+            imageHeight = 1200,
+        )
+        assertThat(anchors).isNotNull()
+        // Centro colapsa na tip (y≈0.295), não no meio tip–dip.
+        anchors!!.forEach { nail ->
+            assertThat(nail.centerY).isWithin(0.02f).of(0.295f)
+        }
     }
 
     @Test

@@ -46,6 +46,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,12 +62,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.domain.model.HandSampleOption
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
@@ -546,12 +549,11 @@ private fun HandSampleCard(
     val bitmap by produceState(initialValue = null as android.graphics.Bitmap?, option.assetPath) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open(option.assetPath).use { input ->
-                    BitmapFactory.decodeStream(input)
-                }
+                context.assets.open(option.assetPath).use(BitmapFactory::decodeStream)
             }.getOrNull()
         }
     }
+    RecycleBitmapOnDispose(bitmap)
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -564,7 +566,8 @@ private fun HandSampleCard(
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = "Exemplo ${option.title}"
+                this.selected = selected
+                contentDescription = handSampleContentDescription(option.title, selected)
             },
     ) {
         Box(
@@ -574,32 +577,9 @@ private fun HandSampleCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
             contentAlignment = Alignment.Center,
         ) {
-            val preview = bitmap
-            if (preview != null) {
-                Image(
-                    bitmap = preview.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+            BitmapPreview(bitmap)
             if (selected) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .size(28.dp)
-                        .clip(SoftSurfaceShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = "Selecionada",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                Box(modifier = Modifier.align(Alignment.TopEnd)) { SelectedCheckBadge() }
             }
         }
         Column(modifier = Modifier.padding(10.dp)) {
@@ -625,14 +605,13 @@ private fun HandPreview(
         path,
         revision,
     ) {
-        value = if (path.isNullOrBlank()) {
-            null
-        } else {
+        value = path?.takeIf { it.isNotBlank() }?.let {
             withContext(Dispatchers.IO) {
-                br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder.decodeFile(path)
+                OrientedBitmapDecoder.decodeFile(it, maxEdge = 1280)
             }
         }
     }
+    RecycleBitmapOnDispose(bitmap)
 
     Box(
         modifier = Modifier
@@ -641,16 +620,16 @@ private fun HandPreview(
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
             .semantics {
-                contentDescription = when {
-                    bitmap != null && isSample -> "Mão de exemplo cadastrada"
-                    bitmap != null -> "Pré-visualização da mão cadastrada"
-                    else -> "Carregando foto da mão"
-                }
+                contentDescription = handPreviewContentDescription(
+                    hasBitmap = bitmap != null,
+                    isSample = isSample,
+                    sampleTitle = sampleTitle,
+                )
             },
         contentAlignment = Alignment.Center,
     ) {
         val preview = bitmap
-        if (preview != null) {
+        if (preview != null && !preview.isRecycled) {
             Image(
                 bitmap = preview.asImageBitmap(),
                 contentDescription = null,
@@ -658,21 +637,84 @@ private fun HandPreview(
                 modifier = Modifier.fillMaxSize(),
             )
             if (isSample) {
-                Text(
-                    text = sampleTitle?.let { "Exemplo · $it" } ?: "Mão de exemplo",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp)
-                        .clip(SoftSurfaceShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.92f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+                Box(modifier = Modifier.align(Alignment.TopStart)) {
+                    SampleHandBadge(sampleTitle = sampleTitle)
+                }
             }
         } else {
-            // Nunca ilustração nem empty state: só loading até a foto (usuária ou exemplo).
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
     }
+}
+
+private fun handSampleContentDescription(title: String, selected: Boolean): String =
+    if (selected) "Exemplo $title, selecionada" else "Exemplo $title"
+
+private fun handPreviewContentDescription(
+    hasBitmap: Boolean,
+    isSample: Boolean,
+    sampleTitle: String?,
+): String = when {
+    hasBitmap && isSample ->
+        sampleTitle?.let { "Mão de exemplo cadastrada: $it" } ?: "Mão de exemplo cadastrada"
+    hasBitmap -> "Pré-visualização da mão cadastrada"
+    else -> "Carregando foto da mão"
+}
+
+@Composable
+private fun RecycleBitmapOnDispose(bitmap: android.graphics.Bitmap?) {
+    DisposableEffect(bitmap) {
+        val held = bitmap
+        onDispose {
+            if (held != null && !held.isRecycled) {
+                runCatching { held.recycle() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BitmapPreview(bitmap: android.graphics.Bitmap?) {
+    val preview = bitmap
+    if (preview != null && !preview.isRecycled) {
+        Image(
+            bitmap = preview.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun SelectedCheckBadge() {
+    Box(
+        modifier = Modifier
+            .padding(10.dp)
+            .size(28.dp)
+            .clip(SoftSurfaceShape)
+            .background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun SampleHandBadge(sampleTitle: String?) {
+    Text(
+        text = sampleTitle?.let { "Exemplo · $it" } ?: "Mão de exemplo",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onPrimary,
+        modifier = Modifier
+            .padding(12.dp)
+            .clip(SoftSurfaceShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.92f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
 }

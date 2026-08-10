@@ -1,0 +1,96 @@
+package br.com.unhasdequecor.data.vision.nail
+
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.Color
+import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
+import br.com.unhasdequecor.data.vision.HandLandmarks
+import br.com.unhasdequecor.data.vision.OrientedHandLandmarks
+import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.NormPoint
+import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
+import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelRect
+import com.google.common.truth.Truth.assertThat
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import org.junit.Test
+
+class NailTryOnPipelineTest {
+
+    private val landmarkProcessor = mockk<HandLandmarkProcessor>()
+    private val roiEstimator = mockk<NailRoiEstimator>()
+    private val segmenter = mockk<NailSegmenter>()
+    private val colorApplier = mockk<NailColorApplier>()
+    private val tracker = NailTracker()
+
+    private val pipeline = NailTryOnPipeline(
+        landmarkProcessor = landmarkProcessor,
+        roiEstimator = roiEstimator,
+        segmenter = segmenter,
+        colorApplier = colorApplier,
+        tracker = tracker,
+    )
+
+    @Test
+    fun `process returns null when landmarks are missing`() {
+        val image = mockk<Bitmap>(relaxed = true)
+        every { landmarkProcessor.detectLandmarksWithOrientationFallback(image) } returns null
+
+        val result = pipeline.process(image, Color.Red)
+
+        assertThat(result).isNull()
+        verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
+
+    @Test
+    fun `process paints nails when segmentation succeeds`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val painted = mockk<Bitmap>(relaxed = true)
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+
+        val roi = NailRoi(
+            finger = Finger.MIDDLE,
+            bounds = PixelRect(left = 90, top = 40, right = 110, bottom = 80),
+            polygon = listOf(
+                PixelPoint(90f, 40f),
+                PixelPoint(110f, 40f),
+                PixelPoint(110f, 80f),
+                PixelPoint(90f, 80f),
+            ),
+            axisFromDip = PixelPoint(100f, 70f),
+            axisToTip = PixelPoint(100f, 45f),
+            lengthPx = 40f,
+            widthPx = 20f,
+            rotationDegrees = 0f,
+            geometricConfidence = 0.9f,
+        )
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(roi)
+
+        val mask = NailMask(
+            width = 20,
+            height = 40,
+            alpha = ByteArray(20 * 40) { 255.toByte() },
+            originX = 90,
+            originY = 40,
+        )
+        every { segmenter.segment(image, roi) } returns mask
+        every { colorApplier.apply(image, any(), Color.Red) } returns painted
+
+        val result = pipeline.process(image, Color.Red, stabilize = false)
+
+        assertThat(result).isNotNull()
+        assertThat(result!!.bitmap).isSameInstanceAs(painted)
+        assertThat(result.nails).hasSize(1)
+        assertThat(result.nails.first().finger).isEqualTo(Finger.MIDDLE)
+    }
+}

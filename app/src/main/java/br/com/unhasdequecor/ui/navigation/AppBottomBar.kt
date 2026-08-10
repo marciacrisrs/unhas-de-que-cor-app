@@ -99,7 +99,7 @@ fun AppBottomBar(
                 .semantics { contentDescription = "Escolher minha cor" },
             shape = CircleShape,
             containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
             elevation = FloatingActionButtonDefaults.elevation(6.dp),
         ) {
             Icon(Icons.Filled.AutoAwesome, contentDescription = null)

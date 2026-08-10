@@ -1,9 +1,14 @@
 package br.com.unhasdequecor.data.vision.nail
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.Color
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelRect
 import com.google.common.truth.Truth.assertThat
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Test
 
 /** Testes de máscara / confiança / cor (sem framework de Bitmap). */
@@ -113,5 +118,43 @@ class NailMaskAndColorTest {
         rois.forEach {
             assertThat(it.geometricConfidence).isLessThan(0.5f)
         }
+    }
+
+    @Test
+    fun `apply recycles output when mask weight is below minimum`() {
+        val source = mockk<Bitmap>(relaxed = true)
+        val out = mockk<Bitmap>(relaxed = true)
+        every { source.copy(any(), any()) } returns out
+        every { out.isRecycled } returns false
+        every { out.getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
+            firstArg<IntArray>().fill(0xFF808080.toInt())
+        }
+        val roi = NailRoi(
+            finger = Finger.INDEX,
+            bounds = PixelRect(0, 0, 2, 2),
+            polygon = listOf(
+                PixelPoint(0f, 0f),
+                PixelPoint(2f, 0f),
+                PixelPoint(2f, 2f),
+                PixelPoint(0f, 2f),
+            ),
+            axisFromDip = PixelPoint(1f, 1.5f),
+            axisToTip = PixelPoint(1f, 0.5f),
+            lengthPx = 2f,
+            widthPx = 2f,
+            rotationDegrees = 0f,
+            geometricConfidence = 0.9f,
+        )
+        val nail = DetectedNail(
+            finger = Finger.INDEX,
+            roi = roi,
+            mask = NailMask(2, 2, ByteArray(4) { 0 }, originX = 0, originY = 0),
+            confidence = 0.9f,
+        )
+
+        val result = NailColorApplier().apply(source, listOf(nail), Color.Red)
+
+        assertThat(result).isNull()
+        verify(exactly = 1) { out.recycle() }
     }
 }
