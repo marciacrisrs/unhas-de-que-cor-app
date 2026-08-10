@@ -3,6 +3,7 @@ package br.com.unhasdequecor.data.local.hand
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import br.com.unhasdequecor.di.IoDispatcher
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
@@ -12,12 +13,13 @@ import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 
 @Singleton
 class HandReferenceFileStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     fun persist(
         sourceAbsolutePath: String,
@@ -33,7 +35,7 @@ class HandReferenceFileStore @Inject constructor(
         }
     }
 
-    suspend fun copySampleAssetToCache(assetPath: String): File = withContext(Dispatchers.IO) {
+    suspend fun copySampleAssetToCache(assetPath: String): File = withContext(ioDispatcher) {
         val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
         val safeName = assetPath.substringAfterLast('/').ifBlank { "sample.webp" }
         val target = File(cacheDir, "sample_$safeName")
@@ -48,15 +50,15 @@ class HandReferenceFileStore @Inject constructor(
     fun deleteStoredImage() {
         val directory = File(context.filesDir, DIRECTORY)
         if (directory.isDirectory) {
-            directory.listFiles()?.forEach { it.delete() }
+            directory.listFiles()?.forEach(::deleteQuietly)
         }
-        directory.delete()
+        deleteQuietly(directory)
     }
 
     suspend fun copyUriStreamToCache(
         input: java.io.InputStream,
         fileName: String = "import.jpg",
-    ): File = withContext(Dispatchers.IO) {
+    ): File = withContext(ioDispatcher) {
         val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
         val target = File(cacheDir, fileName)
         FileOutputStream(target).use { output ->
@@ -103,10 +105,17 @@ class HandReferenceFileStore @Inject constructor(
             path == handRoot.path
     }
 
-    suspend fun clearCaptureCache() = withContext(Dispatchers.IO) {
+    suspend fun clearCaptureCache() = withContext(ioDispatcher) {
         val cacheDir = File(context.cacheDir, CACHE_DIR)
         if (!cacheDir.isDirectory) return@withContext
-        cacheDir.listFiles()?.forEach { it.delete() }
+        cacheDir.listFiles()?.forEach(::deleteQuietly)
+    }
+
+    /** Best-effort delete: usa o Boolean de [File.delete] (Sonar S899). */
+    private fun deleteQuietly(file: File) {
+        if (file.exists() && !file.delete() && file.exists()) {
+            // Arquivo ainda presente (ex.: lock); limpeza fica para o próximo ciclo/OS.
+        }
     }
 
     private fun writeHandJpeg(
@@ -169,7 +178,7 @@ class HandReferenceFileStore @Inject constructor(
             val isHandJpeg = file.name == LEGACY_FILE_NAME ||
                 (file.name.startsWith("hand_") && file.name.endsWith(".jpg"))
             if (isHandJpeg && file.absolutePath != keep.absolutePath) {
-                file.delete()
+                deleteQuietly(file)
             }
         }
     }
