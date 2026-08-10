@@ -10,9 +10,10 @@
 
 ### Qualidade
 - CI: Detekt, Lint, unit tests, JaCoCo domain/app, assemble debug/release
-- SonarCloud via Gradle (QG opcional via `SONAR_QUALITY_GATE_WAIT`)
-- R8/minify no release
+- SonarCloud via Gradle com Quality Gate bloqueante (`SONAR_QUALITY_GATE_WAIT=true`)
+- R8/minify no release; workflow `Release AAB` (manual) para artefato de loja
 
 ### Notas de loja (quando publicar)
 - App offline (sem permissão INTERNET no manifesto mesclado)
 - Câmera opcional; foto da mão fica no armazenamento local do app
+- Textos: `docs/play-listing.md` · Privacidade: `docs/privacy-policy.md`

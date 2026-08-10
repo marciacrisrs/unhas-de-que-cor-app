@@ -17,7 +17,7 @@ O app recomenda cores considerando ocasião, humor e estilo — ou escolhe por v
 - Cadastro de **minha mão** (câmera/galeria) ou amostras curadas
 - Histórico e favoritos locais (Room + DataStore), schema exportado e migrações
 - Result idempotente (SavedStateHandle + `idempotencyKey`); Histórico/Favoritos restauram sem novo save
-- Release com R8/minify (ver `docs/release.md`)
+- Release com R8/minify + checklist Play (`docs/release.md`, `docs/play-listing.md`)
 
 ## Identidade visual
 

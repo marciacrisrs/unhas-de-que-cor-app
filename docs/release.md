@@ -1,50 +1,82 @@
 # Release checklist — Unhas de Que Cor?
 
-## Antes do Play Console
+Fluxo completo até a Play: **keystore → AAB → listing → internal test → smoke**.
 
-1. **Keystore de release**
-   - Gere um keystore (guarde backup offline).
-   - Configure em `~/.gradle/gradle.properties` ou secrets de CI:
+Textos da loja: [`docs/play-listing.md`](play-listing.md)  
+Privacidade: [`docs/privacy-policy.md`](privacy-policy.md)
 
-   ```properties
-   RELEASE_STORE_FILE=/caminho/upload-keystore.jks
-   RELEASE_STORE_PASSWORD=...
-   RELEASE_KEY_ALIAS=...
-   RELEASE_KEY_PASSWORD=...
-   ```
+## 1. Keystore de upload
 
-   Sem essas props, `assembleRelease` usa assinatura **debug** (só para validar minify).
+```bash
+./scripts/generate-upload-keystore.sh
+# ou: ./scripts/generate-upload-keystore.sh ~/keys/unhas-upload.jks upload
+```
 
-2. **Build**
+Configure em `~/.gradle/gradle.properties` (nunca no git):
 
-   ```bash
-   ./gradlew verifyCi
-   ./gradlew :app:bundleRelease   # AAB para Play
-   # ou
-   ./gradlew :app:assembleRelease # APK
-   ```
+```properties
+RELEASE_STORE_FILE=/caminho/unhas-de-que-cor-upload.jks
+RELEASE_STORE_PASSWORD=...
+RELEASE_KEY_ALIAS=upload
+RELEASE_KEY_PASSWORD=...
+```
 
-   - APK: `app/build/outputs/apk/release/app-release.apk`
-   - AAB: `app/build/outputs/bundle/release/app-release.aab`
+Sem essas props, `assembleRelease` / `bundleRelease` usam assinatura **debug** (só para validar minify/R8).
 
-3. **Validar upgrade de Room**
-   - Instale build antigo (schema v1) → atualize para o release.
-   - Confirme histórico/favoritos intactos (migração 1→2).
+### Secrets no GitHub (workflow Release AAB)
 
-4. **Smoke manual**
-   - Home → contexto → Result (try-on na foto)
-   - Escolha por mim → Result
-   - Minha mão: amostra, galeria e câmera; confirmação e remoção
-   - Favoritar / compartilhar
-   - Histórico e Favoritos abrem Result (restore, sem novo save)
-   - Tema claro/escuro
-   - TalkBack: CTAs, FilterTabs, prévia try-on, FAB
+| Secret | Conteúdo |
+|--------|----------|
+| `RELEASE_KEYSTORE_BASE64` | `base64 -w0 seu.jks` |
+| `RELEASE_STORE_PASSWORD` | senha do store |
+| `RELEASE_KEY_ALIAS` | ex. `upload` |
+| `RELEASE_KEY_PASSWORD` | senha da key |
 
-5. **Store listing**
-   - Ícone 512, feature graphic, screenshots
-   - Política de privacidade (app offline; câmera opcional; dados locais; backup Android — foto da mão fora do backup)
-   - Classificação de conteúdo
-   - Changelog / “O que há de novo”: ver `CHANGELOG.md`
+Dispare **Actions → Release AAB → Run workflow**.
+
+## 2. Build local
+
+```bash
+./gradlew verifyCi
+./gradlew :app:bundleRelease   # AAB para Play
+# ou
+./gradlew :app:assembleRelease # APK
+```
+
+- AAB: `app/build/outputs/bundle/release/app-release.aab`
+- APK: `app/build/outputs/apk/release/app-release.apk`
+
+Versão atual: `versionName 1.0.0` / `versionCode 1` (`app/build.gradle.kts`).
+
+## 3. Play Console (ordem sugerida)
+
+1. Criar app + preencher [`play-listing.md`](play-listing.md)
+2. Publicar política de privacidade (URL HTTPS) e colar no Console
+3. Ativar **Play App Signing** e registrar o upload key
+4. Criar release em **Teste interno** com o AAB
+5. Smoke no device (abaixo) na faixa interna
+6. Promover para fechado/produção quando estável
+
+## 4. Validar upgrade de Room
+
+- Instale build antigo (schema v1) → atualize para o release.
+- Confirme histórico/favoritos intactos (migração 1→2).
+
+## 5. Smoke manual
+
+- Home → contexto → Result (try-on na foto)
+- Escolha por mim → Result
+- Minha mão: amostra, galeria e câmera; confirmação e remoção
+- Favoritar / compartilhar
+- Histórico e Favoritos abrem Result (restore, sem novo save)
+- Tema claro/escuro
+- TalkBack: CTAs, FilterTabs, prévia try-on, FAB
+
+## 6. Store listing (resumo)
+
+- Ícone 512, feature graphic, screenshots — checklist em `play-listing.md`
+- Changelog / “O que há de novo”: `CHANGELOG.md` + bloco em `play-listing.md`
+- Classificação de conteúdo (IARC)
 
 ## Gates de qualidade
 
