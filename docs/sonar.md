@@ -39,7 +39,7 @@ Em **Settings → Secrets and variables → Actions**:
 | `SONAR_ORGANIZATION` | Variable (ou Secret) | sim (Cloud) | `marciacrisrs` |
 | `SONAR_PROJECT_KEY` | Variable (ou Secret) | sim | `marciacrisrs_unhas-de-que-cor-app` |
 | `SONAR_HOST_URL` | Variable | não | default `https://sonarcloud.io` |
-| `SONAR_QUALITY_GATE_WAIT` | Variable | não | `true` para falhar o CI se o Quality Gate falhar |
+| `SONAR_QUALITY_GATE_WAIT` | Variable | não | default `true` (CI falha se o Quality Gate falhar); use `false` só para debug |
 
 Enquanto `SONAR_TOKEN` estiver vazio, o job de CI **pula** o passo Sonar (verify continua normal).
 
@@ -74,14 +74,16 @@ A tarefa `sonar` já depende de Detekt, Lint debug e JaCoCo app (`jacocoAppRepor
 - Detekt (relatório checkstyle/XML)
 - Resultados JUnit unitários
 
+Os caminhos dos relatórios no `build.gradle.kts` raiz são **absolutos** (`:app` `buildDirectory`). Paths relativos (`app/build/...`) são resolvidos a partir do módulo `:app` e viram `app/app/build/...`, o que faz o Sonar ignorar cobertura (Quality Gate falha com `new_coverage` 0%).
+
 Gates locais no `verifyCi`:
 - `jacocoDomainCoverageVerification` — ≥80% linhas no pacote `domain`
 - `jacocoAppCoverageVerification` — ≥80% linhas no escopo do relatório Sonar
 
 ## 5. Quality Gate
 
-Por padrão `SONAR_QUALITY_GATE_WAIT=false` — a análise sobe sem quebrar o CI.  
-Quando a dashboard estiver estável, defina a variable `SONAR_QUALITY_GATE_WAIT=true` no GitHub.
+Por padrão `SONAR_QUALITY_GATE_WAIT=true` — o passo Sonar **falha o CI** se o Quality Gate não passar.  
+Para debug temporário, defina a variable `SONAR_QUALITY_GATE_WAIT=false` no GitHub.
 
 ## 6. PR decoration (opcional)
 

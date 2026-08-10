@@ -11,12 +11,21 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   verify:
     name: Verify (quality, sonar, assemble)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Expõe no job para o `if` do passo Sonar (token vazio = step pulado).
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION || vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY || vars.SONAR_PROJECT_KEY }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+      # Quality Gate bloqueia o CI por padrão (defina var=false só para debug).
+      SONAR_QUALITY_GATE_WAIT: ${{ vars.SONAR_QUALITY_GATE_WAIT || 'true' }}
 
     steps:
       - name: Checkout
@@ -53,15 +62,10 @@ jobs:
       - name: Run CI verification
         run: ./gradlew verifyCi --stacktrace --no-configuration-cache
 
-      # 2) Sonar após quality (QG bloqueante só se SONAR_QUALITY_GATE_WAIT=true)
+      # 2) Sonar + Quality Gate (bloqueante com SONAR_QUALITY_GATE_WAIT=true)
       - name: Sonar analysis
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION || vars.SONAR_ORGANIZATION }}
-          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY || vars.SONAR_PROJECT_KEY }}
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
-          SONAR_QUALITY_GATE_WAIT: ${{ vars.SONAR_QUALITY_GATE_WAIT || 'false' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew sonar --stacktrace --no-configuration-cache
 
