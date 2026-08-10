@@ -408,13 +408,17 @@ fun FilterTab(
     }
 }
 
+data class HistoryRowModel(
+    val colorName: String,
+    val colorHex: Long,
+    val tags: List<NailStyle>,
+    val dateLabel: String,
+    val isFavorite: Boolean,
+)
+
 @Composable
 fun HistoryRow(
-    colorName: String,
-    colorHex: Long,
-    tags: List<NailStyle>,
-    dateLabel: String,
-    isFavorite: Boolean,
+    model: HistoryRowModel,
     onFavoriteClick: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -431,25 +435,25 @@ fun HistoryRow(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            NailSwatch(colorHex = colorHex, colorName = colorName)
+            NailSwatch(colorHex = model.colorHex, colorName = model.colorName)
             Box(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = colorName,
+                    text = model.colorName,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = tags.joinToString(" • ") { it.displayName },
+                    text = model.tags.joinToString(" • ") { it.displayName },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = dateLabel,
+                    text = model.dateLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -457,15 +461,19 @@ fun HistoryRow(
             IconButton(
                 onClick = onFavoriteClick,
                 modifier = Modifier.semantics {
-                    contentDescription = if (isFavorite) {
-                        "Remover $colorName dos favoritos"
+                    contentDescription = if (model.isFavorite) {
+                        "Remover ${model.colorName} dos favoritos"
                     } else {
-                        "Salvar $colorName nos favoritos"
+                        "Salvar ${model.colorName} nos favoritos"
                     }
                 },
             ) {
                 Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    imageVector = if (model.isFavorite) {
+                        Icons.Filled.Favorite
+                    } else {
+                        Icons.Filled.FavoriteBorder
+                    },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )

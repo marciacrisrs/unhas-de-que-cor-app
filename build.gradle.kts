@@ -29,7 +29,7 @@ sonar {
         // Relatórios gerados pelo verifyCi / tarefas do módulo :app
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
-            "app/build/reports/jacoco/jacocoDomainReport/jacocoDomainReport.xml",
+            "app/build/reports/jacoco/jacocoAppReport/jacocoAppReport.xml",
         )
         property("sonar.androidLint.reportPaths", "app/build/reports/lint-results-debug.xml")
         property("sonar.kotlin.detekt.reportPaths", "app/build/reports/detekt/detekt.xml")
@@ -58,6 +58,23 @@ sonar {
                 "**/ui/theme/**",
                 "**/*Activity*",
                 "**/*Application*",
+                "**/*Screen*",
+                "**/ui/components/BrandComponents*",
+                "**/ui/components/HandTryOn*",
+                "**/ui/navigation/AppNavHost*",
+                "**/ui/navigation/AppBottomBar*",
+                "**/ui/navigation/BottomDestination*",
+                "**/data/vision/MediaPipe*",
+                "**/data/vision/nail/GeometricNailSegmenter*",
+                "**/data/vision/nail/NailTryOn*",
+                "**/data/vision/nail/NailTracker*",
+                "**/data/local/datastore/**",
+                "**/data/local/hand/**",
+                "**/data/local/db/dao/**",
+                "**/data/local/db/AppDatabase*",
+                "**/data/repository/HandReferenceRepositoryImpl*",
+                "**/data/repository/PreferencesRepositoryImpl*",
+                "**/data/repository/ColorCatalogRepositoryImpl*",
                 "**/BuildConfig.*",
             ).joinToString(","),
         )
@@ -70,7 +87,7 @@ tasks.named("sonar") {
     dependsOn(
         ":app:detekt",
         ":app:lintDebug",
-        ":app:jacocoDomainReport",
+        ":app:jacocoAppReport",
     )
 }
 

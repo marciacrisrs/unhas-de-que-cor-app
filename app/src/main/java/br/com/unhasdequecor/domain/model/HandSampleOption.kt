@@ -17,6 +17,8 @@ object HandSampleCatalog {
      */
     const val DEFAULT_ID = "clara_vermelho"
 
+    private const val REFERENCE_DETAIL = "Referência"
+
     val defaultOption: HandSampleOption
         get() = checkNotNull(findById(DEFAULT_ID))
 
@@ -24,19 +26,19 @@ object HandSampleCatalog {
         HandSampleOption(
             id = "retinta_vinho",
             skinLabel = "Pele retinta",
-            detailLabel = "Referência",
+            detailLabel = REFERENCE_DETAIL,
             assetPath = "hand_samples/hand_sample_retinta_vinho.webp",
         ),
         HandSampleOption(
             id = "morena_nude",
             skinLabel = "Pele morena",
-            detailLabel = "Referência",
+            detailLabel = REFERENCE_DETAIL,
             assetPath = "hand_samples/hand_sample_morena_nude.webp",
         ),
         HandSampleOption(
             id = "clara_vermelho",
             skinLabel = "Pele clara",
-            detailLabel = "Referência",
+            detailLabel = REFERENCE_DETAIL,
             assetPath = "hand_samples/hand_sample_clara_vermelho.webp",
         ),
         HandSampleOption(

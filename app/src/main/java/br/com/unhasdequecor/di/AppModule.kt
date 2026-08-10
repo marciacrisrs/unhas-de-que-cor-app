@@ -62,47 +62,47 @@ object DatabaseModule {
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class RepositoryModule {
+interface RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindColorCatalogRepository(
+    fun bindColorCatalogRepository(
         impl: ColorCatalogRepositoryImpl,
     ): ColorCatalogRepository
 
     @Binds
     @Singleton
-    abstract fun bindHistoryRepository(
+    fun bindHistoryRepository(
         impl: HistoryRepositoryImpl,
     ): HistoryRepository
 
     @Binds
     @Singleton
-    abstract fun bindPreferencesRepository(
+    fun bindPreferencesRepository(
         impl: PreferencesRepositoryImpl,
     ): PreferencesRepository
 
     @Binds
     @Singleton
-    abstract fun bindHandReferenceRepository(
+    fun bindHandReferenceRepository(
         impl: HandReferenceRepositoryImpl,
     ): HandReferenceRepository
 
     @Binds
     @Singleton
-    abstract fun bindHandNailDetector(
+    fun bindHandNailDetector(
         impl: MediaPipeHandNailDetector,
     ): HandNailDetector
 
     @Binds
     @Singleton
-    abstract fun bindHandLandmarkProcessor(
+    fun bindHandLandmarkProcessor(
         impl: MediaPipeHandNailDetector,
     ): HandLandmarkProcessor
 
     @Binds
     @Singleton
-    abstract fun bindNailSegmenter(
+    fun bindNailSegmenter(
         impl: GeometricNailSegmenter,
     ): NailSegmenter
 }

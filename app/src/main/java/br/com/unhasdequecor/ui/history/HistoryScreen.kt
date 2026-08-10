@@ -32,6 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.ui.components.FilterTab
 import br.com.unhasdequecor.ui.components.HistoryRow
+import br.com.unhasdequecor.ui.components.HistoryRowModel
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
@@ -179,11 +180,13 @@ private fun HistoryMonthCard(
         ) {
             group.entries.forEach { entry ->
                 HistoryRow(
-                    colorName = entry.colorName,
-                    colorHex = entry.colorHex,
-                    tags = entry.tags,
-                    dateLabel = entry.dateLabel,
-                    isFavorite = entry.isFavorite,
+                    model = HistoryRowModel(
+                        colorName = entry.colorName,
+                        colorHex = entry.colorHex,
+                        tags = entry.tags,
+                        dateLabel = entry.dateLabel,
+                        isFavorite = entry.isFavorite,
+                    ),
                     onFavoriteClick = { onToggleFavorite(entry) },
                     onClick = { onOpenResult(entry) },
                 )

@@ -64,15 +64,17 @@ Ou via propriedades Gradle:
   -Psonar.projectKey=sua-org_unhas-de-que-cor-app
 ```
 
-A tarefa `sonar` já depende de Detekt, Lint debug e JaCoCo domain.
+A tarefa `sonar` já depende de Detekt, Lint debug e JaCoCo app (`jacocoAppReport`).
 
 ## 4. O que é enviado
 
 - Código Kotlin (`:app`)
-- Cobertura JaCoCo do pacote `domain` (`jacocoDomainReport.xml`)
+- Cobertura JaCoCo (`jacocoAppReport.xml`) — domain, data testável e ViewModels
 - Android Lint (`lint-results-debug.xml`)
 - Detekt (relatório checkstyle/XML)
 - Resultados JUnit unitários
+
+O gate local `jacocoDomainCoverageVerification` continua exigindo ≥80% só no pacote `domain`.
 
 ## 5. Quality Gate
 
