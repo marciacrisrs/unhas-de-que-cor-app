@@ -159,6 +159,7 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     reports {
         html.required.set(true)
         sarif.required.set(true)
+        // Checkstyle XML → sonar.kotlin.detekt.reportPaths
         checkstyle.required.set(true)
         markdown.required.set(true)
     }
