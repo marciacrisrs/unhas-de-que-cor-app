@@ -12,17 +12,11 @@ O app recomenda cores considerando ocasião, humor e estilo — ou escolhe por v
 
 - Identidade visual e design system (tema claro + escuro)
 - Navegação com bottom bar + CTA central
-- Tela inicial
-- Escolha por contexto
-- Escolha por mim
-- Preferências de estilo
-- Motor inicial de recomendação
-- Tela de resultado visual
-- Histórico e favoritos locais (Room + DataStore)
-- Room com schema exportado e migrações versionadas (sem wipe destrutivo)
-- Result idempotente (SavedStateHandle + `idempotencyKey` no histórico)
-- Histórico/Favoritos abrem Result em modo restore (sem novo save)
-- Room com migrações versionadas + Result idempotente
+- Tela inicial, escolha por contexto / por mim, preferências de estilo
+- Motor de recomendação + tela de resultado com **try-on em foto real** (MediaPipe + máscara)
+- Cadastro de **minha mão** (câmera/galeria) ou amostras curadas
+- Histórico e favoritos locais (Room + DataStore), schema exportado e migrações
+- Result idempotente (SavedStateHandle + `idempotencyKey`); Histórico/Favoritos restauram sem novo save
 - Release com R8/minify (ver `docs/release.md`)
 
 ## Identidade visual
@@ -33,18 +27,18 @@ Paleta (contraste em pontos estratégicos):
 |-------|-----|-----|
 | Base | `#FCF1EE` | Fundo |
 | Superfície suave | `#ECB2C8` | Cards e áreas calmas |
-| Diversão | `#F590B6` | Tags e acentos |
-| Ação | `#A4082B` | CTAs e FAB |
+| Diversão | `#F590B6` | FAB, tabs selecionadas, acentos (texto usa `onSecondary`) |
+| Ação | `#A4082B` | CTAs primários |
 | Identidade | `#400113` | Texto forte / marca |
 
-Princípios de UI: cards grandes e arredondados, muito respiro no `#FCF1EE`, ilustração de unhas na recomendação. Tipografia: **Playfair Display** (títulos) + **Poppins** (UI).
+Princípios de UI: cards grandes e arredondados, muito respiro no `#FCF1EE`, prévia try-on na recomendação (foto, sem ilustração vetorial). Tipografia: **Playfair Display** (títulos) + **Poppins** (UI). Guia: [`docs/visual-guide.md`](docs/visual-guide.md).
 
 ## Stack
 
 - Kotlin + Jetpack Compose (Material 3)
 - Clean Architecture + MVVM + UDF
-- Hilt, Navigation, Room, DataStore
-- Testes de domínio com JUnit / MockK / Truth
+- Hilt, Navigation, Room, DataStore, MediaPipe Hand Landmarker
+- Testes com JUnit / MockK / Truth
 
 ## Como rodar
 

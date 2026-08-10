@@ -14,11 +14,15 @@ import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import br.com.unhasdequecor.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -32,6 +36,12 @@ class HandReferenceViewModelTest {
     private val repository = FakeHandReferenceRepository()
     private val context = mockk<Context>(relaxed = true)
     private val fileStore = mockk<HandReferenceFileStore>(relaxed = true)
+
+    @Before
+    fun stubFileStore() {
+        coEvery { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
+        coEvery { fileStore.clearCaptureCache() } just runs
+    }
 
     private fun viewModel(): HandReferenceViewModel = HandReferenceViewModel(
         context = context,
@@ -81,7 +91,6 @@ class HandReferenceViewModelTest {
 
     @Test
     fun `confirm pending sample persists selection`() = runTest {
-        every { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         val viewModel = viewModel()
 
         viewModel.openSamplePicker()
@@ -101,7 +110,6 @@ class HandReferenceViewModelTest {
 
     @Test
     fun `confirm camera after sample clears sample source`() = runTest {
-        every { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         val viewModel = viewModel()
         viewModel.useSampleHand("morena_nude")
         advanceUntilIdle()

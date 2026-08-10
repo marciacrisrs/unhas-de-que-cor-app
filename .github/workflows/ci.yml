@@ -9,18 +9,14 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   verify:
-    name: Verify (detekt, lint, tests, coverage, assemble)
+    name: Verify (quality, sonar, assemble)
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      # Exposto no job para o `if` do passo Sonar (token vazio = step pulado).
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION || vars.SONAR_ORGANIZATION }}
-      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY || vars.SONAR_PROJECT_KEY }}
-      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
-      SONAR_QUALITY_GATE_WAIT: ${{ vars.SONAR_QUALITY_GATE_WAIT || 'false' }}
 
     steps:
       - name: Checkout
@@ -47,22 +43,25 @@ jobs:
           # Instala o necessário aqui; evita cache manual do SDK (restore tar flaky).
           packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses >/dev/null || true
-
       - name: Write local.properties
         run: echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # 1) Qualidade + cobertura + assemble (verifyCi)
       - name: Run CI verification
         run: ./gradlew verifyCi --stacktrace --no-configuration-cache
 
+      # 2) Sonar após quality (QG bloqueante só se SONAR_QUALITY_GATE_WAIT=true)
       - name: Sonar analysis
-        # Roda só quando o token estiver configurado (repo secret SONAR_TOKEN).
-        if: ${{ env.SONAR_TOKEN != '' }}
+        if: ${{ secrets.SONAR_TOKEN != '' }}
         env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION || vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY || vars.SONAR_PROJECT_KEY }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          SONAR_QUALITY_GATE_WAIT: ${{ vars.SONAR_QUALITY_GATE_WAIT || 'false' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew sonar --stacktrace --no-configuration-cache
 
@@ -73,7 +72,17 @@ jobs:
           name: coverage-reports
           path: |
             app/build/reports/jacoco/jacocoDomainReport/
-            app/build/reports/coverage/
+            app/build/reports/jacoco/jacocoAppReport/
+          if-no-files-found: ignore
+
+      - name: Upload APK artifacts
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: apk-artifacts
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
           if-no-files-found: ignore
 
       - name: Upload Detekt reports

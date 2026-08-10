@@ -1,4 +1,4 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -40,6 +40,7 @@ object PolishMaskRecolorer {
 
         val meanNailLum = meanNailLuminance(pixels, maskPixels) ?: run {
             recycleIfScaled(scaledMask, mask)
+            if (!out.isRecycled) out.recycle()
             return null
         }
 

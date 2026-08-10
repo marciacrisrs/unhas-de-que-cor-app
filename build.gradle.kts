@@ -66,7 +66,7 @@ sonar {
                 "**/ui/navigation/BottomDestination*",
                 "**/data/vision/MediaPipe*",
                 "**/data/vision/nail/GeometricNailSegmenter*",
-                "**/data/vision/nail/NailTryOn*",
+                "**/data/vision/nail/DetectedNailPolishApplier*",
                 "**/data/vision/nail/NailTracker*",
                 "**/data/local/datastore/**",
                 "**/data/local/hand/**",
@@ -94,12 +94,13 @@ tasks.named("sonar") {
 tasks.register("verifyCi") {
     group = "verification"
     description =
-        "Roda o mesmo conjunto de verificações do CI (detekt, lint, unit tests, cobertura domain, assembleDebug + release)."
+        "Roda o mesmo conjunto de verificações do CI (detekt, lint, unit tests, cobertura domain/app, assembleDebug + release)."
     dependsOn(
         ":app:detekt",
         ":app:lintDebug",
         ":app:testDebugUnitTest",
         ":app:jacocoDomainCoverageVerification",
+        ":app:jacocoAppCoverageVerification",
         ":app:assembleDebug",
         ":app:assembleRelease",
     )

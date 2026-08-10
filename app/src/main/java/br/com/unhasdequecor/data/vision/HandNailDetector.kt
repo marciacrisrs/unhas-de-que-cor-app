@@ -1,7 +1,7 @@
 package br.com.unhasdequecor.data.vision
 
 import android.graphics.Bitmap
-import br.com.unhasdequecor.ui.components.NailOverlayAnchor
+import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
 
 /**
  * Detecta âncoras de unhas a partir de uma foto (legado / amostras).

@@ -1,4 +1,4 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 /**
  * Âncoras normalizadas (0–1) no espaço da imagem (ContentScale.FillBounds + aspect da bitmap).

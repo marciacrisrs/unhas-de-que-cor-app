@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,7 +39,11 @@ import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
+import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
+import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
+import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchors
 import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
+import br.com.unhasdequecor.data.vision.nail.PolishMaskRecolorer
 import br.com.unhasdequecor.di.NailPipelineEntryPoint
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import dagger.hilt.android.EntryPointAccessors
@@ -88,20 +94,27 @@ fun HandTryOnPreview(
         pipeline,
     ) {
         value = withContext(Dispatchers.Default) {
-            val decoded = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 2048)
-                ?: return@withContext null
-            val resolved = resolvePreview(
-                context = context.applicationContext,
-                bitmap = decoded,
-                polishColor = polishColor,
-                sampleId = sampleId,
-                pipeline = pipeline,
-            )
-            // decodeFile sempre cria bitmap nova; se o pipeline devolveu outra, libera a fonte.
-            if (resolved.bitmap !== decoded) {
+            var decoded: Bitmap? = null
+            try {
+                decoded = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 1280)
+                    ?: return@withContext null
+                val resolved = resolvePreview(
+                    context = context.applicationContext,
+                    bitmap = decoded,
+                    polishColor = polishColor,
+                    sampleId = sampleId,
+                    pipeline = pipeline,
+                )
+                // decodeFile sempre cria bitmap nova; se o pipeline devolveu outra, libera a fonte.
+                if (resolved.bitmap !== decoded) {
+                    recycleQuietly(decoded)
+                    decoded = null
+                }
+                resolved
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 recycleQuietly(decoded)
+                throw cancelled
             }
-            resolved
         }
     }
 
@@ -116,6 +129,7 @@ fun HandTryOnPreview(
     val aspect = preview?.bitmap?.let { bmp ->
         if (bmp.height > 0) bmp.width.toFloat() / bmp.height.toFloat() else NailLandmarkMapper.PREVIEW_ASPECT
     } ?: NailLandmarkMapper.PREVIEW_ASPECT
+    val statusLabel = previewStatusLabel(mode = preview?.mode, isUserPhoto = sampleId == null)
 
     Box(
         modifier = modifier
@@ -124,21 +138,33 @@ fun HandTryOnPreview(
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .semantics {
-                contentDescription = "Prévia da cor $colorName na sua mão"
+                contentDescription = if (preview == null) {
+                    "Preparando prévia da cor $colorName na sua mão"
+                } else {
+                    "Prévia da cor $colorName na sua mão. $statusLabel"
+                }
             },
+        contentAlignment = Alignment.Center,
     ) {
-        TryOnPreviewContent(data = preview, polishColor = polishColor)
-        Text(
-            text = previewStatusLabel(mode = preview?.mode, isUserPhoto = sampleId == null),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
-                .clip(SoftSurfaceShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.88f))
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-        )
+        if (preview == null) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(36.dp),
+            )
+        } else {
+            TryOnPreviewContent(data = preview, polishColor = polishColor)
+            Text(
+                text = statusLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(12.dp)
+                    .clip(SoftSurfaceShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.88f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            )
+        }
     }
 }
 

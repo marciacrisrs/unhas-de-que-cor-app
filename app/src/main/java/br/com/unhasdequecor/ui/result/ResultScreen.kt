@@ -396,22 +396,11 @@ private fun SimilarColorsSection(
     primary: NailColor,
     similar: List<NailColor>,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "CORES PARECIDAS",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.secondary,
-        )
-        Text(
-            text = "VER TODAS ›",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
+    Text(
+        text = "CORES PARECIDAS",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+    )
     Spacer(modifier = Modifier.height(12.dp))
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),

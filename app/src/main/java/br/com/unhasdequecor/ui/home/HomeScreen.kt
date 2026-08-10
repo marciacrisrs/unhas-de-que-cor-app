@@ -124,7 +124,7 @@ fun HomeScreen(
         Text(
             text = "CONTINUE EXPLORANDO",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.secondary,
+            color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(
@@ -317,7 +317,7 @@ private fun InspirationCard(
                 Text(
                     text = "INSPIRAÇÃO DO DIA",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(

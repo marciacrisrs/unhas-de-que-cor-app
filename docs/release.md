@@ -18,35 +18,40 @@
 2. **Build**
 
    ```bash
-   ./gradlew :app:assembleRelease
+   ./gradlew verifyCi
+   ./gradlew :app:bundleRelease   # AAB para Play
+   # ou
+   ./gradlew :app:assembleRelease # APK
    ```
 
-   Artefato: `app/build/outputs/apk/release/app-release.apk`  
-   (ou AAB com `:app:bundleRelease` quando for publicar).
+   - APK: `app/build/outputs/apk/release/app-release.apk`
+   - AAB: `app/build/outputs/bundle/release/app-release.aab`
 
 3. **Validar upgrade de Room**
    - Instale build antigo (schema v1) → atualize para o release.
    - Confirme histórico/favoritos intactos (migração 1→2).
 
 4. **Smoke manual**
-   - Home → contexto → Result
+   - Home → contexto → Result (try-on na foto)
    - Escolha por mim → Result
+   - Minha mão: amostra, galeria e câmera; confirmação e remoção
    - Favoritar / compartilhar
    - Histórico e Favoritos abrem Result (restore, sem novo save)
    - Tema claro/escuro
-   - TalkBack nos CTAs principais
+   - TalkBack: CTAs, FilterTabs, prévia try-on, FAB
 
 5. **Store listing**
    - Ícone 512, feature graphic, screenshots
-   - Política de privacidade (app offline; dados locais; backup Android)
+   - Política de privacidade (app offline; câmera opcional; dados locais; backup Android — foto da mão fora do backup)
    - Classificação de conteúdo
+   - Changelog / “O que há de novo”: ver `CHANGELOG.md`
 
 ## Gates de qualidade
 
 ```bash
 ./gradlew verifyCi
-./gradlew :app:assembleRelease
 ```
 
-- Detekt + Lint + unit tests + JaCoCo domain ≥80% + assembleDebug
-- Release: R8/minify + shrink resources ligados
+Inclui: Detekt + Lint + unit tests + JaCoCo domain ≥80% + JaCoCo app ≥80% + assembleDebug + assembleRelease (R8/minify).
+
+Sonar: `./gradlew sonar` (QG bloqueante com `SONAR_QUALITY_GATE_WAIT=true`).

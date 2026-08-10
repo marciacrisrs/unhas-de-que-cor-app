@@ -9,7 +9,7 @@ import kotlin.math.pow
 
 /**
  * Aplica cor de esmalte só nos pixels da [NailMask], preservando luminância/brilho.
- * Reutiliza a mesma filosofia de [br.com.unhasdequecor.ui.components.PolishMaskRecolorer].
+ * Reutiliza a mesma filosofia de [br.com.unhasdequecor.data.vision.nail.PolishMaskRecolorer].
  */
 @Singleton
 class NailColorApplier @Inject constructor() {
@@ -44,7 +44,10 @@ class NailColorApplier @Inject constructor() {
                 weight += coverage
             }
         }
-        if (weight < MIN_WEIGHT) return null
+        if (weight < MIN_WEIGHT) {
+            if (!out.isRecycled) out.recycle()
+            return null
+        }
         val meanLum = (lumSum / weight).coerceAtLeast(1f)
 
         for (nail in nails) {

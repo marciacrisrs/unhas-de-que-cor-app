@@ -4,8 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates
-import br.com.unhasdequecor.ui.components.NailLandmarkMapper
-import br.com.unhasdequecor.ui.components.NailOverlayAnchor
+import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
+import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode

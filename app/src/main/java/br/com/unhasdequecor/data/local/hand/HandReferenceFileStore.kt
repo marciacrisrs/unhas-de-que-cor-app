@@ -12,6 +12,8 @@ import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class HandReferenceFileStore @Inject constructor(
@@ -31,7 +33,7 @@ class HandReferenceFileStore @Inject constructor(
         }
     }
 
-    fun copySampleAssetToCache(assetPath: String): File {
+    suspend fun copySampleAssetToCache(assetPath: String): File = withContext(Dispatchers.IO) {
         val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
         val safeName = assetPath.substringAfterLast('/').ifBlank { "sample.webp" }
         val target = File(cacheDir, "sample_$safeName")
@@ -40,7 +42,7 @@ class HandReferenceFileStore @Inject constructor(
                 input.copyTo(output)
             }
         }
-        return target
+        target
     }
 
     fun deleteStoredImage() {
@@ -51,13 +53,16 @@ class HandReferenceFileStore @Inject constructor(
         directory.delete()
     }
 
-    fun copyUriStreamToCache(input: java.io.InputStream, fileName: String = "import.jpg"): File {
+    suspend fun copyUriStreamToCache(
+        input: java.io.InputStream,
+        fileName: String = "import.jpg",
+    ): File = withContext(Dispatchers.IO) {
         val cacheDir = File(context.cacheDir, CACHE_DIR).also { it.mkdirs() }
         val target = File(cacheDir, fileName)
         FileOutputStream(target).use { output ->
             input.copyTo(output)
         }
-        return target
+        target
     }
 
     fun createCameraCaptureFile(): File {
@@ -71,6 +76,9 @@ class HandReferenceFileStore @Inject constructor(
         if (!source.isFile) {
             return HandReferenceRejection.INVALID_IMAGE
         }
+        if (!isAllowedSourcePath(source)) {
+            return HandReferenceRejection.INVALID_IMAGE
+        }
         if (source.length() > MAX_BYTES) {
             return HandReferenceRejection.TOO_LARGE
         }
@@ -82,6 +90,23 @@ class HandReferenceFileStore @Inject constructor(
                 HandReferenceRejection.TOO_SMALL
             else -> null
         }
+    }
+
+    /** Defesa em profundidade: só aceita arquivos sob cache de captura ou pasta da mão. */
+    private fun isAllowedSourcePath(source: File): Boolean {
+        val canonical = runCatching { source.canonicalFile }.getOrNull() ?: return false
+        val captureRoot = File(context.cacheDir, CACHE_DIR).canonicalFile
+        val handRoot = File(context.filesDir, DIRECTORY).canonicalFile
+        val path = canonical.path
+        return path.startsWith(captureRoot.path + File.separator) ||
+            path.startsWith(handRoot.path + File.separator) ||
+            path == handRoot.path
+    }
+
+    suspend fun clearCaptureCache() = withContext(Dispatchers.IO) {
+        val cacheDir = File(context.cacheDir, CACHE_DIR)
+        if (!cacheDir.isDirectory) return@withContext
+        cacheDir.listFiles()?.forEach { it.delete() }
     }
 
     private fun writeHandJpeg(

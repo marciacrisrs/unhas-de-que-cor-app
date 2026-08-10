@@ -148,3 +148,20 @@ Ativar QG; reordenar quality→Sonar→assemble→upload; publicar APK/AAB + `ja
 - Sem leaks conhecidos de Bitmap nos early-returns; import de mão em `Dispatchers.IO`.
 - Try-on sem dependência `data`→`ui`; testes do pipeline no CI.
 - `SONAR_QUALITY_GATE_WAIT=true` verde; AAB assinado com keystore de upload.
+
+---
+
+## Follow-up aplicado (2026-08-10)
+
+Branch `cursor/especialistas-followups-535f` (inclui smells #17):
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Contraste + FilterTab a11y | Feito (`onSecondary`, tabs 48dp, labels em `primary`) |
+| 2 | Recycle bitmaps + I/O | Feito (early-return recycle, FileStore suspend/`Dispatchers.IO`, UI dispose) |
+| 3 | Ciclo data↔ui try-on | Feito (mappers/recolor em `data/vision/nail`) |
+| 4 | Testes + gate app | Feito (`NailTryOnPipelineTest`, `jacocoAppCoverageVerification` ≥80%) |
+| 5 | README / release / AGENTS | Feito + `CHANGELOG.md` |
+| 6 | Manifest rede | Feito (`INTERNET`/`ACCESS_NETWORK_STATE` removidos no merge) |
+| 7 | CI artefatos / ordem / permissions | Feito (QG wait ainda opt-in via var) |
+| 8 | Keystore + AAB + listing Play | Pendente (operacional / console) |

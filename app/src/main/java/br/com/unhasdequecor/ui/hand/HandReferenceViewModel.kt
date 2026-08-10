@@ -217,6 +217,7 @@ class HandReferenceViewModel @Inject constructor(
             }
             when (val outcome = useSampleHandReference(option.id, prepared.absolutePath)) {
                 is HandReferenceSaveOutcome.Saved -> {
+                    fileStore.clearCaptureCache()
                     _uiState.update {
                         it.copy(
                             isSaving = false,
@@ -252,6 +253,7 @@ class HandReferenceViewModel @Inject constructor(
     private suspend fun persistUser(path: String) {
         when (val outcome = saveHandReference(path, HandReferenceSource.USER)) {
             is HandReferenceSaveOutcome.Saved -> {
+                fileStore.clearCaptureCache()
                 _uiState.update {
                     it.copy(
                         isSaving = false,

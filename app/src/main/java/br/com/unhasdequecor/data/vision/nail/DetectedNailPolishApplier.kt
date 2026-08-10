@@ -1,4 +1,4 @@
-package br.com.unhasdequecor.ui.components
+package br.com.unhasdequecor.data.vision.nail
 
 import android.graphics.Bitmap
 import android.graphics.Canvas

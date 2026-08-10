@@ -192,10 +192,11 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/data/vision/nail/DetectedNail*",
     "**/br/com/unhasdequecor/data/vision/nail/ImageCoordinates*",
     "**/br/com/unhasdequecor/data/vision/nail/NailColorApplier*",
+    "**/br/com/unhasdequecor/data/vision/nail/PolishMaskRecolorer*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailOverlayAnchors*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailLandmarkMapper*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailTryOnPipeline*",
     "**/br/com/unhasdequecor/data/repository/HistoryRepositoryImpl*",
-    "**/br/com/unhasdequecor/ui/components/PolishMaskRecolorer*",
-    "**/br/com/unhasdequecor/ui/components/NailOverlayAnchors*",
-    "**/br/com/unhasdequecor/ui/components/NailLandmarkMapper*",
     "**/br/com/unhasdequecor/ui/history/HistoryViewModel*",
     "**/br/com/unhasdequecor/ui/result/ResultViewModel*",
     "**/br/com/unhasdequecor/ui/hand/HandReferenceViewModel*",
@@ -217,8 +218,9 @@ val jacocoExcludes = listOf(
     "**/di/**",
     "**/MediaPipe*",
     "**/GeometricNailSegmenter*",
-    "**/NailTryOn*",
+    "**/NailTryOnResult*",
     "**/NailTracker*",
+    "**/DetectedNailPolishApplier*",
     "**/dao/**",
 )
 
@@ -291,6 +293,26 @@ tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
 
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(domainClassDirectories())
+    executionData.setFrom(jacocoExecutionData())
+
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoAppCoverageVerification") {
+    group = "verification"
+    description = "Exige ≥80% de cobertura de linhas no escopo app (relatório Sonar)."
+    dependsOn("jacocoAppReport")
+
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(appClassDirectories())
     executionData.setFrom(jacocoExecutionData())
 
     violationRules {

@@ -69,12 +69,14 @@ A tarefa `sonar` já depende de Detekt, Lint debug e JaCoCo app (`jacocoAppRepor
 ## 4. O que é enviado
 
 - Código Kotlin (`:app`)
-- Cobertura JaCoCo (`jacocoAppReport.xml`) — domain, data testável e ViewModels
+- Cobertura JaCoCo (`jacocoAppReport.xml`) — domain, data testável, vision helpers e ViewModels
 - Android Lint (`lint-results-debug.xml`)
 - Detekt (relatório checkstyle/XML)
 - Resultados JUnit unitários
 
-O gate local `jacocoDomainCoverageVerification` continua exigindo ≥80% só no pacote `domain`.
+Gates locais no `verifyCi`:
+- `jacocoDomainCoverageVerification` — ≥80% linhas no pacote `domain`
+- `jacocoAppCoverageVerification` — ≥80% linhas no escopo do relatório Sonar
 
 ## 5. Quality Gate
 

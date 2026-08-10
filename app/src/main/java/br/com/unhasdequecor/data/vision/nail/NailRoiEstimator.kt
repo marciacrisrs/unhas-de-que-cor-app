@@ -13,7 +13,7 @@ import javax.inject.Singleton
 /**
  * Estima ROI + polígono almond da unha a partir de MCP/PIP/DIP/TIP.
  *
- * Largura alinhada ao [br.com.unhasdequecor.ui.components.NailLandmarkMapper]
+ * Largura alinhada ao [br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper]
  * (proporcional ao comprimento tip–DIP), não a uma heurística estreita de falange.
  */
 @Singleton
