@@ -165,7 +165,7 @@ class HandReferenceFileStore @Inject constructor(
                 ),
             )
         } else {
-            destination.delete()
+            deleteQuietly(destination)
             HandReferenceSaveOutcome.Rejected(HandReferenceRejection.IO_ERROR)
         }
     }
