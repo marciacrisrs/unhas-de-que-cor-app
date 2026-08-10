@@ -24,17 +24,12 @@ object PolishMaskRecolorer {
 
     fun recolor(source: Bitmap, mask: Bitmap, polishColor: Color): Bitmap? {
         if (source.width <= 0 || source.height <= 0) return null
-        val scaledMask = if (mask.width == source.width && mask.height == source.height) {
-            mask
-        } else {
-            Bitmap.createScaledBitmap(mask, source.width, source.height, true)
-        }
+        val scaledMask = scaledMaskOrSelf(mask, source.width, source.height)
         val out = source.copy(Bitmap.Config.ARGB_8888, true) ?: return null
         val target = polishColor.toArgb()
         val tr = AndroidColor.red(target)
         val tg = AndroidColor.green(target)
         val tb = AndroidColor.blue(target)
-        val targetLum = luminance(tr, tg, tb).coerceAtLeast(8f)
 
         val width = out.width
         val height = out.height
@@ -43,6 +38,31 @@ object PolishMaskRecolorer {
         out.getPixels(pixels, 0, width, 0, 0, width, height)
         scaledMask.getPixels(maskPixels, 0, width, 0, 0, width, height)
 
+        val meanNailLum = meanNailLuminance(pixels, maskPixels) ?: run {
+            recycleIfScaled(scaledMask, mask)
+            return null
+        }
+
+        applyPolish(pixels, maskPixels, tr, tg, tb, meanNailLum)
+        out.setPixels(pixels, 0, width, 0, 0, width, height)
+        recycleIfScaled(scaledMask, mask)
+        return out
+    }
+
+    private fun scaledMaskOrSelf(mask: Bitmap, width: Int, height: Int): Bitmap =
+        if (mask.width == width && mask.height == height) {
+            mask
+        } else {
+            Bitmap.createScaledBitmap(mask, width, height, true)
+        }
+
+    private fun recycleIfScaled(scaledMask: Bitmap, original: Bitmap) {
+        if (scaledMask !== original) {
+            scaledMask.recycle()
+        }
+    }
+
+    private fun meanNailLuminance(pixels: IntArray, maskPixels: IntArray): Float? {
         var maskWeightSum = 0f
         var maskedLumSum = 0f
         var coveredCount = 0
@@ -59,59 +79,76 @@ object PolishMaskRecolorer {
             maskWeightSum += coverage
             maskedLumSum += lum * coverage
         }
-        // Guarda: máscara inválida / alpha opaco em tudo → não pinta a foto inteira.
         val coverageRatio = coveredCount.toFloat() / pixels.size.toFloat()
         if (maskWeightSum <= 0f || coverageRatio > MAX_MASK_COVERAGE_RATIO) {
-            if (scaledMask !== mask) {
-                scaledMask.recycle()
-            }
             return null
         }
-        val meanNailLum = (maskedLumSum / maskWeightSum).coerceAtLeast(1f)
+        return (maskedLumSum / maskWeightSum).coerceAtLeast(1f)
+    }
 
+    private fun applyPolish(
+        pixels: IntArray,
+        maskPixels: IntArray,
+        tr: Int,
+        tg: Int,
+        tb: Int,
+        meanNailLum: Float,
+    ) {
         for (i in pixels.indices) {
             val coverage = maskCoverage(maskPixels[i])
             if (coverage < MIN_COVERAGE) continue
-
-            val src = pixels[i]
-            val sr = AndroidColor.red(src)
-            val sg = AndroidColor.green(src)
-            val sb = AndroidColor.blue(src)
-            val sa = AndroidColor.alpha(src)
-            val lum = luminance(sr, sg, sb)
-
-            // Sombreamento relativo ao brilho médio da unha na foto.
-            val shade = (lum / meanNailLum).coerceIn(MIN_SHADE, MAX_SHADE)
-            var nr = (tr * shade).toInt().coerceIn(0, 255)
-            var ng = (tg * shade).toInt().coerceIn(0, 255)
-            var nb = (tb * shade).toInt().coerceIn(0, 255)
-
-            // Specular: pixels claros viram brilho de esmalte (quase branco).
-            val specular = specularAmount(lum, meanNailLum)
-            if (specular > 0f) {
-                nr = mixChannel(nr, 255, specular)
-                ng = mixChannel(ng, 255, specular)
-                nb = mixChannel(nb, 255, specular)
-            }
-
-            // Leve saturação do tom alvo para parecer camada de esmalte.
-            val vivid = vividize(nr, ng, nb, tr, tg, tb, 0.18f)
-            nr = vivid[0]
-            ng = vivid[1]
-            nb = vivid[2]
-
-            val blend = coverage.pow(0.85f).coerceIn(0f, 1f)
-            val outR = mixChannel(sr, nr, blend)
-            val outG = mixChannel(sg, ng, blend)
-            val outB = mixChannel(sb, nb, blend)
-            pixels[i] = AndroidColor.argb(sa, outR, outG, outB)
+            pixels[i] = polishPixel(pixels[i], coverage, tr, tg, tb, meanNailLum)
         }
-        out.setPixels(pixels, 0, width, 0, 0, width, height)
-        if (scaledMask !== mask) {
-            scaledMask.recycle()
-        }
-        return out
     }
+
+    internal fun polishPixel(
+        src: Int,
+        coverage: Float,
+        tr: Int,
+        tg: Int,
+        tb: Int,
+        meanNailLum: Float,
+    ): Int {
+        val sr = channelRed(src)
+        val sg = channelGreen(src)
+        val sb = channelBlue(src)
+        val sa = channelAlpha(src)
+        val lum = luminance(sr, sg, sb)
+
+        val shade = (lum / meanNailLum).coerceIn(MIN_SHADE, MAX_SHADE)
+        var nr = (tr * shade).toInt().coerceIn(0, 255)
+        var ng = (tg * shade).toInt().coerceIn(0, 255)
+        var nb = (tb * shade).toInt().coerceIn(0, 255)
+
+        val specular = specularAmount(lum, meanNailLum)
+        if (specular > 0f) {
+            nr = mixChannel(nr, 255, specular)
+            ng = mixChannel(ng, 255, specular)
+            nb = mixChannel(nb, 255, specular)
+        }
+
+        val vivid = vividize(nr, ng, nb, tr, tg, tb, 0.18f)
+        nr = vivid[0]
+        ng = vivid[1]
+        nb = vivid[2]
+
+        val blend = coverage.pow(0.85f).coerceIn(0f, 1f)
+        return packArgb(
+            sa,
+            mixChannel(sr, nr, blend),
+            mixChannel(sg, ng, blend),
+            mixChannel(sb, nb, blend),
+        )
+    }
+
+    /** Helpers puros (testáveis sem Robolectric). */
+    internal fun packArgb(a: Int, r: Int, g: Int, b: Int): Int =
+        (a shl 24) or (r shl 16) or (g shl 8) or b
+
+    internal fun channelAlpha(color: Int): Int = (color ushr 24) and 0xFF
+    internal fun channelRed(color: Int): Int = (color shr 16) and 0xFF
+    internal fun channelGreen(color: Int): Int = (color shr 8) and 0xFF
+    internal fun channelBlue(color: Int): Int = color and 0xFF
 
     private fun maskCoverage(maskPixel: Int): Float {
         val alpha = AndroidColor.alpha(maskPixel)

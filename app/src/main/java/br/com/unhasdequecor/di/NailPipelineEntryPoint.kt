@@ -7,6 +7,6 @@ import dagger.hilt.components.SingletonComponent
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
-interface NailPipelineEntryPoint {
+fun interface NailPipelineEntryPoint {
     fun nailTryOnPipeline(): NailTryOnPipeline
 }

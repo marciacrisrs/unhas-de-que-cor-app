@@ -71,7 +71,9 @@ Isso executa, em sequência:
 4. **Cobertura do domínio** (`:app:jacocoDomainCoverageVerification`) — ≥80% linhas  
 5. **Assemble debug + release**
 
-Relatório HTML local: `app/build/reports/jacoco/jacocoDomainReport/html/index.html`.
+Relatórios HTML locais:
+- Domain: `app/build/reports/jacoco/jacocoDomainReport/html/index.html`
+- App (Sonar): `app/build/reports/jacoco/jacocoAppReport/html/index.html`
 
 ### SonarCloud
 

@@ -24,11 +24,13 @@ class HistoryRowClickTest {
         composeRule.setContent {
             UnhasDeQueCorTheme {
                 HistoryRow(
-                    colorName = "Malva Suave",
-                    colorHex = 0xFFB48A9A,
-                    tags = listOf(NailStyle.ROMANTICO),
-                    dateLabel = "09/08/2026",
-                    isFavorite = false,
+                    model = HistoryRowModel(
+                        colorName = "Malva Suave",
+                        colorHex = 0xFFB48A9A,
+                        tags = listOf(NailStyle.ROMANTICO),
+                        dateLabel = "09/08/2026",
+                        isFavorite = false,
+                    ),
                     onFavoriteClick = {},
                     onClick = { clicked = true },
                 )

@@ -178,6 +178,31 @@ val domainCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/domain/**",
 )
 
+/** Pacotes/classes com testes unitários estáveis — relatório Sonar. */
+val appCoverageIncludes = listOf(
+    "**/br/com/unhasdequecor/domain/**",
+    "**/br/com/unhasdequecor/data/catalog/**",
+    "**/br/com/unhasdequecor/data/local/db/DatabaseMigrations*",
+    "**/br/com/unhasdequecor/data/local/db/HistoryMapper*",
+    "**/br/com/unhasdequecor/data/local/db/HistoryLimits*",
+    "**/br/com/unhasdequecor/data/local/db/entity/**",
+    "**/br/com/unhasdequecor/data/vision/nail/NailRoi*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailMask*",
+    "**/br/com/unhasdequecor/data/vision/nail/Finger*",
+    "**/br/com/unhasdequecor/data/vision/nail/DetectedNail*",
+    "**/br/com/unhasdequecor/data/vision/nail/ImageCoordinates*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailColorApplier*",
+    "**/br/com/unhasdequecor/data/repository/HistoryRepositoryImpl*",
+    "**/br/com/unhasdequecor/ui/components/PolishMaskRecolorer*",
+    "**/br/com/unhasdequecor/ui/components/NailOverlayAnchors*",
+    "**/br/com/unhasdequecor/ui/components/NailLandmarkMapper*",
+    "**/br/com/unhasdequecor/ui/history/HistoryViewModel*",
+    "**/br/com/unhasdequecor/ui/result/ResultViewModel*",
+    "**/br/com/unhasdequecor/ui/hand/HandReferenceViewModel*",
+    "**/br/com/unhasdequecor/ui/navigation/Routes*",
+    "**/br/com/unhasdequecor/ui/navigation/ResultSources*",
+)
+
 val jacocoExcludes = listOf(
     "**/R.class",
     "**/R$*.class",
@@ -190,25 +215,42 @@ val jacocoExcludes = listOf(
     "**/*Module*",
     "**/*Module$*",
     "**/di/**",
+    "**/MediaPipe*",
+    "**/GeometricNailSegmenter*",
+    "**/NailTryOn*",
+    "**/NailTracker*",
+    "**/dao/**",
 )
 
-fun Project.domainClassDirectories(): FileCollection {
+fun Project.jacocoClassDirectories(includes: List<String>): FileCollection {
     val buildDirPath = layout.buildDirectory.get().asFile
     // AGP 9 (built-in Kotlin compiler): classes live under intermediates/, not tmp/kotlin-classes.
     val kotlinTree = fileTree(
         buildDirPath.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
     ) {
-        include(domainCoverageIncludes)
+        include(includes)
         exclude(jacocoExcludes)
     }
     val javaTree = fileTree(
         buildDirPath.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
     ) {
-        include(domainCoverageIncludes)
+        include(includes)
         exclude(jacocoExcludes)
     }
     return files(kotlinTree, javaTree)
 }
+
+fun Project.domainClassDirectories(): FileCollection = jacocoClassDirectories(domainCoverageIncludes)
+
+fun Project.appClassDirectories(): FileCollection = jacocoClassDirectories(appCoverageIncludes)
+
+fun Project.jacocoExecutionData(): FileCollection =
+    fileTree(layout.buildDirectory.get().asFile) {
+        include(
+            "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
+            "jacoco/testDebugUnitTest.exec",
+        )
+    }
 
 tasks.register<JacocoReport>("jacocoDomainReport") {
     group = "verification"
@@ -223,14 +265,23 @@ tasks.register<JacocoReport>("jacocoDomainReport") {
 
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(domainClassDirectories())
-    executionData.setFrom(
-        fileTree(layout.buildDirectory.get().asFile) {
-            include(
-                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
-                "jacoco/testDebugUnitTest.exec",
-            )
-        },
-    )
+    executionData.setFrom(jacocoExecutionData())
+}
+
+tasks.register<JacocoReport>("jacocoAppReport") {
+    group = "verification"
+    description = "Gera relatório JaCoCo da lógica coberta por testes unitários (domain + data + VMs)."
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(appClassDirectories())
+    executionData.setFrom(jacocoExecutionData())
 }
 
 tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
@@ -240,14 +291,7 @@ tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
 
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(domainClassDirectories())
-    executionData.setFrom(
-        fileTree(layout.buildDirectory.get().asFile) {
-            include(
-                "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
-                "jacoco/testDebugUnitTest.exec",
-            )
-        },
-    )
+    executionData.setFrom(jacocoExecutionData())
 
     violationRules {
         rule {

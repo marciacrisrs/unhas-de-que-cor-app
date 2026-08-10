@@ -247,32 +247,55 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         for (y in 0 until h) {
             for (x in 0 until w) {
                 val i = y * w + x
-                if ((src[i].toInt() and 0xFF) >= MASK_SOLID) {
-                    out[i] = 255.toByte()
-                    continue
-                }
-                var best = Int.MAX_VALUE
-                for (dy in -radius..radius) {
-                    for (dx in -radius..radius) {
-                        val nx = x + dx
-                        val ny = y + dy
-                        val inside = nx in 0 until w && ny in 0 until h
-                        val solid = inside && (src[ny * w + nx].toInt() and 0xFF) >= MASK_SOLID
-                        if (solid) {
-                            val d2 = dx * dx + dy * dy
-                            if (d2 < best) best = d2
-                        }
-                    }
-                }
-                if (best == Int.MAX_VALUE || best > r2) {
-                    out[i] = 0
-                } else {
-                    val t = 1f - sqrt(best.toFloat()) / (radius + 0.01f)
-                    out[i] = (t.coerceIn(0f, 1f) * 255f).roundToInt().toByte()
-                }
+                out[i] = featherAlpha(src, w, h, x, y, radius, r2)
             }
         }
         return out
+    }
+
+    private fun featherAlpha(
+        src: ByteArray,
+        w: Int,
+        h: Int,
+        x: Int,
+        y: Int,
+        radius: Int,
+        r2: Int,
+    ): Byte {
+        val i = y * w + x
+        if ((src[i].toInt() and 0xFF) >= MASK_SOLID) {
+            return 255.toByte()
+        }
+        val best = nearestSolidDistanceSq(src, w, h, x, y, radius)
+        if (best == Int.MAX_VALUE || best > r2) {
+            return 0
+        }
+        val t = 1f - sqrt(best.toFloat()) / (radius + 0.01f)
+        return (t.coerceIn(0f, 1f) * 255f).roundToInt().toByte()
+    }
+
+    private fun nearestSolidDistanceSq(
+        src: ByteArray,
+        w: Int,
+        h: Int,
+        x: Int,
+        y: Int,
+        radius: Int,
+    ): Int {
+        var best = Int.MAX_VALUE
+        for (dy in -radius..radius) {
+            for (dx in -radius..radius) {
+                val nx = x + dx
+                val ny = y + dy
+                val inside = nx in 0 until w && ny in 0 until h
+                val solid = inside && (src[ny * w + nx].toInt() and 0xFF) >= MASK_SOLID
+                if (solid) {
+                    val d2 = dx * dx + dy * dy
+                    if (d2 < best) best = d2
+                }
+            }
+        }
+        return best
     }
 
     private fun colorDistance(r: Int, g: Int, b: Int, skin: SkinStats): Float {

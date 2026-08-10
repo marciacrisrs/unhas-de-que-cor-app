@@ -7,6 +7,6 @@ import android.graphics.Bitmap
  * Implementação atual: geométrica + refinamento por cor.
  * Futuro: modelo ML sem mudar o restante do pipeline.
  */
-interface NailSegmenter {
+fun interface NailSegmenter {
     fun segment(image: Bitmap, roi: NailRoi): NailMask?
 }

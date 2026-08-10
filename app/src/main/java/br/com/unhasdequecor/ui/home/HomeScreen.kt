@@ -283,11 +283,7 @@ private fun HeroActionCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                     contentDescription = null,
-                    tint = if (emphasized) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp),
                 )
             }

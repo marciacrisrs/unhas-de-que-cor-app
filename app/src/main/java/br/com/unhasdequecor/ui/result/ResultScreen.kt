@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.ui.result
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -48,6 +48,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.domain.model.ColorRecommendation
+import br.com.unhasdequecor.domain.model.NailColor
 import br.com.unhasdequecor.ui.components.HandTryOnPreview
 import br.com.unhasdequecor.ui.components.InfoTag
 import br.com.unhasdequecor.ui.components.NailPolishMark
@@ -58,7 +60,6 @@ import br.com.unhasdequecor.ui.components.SecondaryCtaButton
 import br.com.unhasdequecor.ui.theme.FunChipShape
 import br.com.unhasdequecor.ui.theme.RecommendationCardShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
-import android.content.Intent
 
 private const val FAVORITE_BUTTON_WEIGHT = 1.2f
 private const val SHARE_BUTTON_WEIGHT = 1f
@@ -72,277 +73,365 @@ fun ResultScreen(
     viewModel: ResultViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        TopAppBar(
-            title = {
-                Text("Sua cor ideal", style = MaterialTheme.typography.headlineSmall)
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                }
-            },
-            actions = {
-                NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 40.dp, decorative = true)
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.background,
-            ),
-        )
-
+        ResultTopBar(onBack = onBack)
         when {
-            state.isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            state.errorMessage != null -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(28.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(state.errorMessage.orEmpty())
-                    Spacer(modifier = Modifier.height(16.dp))
-                    PrimaryCtaButton(text = "Tentar de novo", onClick = viewModel::recommendAgain)
-                }
-            }
+            state.isLoading -> ResultLoading()
+            state.errorMessage != null -> ResultError(
+                message = state.errorMessage.orEmpty(),
+                onRetry = viewModel::recommendAgain,
+            )
             else -> {
                 val recommendation = state.recommendation ?: return
-                val color = recommendation.color
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn() + slideInVertically { it / 5 },
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp),
-                    ) {
-                        ProgressSteps(current = 2, total = 2)
-                        Spacer(modifier = Modifier.height(20.dp))
+                ResultSuccessContent(
+                    state = state,
+                    recommendation = recommendation,
+                    onOpenHandReference = onOpenHandReference,
+                    onToggleFavorite = viewModel::onToggleFavorite,
+                    onRecommendAgain = viewModel::recommendAgain,
+                    onOpenHistory = onOpenHistory,
+                )
+            }
+        }
+    }
+}
 
-                        Surface(
-                            shape = RecommendationCardShape,
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    val handPath = state.handLocalPath
-                                    if (handPath != null) {
-                                        HandTryOnPreview(
-                                            imagePath = handPath,
-                                            revision = state.handRevision,
-                                            polishColor = Color(color.hex),
-                                            colorName = color.name,
-                                            sampleId = state.handSampleId.takeIf { state.isSampleHand },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 4.dp),
-                                        )
-                                    } else {
-                                        // Nunca ilustração: só espera a amostra padrão materializar.
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 4.dp)
-                                                .aspectRatio(3f / 4f)
-                                                .clip(SoftSurfaceShape)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            CircularProgressIndicator(
-                                                color = MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                    IconButton(
-                                        onClick = viewModel::onToggleFavorite,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(8.dp)
-                                            .background(
-                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                                CircleShape,
-                                            ),
-                                    ) {
-                                        Icon(
-                                            imageVector = if (state.isFavorite) {
-                                                Icons.Filled.Favorite
-                                            } else {
-                                                Icons.Filled.FavoriteBorder
-                                            },
-                                            contentDescription = if (state.isFavorite) {
-                                                "Remover dos favoritos"
-                                            } else {
-                                                "Salvar nos favoritos"
-                                            },
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                }
-                                if (!state.hasHandReference || state.isSampleHand) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    SecondaryCtaButton(
-                                        text = "Usar minha mão",
-                                        onClick = onOpenHandReference,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = "Sua cor do momento é",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    text = color.name,
-                                    style = MaterialTheme.typography.displayMedium,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                ) {
-                                    color.tags.take(3).forEach { tag ->
-                                        InfoTag(label = tag.displayName)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = color.description,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = recommendation.rationale,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                NailPolishMark(
-                                    markSize = 64.dp,
-                                    polishColor = Color(color.hex),
-                                    decorative = true,
-                                    modifier = Modifier.align(Alignment.End),
-                                )
-                            }
-                        }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ResultTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Text("Sua cor ideal", style = MaterialTheme.typography.headlineSmall)
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+            }
+        },
+        actions = {
+            NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 40.dp, decorative = true)
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+        ),
+    )
+}
 
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            PrimaryCtaButton(
-                                text = if (state.isFavorite) "Salvo" else "Salvar nos favoritos",
-                                onClick = viewModel::onToggleFavorite,
-                                modifier = Modifier.weight(FAVORITE_BUTTON_WEIGHT),
-                            )
-                            OutlinedButton(
-                                onClick = {
-                                    val share = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(
-                                            Intent.EXTRA_TEXT,
-                                            "Minha cor do momento no Unhas de Que Cor? é ${color.name}.",
-                                        )
-                                    }
-                                    context.startActivity(Intent.createChooser(share, "Compartilhar"))
-                                },
-                                modifier = Modifier
-                                    .weight(SHARE_BUTTON_WEIGHT)
-                                    .height(52.dp),
-                                shape = SoftSurfaceShape,
-                            ) {
-                                Icon(Icons.Outlined.Share, contentDescription = null)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Compartilhar", style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
+@Composable
+private fun ResultLoading() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    }
+}
 
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Surface(
-                            shape = SoftSurfaceShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                        ) {
-                            Text(
-                                text = "Dica: ${color.tip}",
-                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
+@Composable
+private fun ResultError(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(28.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(message)
+        Spacer(modifier = Modifier.height(16.dp))
+        PrimaryCtaButton(text = "Tentar de novo", onClick = onRetry)
+    }
+}
 
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "CORES PARECIDAS",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.secondary,
-                            )
-                            Text(
-                                text = "VER TODAS ›",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        ) {
-                            (listOf(color) + recommendation.similarColors).forEach { item ->
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    NailSwatch(
-                                        colorHex = item.hex,
-                                        colorName = item.name,
-                                        width = 48.dp,
-                                        height = 72.dp,
-                                        modifier = Modifier.border(
-                                            width = if (item.id == color.id) 2.dp else 0.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            shape = FunChipShape,
-                                        ),
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(item.name, style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        TextButton(
-                            onClick = viewModel::recommendAgain,
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        ) {
-                            Icon(Icons.Filled.Bookmark, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Quero outra sugestão")
-                        }
-                        TextButton(
-                            onClick = onOpenHistory,
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        ) {
-                            Text("Ver histórico")
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
+@Composable
+private fun ResultSuccessContent(
+    state: ResultUiState,
+    recommendation: ColorRecommendation,
+    onOpenHandReference: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onRecommendAgain: () -> Unit,
+    onOpenHistory: () -> Unit,
+) {
+    val color = recommendation.color
+    val context = LocalContext.current
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn() + slideInVertically { it / 5 },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+        ) {
+            ProgressSteps(current = 2, total = 2)
+            Spacer(modifier = Modifier.height(20.dp))
+            ResultHeroCard(
+                state = state,
+                color = color,
+                rationale = recommendation.rationale,
+                onToggleFavorite = onToggleFavorite,
+                onOpenHandReference = onOpenHandReference,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            ResultPrimaryActions(
+                isFavorite = state.isFavorite,
+                onToggleFavorite = onToggleFavorite,
+                onShare = {
+                    val share = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "Minha cor do momento no Unhas de Que Cor? é ${color.name}.",
+                        )
                     }
+                    context.startActivity(Intent.createChooser(share, "Compartilhar"))
+                },
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            ResultTip(tip = color.tip)
+            Spacer(modifier = Modifier.height(24.dp))
+            SimilarColorsSection(
+                primary = color,
+                similar = recommendation.similarColors,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            TextButton(
+                onClick = onRecommendAgain,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) {
+                Icon(Icons.Filled.Bookmark, contentDescription = null)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Quero outra sugestão")
+            }
+            TextButton(
+                onClick = onOpenHistory,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) {
+                Text("Ver histórico")
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun ResultHeroCard(
+    state: ResultUiState,
+    color: NailColor,
+    rationale: String,
+    onToggleFavorite: () -> Unit,
+    onOpenHandReference: () -> Unit,
+) {
+    Surface(
+        shape = RecommendationCardShape,
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            ResultHandPreview(
+                state = state,
+                polishColor = Color(color.hex),
+                colorName = color.name,
+                onToggleFavorite = onToggleFavorite,
+            )
+            if (!state.hasHandReference || state.isSampleHand) {
+                Spacer(modifier = Modifier.height(12.dp))
+                SecondaryCtaButton(
+                    text = "Usar minha mão",
+                    onClick = onOpenHandReference,
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Sua cor do momento é",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = color.name,
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            ) {
+                color.tags.take(3).forEach { tag ->
+                    InfoTag(label = tag.displayName)
                 }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = color.description,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = rationale,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            NailPolishMark(
+                markSize = 64.dp,
+                polishColor = Color(color.hex),
+                decorative = true,
+                modifier = Modifier.align(Alignment.End),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResultHandPreview(
+    state: ResultUiState,
+    polishColor: Color,
+    colorName: String,
+    onToggleFavorite: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        val handPath = state.handLocalPath
+        if (handPath != null) {
+            HandTryOnPreview(
+                imagePath = handPath,
+                revision = state.handRevision,
+                polishColor = polishColor,
+                colorName = colorName,
+                sampleId = state.handSampleId.takeIf { state.isSampleHand },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .aspectRatio(3f / 4f)
+                    .clip(SoftSurfaceShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        IconButton(
+            onClick = onToggleFavorite,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(8.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    CircleShape,
+                ),
+        ) {
+            Icon(
+                imageVector = if (state.isFavorite) {
+                    Icons.Filled.Favorite
+                } else {
+                    Icons.Filled.FavoriteBorder
+                },
+                contentDescription = if (state.isFavorite) {
+                    "Remover dos favoritos"
+                } else {
+                    "Salvar nos favoritos"
+                },
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResultPrimaryActions(
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onShare: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        PrimaryCtaButton(
+            text = if (isFavorite) "Salvo" else "Salvar nos favoritos",
+            onClick = onToggleFavorite,
+            modifier = Modifier.weight(FAVORITE_BUTTON_WEIGHT),
+        )
+        OutlinedButton(
+            onClick = onShare,
+            modifier = Modifier
+                .weight(SHARE_BUTTON_WEIGHT)
+                .height(52.dp),
+            shape = SoftSurfaceShape,
+        ) {
+            Icon(Icons.Outlined.Share, contentDescription = null)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Compartilhar", style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+@Composable
+private fun ResultTip(tip: String) {
+    Surface(
+        shape = SoftSurfaceShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+    ) {
+        Text(
+            text = "Dica: $tip",
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun SimilarColorsSection(
+    primary: NailColor,
+    similar: List<NailColor>,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "CORES PARECIDAS",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Text(
+            text = "VER TODAS ›",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+    ) {
+        (listOf(primary) + similar).forEach { item ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                NailSwatch(
+                    colorHex = item.hex,
+                    colorName = item.name,
+                    width = 48.dp,
+                    height = 72.dp,
+                    modifier = Modifier.border(
+                        width = if (item.id == primary.id) 2.dp else 0.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = FunChipShape,
+                    ),
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(item.name, style = MaterialTheme.typography.labelSmall)
             }
         }
     }

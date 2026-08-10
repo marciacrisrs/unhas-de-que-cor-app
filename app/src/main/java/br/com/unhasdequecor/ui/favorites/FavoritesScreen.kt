@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.ui.components.HistoryRow
+import br.com.unhasdequecor.ui.components.HistoryRowModel
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.history.HistoryRowUi
 
@@ -75,11 +76,13 @@ fun FavoritesScreen(
                     }
                     items(group.entries, key = { it.id }) { entry ->
                         HistoryRow(
-                            colorName = entry.colorName,
-                            colorHex = entry.colorHex,
-                            tags = entry.tags,
-                            dateLabel = entry.dateLabel,
-                            isFavorite = entry.isFavorite,
+                            model = HistoryRowModel(
+                                colorName = entry.colorName,
+                                colorHex = entry.colorHex,
+                                tags = entry.tags,
+                                dateLabel = entry.dateLabel,
+                                isFavorite = entry.isFavorite,
+                            ),
                             onFavoriteClick = { viewModel.onToggleFavorite(entry) },
                             onClick = { onOpenResult(entry) },
                         )

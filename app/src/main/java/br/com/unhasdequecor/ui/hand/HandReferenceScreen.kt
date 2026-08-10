@@ -208,14 +208,25 @@ fun HandReferenceScreen(
     HandReferenceScaffold(
         state = state,
         snackbarHostState = snackbarHostState,
-        onBack = onBack,
-        onOpenSamplePicker = viewModel::openSamplePicker,
-        onOpenReplaceSheet = viewModel::openReplaceSheet,
-        onOpenRemoveConfirm = viewModel::openRemoveConfirm,
-        onConfirmUserPhoto = viewModel::confirmPendingUserPhoto,
-        onDiscardUserPhoto = viewModel::discardPendingUserPhoto,
+        actions = HandReferenceActions(
+            onBack = onBack,
+            onOpenSamplePicker = viewModel::openSamplePicker,
+            onOpenReplaceSheet = viewModel::openReplaceSheet,
+            onOpenRemoveConfirm = viewModel::openRemoveConfirm,
+            onConfirmUserPhoto = viewModel::confirmPendingUserPhoto,
+            onDiscardUserPhoto = viewModel::discardPendingUserPhoto,
+        ),
     )
 }
+
+private data class HandReferenceActions(
+    val onBack: () -> Unit,
+    val onOpenSamplePicker: () -> Unit,
+    val onOpenReplaceSheet: () -> Unit,
+    val onOpenRemoveConfirm: () -> Unit,
+    val onConfirmUserPhoto: () -> Unit,
+    val onDiscardUserPhoto: () -> Unit,
+)
 
 @Composable
 private fun HandReferenceMessageEffects(
@@ -245,12 +256,7 @@ private fun HandReferenceMessageEffects(
 private fun HandReferenceScaffold(
     state: HandReferenceUiState,
     snackbarHostState: SnackbarHostState,
-    onBack: () -> Unit,
-    onOpenSamplePicker: () -> Unit,
-    onOpenReplaceSheet: () -> Unit,
-    onOpenRemoveConfirm: () -> Unit,
-    onConfirmUserPhoto: () -> Unit,
-    onDiscardUserPhoto: () -> Unit,
+    actions: HandReferenceActions,
 ) {
     Box(
         modifier = Modifier
@@ -263,7 +269,7 @@ private fun HandReferenceScaffold(
                     Text("Minha mão", style = MaterialTheme.typography.headlineSmall)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = actions.onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
                 },
@@ -275,15 +281,15 @@ private fun HandReferenceScaffold(
                 UserPhotoConfirmContent(
                     path = state.pendingUserPreviewPath.orEmpty(),
                     enabled = !state.isSaving,
-                    onConfirm = onConfirmUserPhoto,
-                    onDiscard = onDiscardUserPhoto,
+                    onConfirm = actions.onConfirmUserPhoto,
+                    onDiscard = actions.onDiscardUserPhoto,
                 )
             } else {
                 HandReferenceContent(
                     state = state,
-                    onOpenSamplePicker = onOpenSamplePicker,
-                    onOpenReplaceSheet = onOpenReplaceSheet,
-                    onOpenRemoveConfirm = onOpenRemoveConfirm,
+                    onOpenSamplePicker = actions.onOpenSamplePicker,
+                    onOpenReplaceSheet = actions.onOpenReplaceSheet,
+                    onOpenRemoveConfirm = actions.onOpenRemoveConfirm,
                 )
             }
         }

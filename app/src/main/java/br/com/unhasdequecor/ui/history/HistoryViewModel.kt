@@ -87,8 +87,9 @@ class HistoryViewModel @Inject constructor(
 internal fun List<HistoryEntry>.toHistoryUiState(
     filter: HistoryFilter = HistoryFilter.ALL,
 ): HistoryUiState {
-    val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy").withLocale(Locale("pt", "BR"))
-    val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale("pt", "BR"))
+    val ptBr = Locale.forLanguageTag("pt-BR")
+    val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy").withLocale(ptBr)
+    val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", ptBr)
     val monthGroups = groupBy {
         Instant.ofEpochMilli(it.createdAtEpochMs)
             .atZone(ZoneId.systemDefault())
@@ -99,7 +100,7 @@ internal fun List<HistoryEntry>.toHistoryUiState(
         .map { (month, items) ->
             HistoryMonthGroupUi(
                 monthLabel = month.format(monthFormatter).replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(Locale("pt", "BR")) else it.toString()
+                    if (it.isLowerCase()) it.titlecase(ptBr) else it.toString()
                 },
                 entries = items.map { entry ->
                     HistoryRowUi(
