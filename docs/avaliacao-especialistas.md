@@ -270,9 +270,9 @@ de paint path; constantes mágicas sem ground-truth.
 | Pri | Item | Status |
 |-----|------|--------|
 | P0 | Confirmar QG Sonar #35/#36 na CI | Em andamento (Verify) |
-| P1 | Testes `paintUserPreview` / empty anchors | Aberto |
-| P1 | Guarda `getBackStackEntry(HOME)` | Aberto |
-| P1 | A11y: banner try-on + convite `maxLines` | Aberto |
+| P1 | Testes `paintUserPreview` / empty anchors | Feito (contrato `planRender` + labels) |
+| P1 | Guarda `getBackStackEntry(HOME)` | Feito |
+| P1 | A11y: banner try-on + convite `maxLines` | Feito |
 | P2 | Result→mão destino; chrome Favoritos; smells History | Aberto |
 | P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Aberto |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
@@ -280,57 +280,25 @@ de paint path; constantes mágicas sem ground-truth.
 
 ---
 
-## Reavaliação 2026-08-12f — pós #40 / #41 / #42
+## Implementação — Try-on confiável na mão real
 
-**Base:** `origin/master` @ `f23cec0` · versão **1.0.5 (6)** · PRs abertos: nenhum  
-**CI:** Verify em master **sucesso** após merge do #42.
+Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTryOnPreview`:
 
-### Veredito global
+| Regra | Comportamento |
+|-------|----------------|
+| `presenceScore` &lt; 0.28 | `REJECTED` → `detect` retorna `null` (sem claim) |
+| 0.28–0.55 | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” (mesmo com ≥3 máscaras) |
+| ≥0.55 **e** ≥3 máscaras | `STRONG` + `FULL` → “Prévia na sua mão” |
+| Elipse / poucas máscaras | Nunca `FULL` — modo ≈ qualidade |
 
-**Aprovado com ressalvas** para faixa interna / validação em device. Sem bloqueio
-de produto. Try-on mais resiliente a contraluz sem overlay `DEFAULT` mentiroso;
-QG Sonar recuperado; símbolos nativos instrumentados (aviso Play pode persistir
-porque MediaPipe já vem stripped).
+### Reavaliação especialistas (pós-PR #44) — melhorias aplicadas
 
-### O que entrou desde 12e
+| Especialista | Achado | Status |
+|--------------|--------|--------|
+| Vision / UI | TalkBack CD dizia “na sua mão” em qualquer modo | Feito — `TryOnPreviewLabels` |
+| Vision | Mid presence + ≥3 máscaras virava FULL | Feito — classify só por presence; FULL = STRONG ∧ ≥3 máscaras |
+| A11y | Banner alpha 0.88 + CD duplicado; convite `maxLines=1` | Feito — primary sólido, `clearAndSetSemantics`, convite `maxLines=2` + CD completo |
+| Android | `getBackStackEntry(HOME)` sem guarda | Feito — `runCatching` + fallback `navigate(HOME)` |
+| Test | Gaps reliability / labels / applier early-return | Feito — testes + JaCoCo `TryOnPreviewLabels*` |
 
-| PR | Escopo | Avaliação |
-|----|--------|-----------|
-| [#40](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/40) | `ndk.debugSymbolLevel` + NDK CI + upload condicional | Correto; limitação MediaPipe documentada |
-| [#41](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/41) | Enhancer + Variants; limiar 0.10; copy contraluz | Melhora recall; risco FP sem floor pós-detecção |
-| [#42](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/42) | JaCoCo Enhancer + exclusão Variants no Sonar | QG `new_coverage` recuperado |
-
-### Vision Try-On — checklist
-
-| Item | Status |
-|------|--------|
-| Sem landmarks → zero overlay DEFAULT | Ok |
-| Rótulos DETECTED / aproximada / não detectada | Ok (+ “evite contraluz”) |
-| Fallbacks contraste / gamma / espelho / rotação | Ok |
-| Floor `presenceScore` além do limiar 0.10 | **Aberto (P1)** |
-| Smoke device (luz frontal vs contraluz) | **OUT_OF_REPO** |
-
-### Backlog residual (pós 12f)
-
-| Pri | Item | Status |
-|-----|------|--------|
-| P0 | QG Sonar #35/#36/#41 | **Feito** (#42 + Verify master verde) |
-| P1 | Floor de confiança pós-detecção | Aberto |
-| P1 | Testes `paintUserPreview` / empty anchors | Aberto |
-| P1 | Guarda `getBackStackEntry(HOME)` | Aberto |
-| P1 | A11y banner try-on + convite `maxLines` | Aberto |
-| P1 | CHANGELOG / whatsnew 1.0.5 | Aberto |
-| P2 | Result→mão destino; chrome Favoritos | Aberto |
-| P2 | `DetectedNailPolishApplier` tests; DRY constantes | Aberto |
-| P2 | Custo N variantes Bitmap (medir) | Aberto |
-| — | Keystore + listing Play | **OUT_OF_REPO** |
-| — | Smoke try-on + A11y Scanner em device | **OUT_OF_REPO** |
-| — | Aviso Play símbolos (libs stripped) | Aceito / documentado |
-
-### Top 5 próximos passos
-
-1. Smoke em device com 1.0.5 (luz frontal vs contraluz).
-2. Piso de `presenceScore` antes de rotular “Prévia na sua mão”.
-3. CHANGELOG / whatsnew 1.0.5.
-4. Guarda HOME + a11y banner/convite.
-5. Play listing/keystore só após smoke ok.
+Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).

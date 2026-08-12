@@ -397,7 +397,7 @@ private fun HandReferenceInviteCard(
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = title
+                contentDescription = "$title. $subtitle"
             },
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -409,7 +409,7 @@ private fun HandReferenceInviteCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
