@@ -30,6 +30,12 @@ object HandSampleCatalog {
             assetPath = "hand_samples/hand_sample_retinta_vinho.webp",
         ),
         HandSampleOption(
+            id = "retinta_polegar",
+            skinLabel = "Pele retinta",
+            detailLabel = "Pose diversa",
+            assetPath = "hand_samples/hand_sample_retinta_polegar.webp",
+        ),
+        HandSampleOption(
             id = "morena_nude",
             skinLabel = "Pele morena",
             detailLabel = REFERENCE_DETAIL,
