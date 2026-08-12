@@ -48,6 +48,7 @@ import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.data.vision.nail.PolishMaskRecolorer
 import br.com.unhasdequecor.data.vision.nail.TryOnHandReliability
 import br.com.unhasdequecor.data.vision.nail.UserTryOnRenderMode
+import br.com.unhasdequecor.data.vision.nail.UserTryOnRenderPlan
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -369,96 +370,109 @@ private fun paintUserPreview(
         nailCount = snapshot?.nails?.size ?: 0,
         hasMappableAnchors = mappedAnchors != null,
     )
-
-    when (plan.mode) {
-        UserTryOnRenderMode.NONE -> {
-            val displaySource = snapshot?.workingBitmap ?: assets.decoded
-            val display = ownedPreviewBitmap(
-                candidate = displaySource,
-                protected = listOfNotNull(snapshot?.workingBitmap, assets.decoded),
-            )
-            return TryOnPreviewData(
-                bitmap = display,
-                anchors = emptyList(),
-                mode = TryOnMode.NOT_DETECTED,
-                nails = emptyList(),
-                landmarks = null,
-                showDebug = pipeline.debugEnabled,
-            )
-        }
-        UserTryOnRenderMode.FULL -> {
-            checkNotNull(snapshot)
-            val result = pipeline.recolor(snapshot, polishColor)
-            val painted = ownedPreviewBitmap(
-                candidate = result.bitmap,
-                protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
-            )
-            return TryOnPreviewData(
-                bitmap = painted,
-                anchors = emptyList(),
-                mode = TryOnMode.DETECTED,
-                nails = result.nails,
-                landmarks = result.landmarks,
-                showDebug = result.debugEnabled,
-            )
-        }
-        UserTryOnRenderMode.APPROXIMATE -> {
-            checkNotNull(snapshot)
-            if (plan.useNailMasks && snapshot.nails.isNotEmpty()) {
-                val result = pipeline.recolor(snapshot, polishColor)
-                val painted = ownedPreviewBitmap(
-                    candidate = result.bitmap,
-                    protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
-                )
-                return TryOnPreviewData(
-                    bitmap = painted,
-                    anchors = emptyList(),
-                    mode = TryOnMode.APPROXIMATE,
-                    nails = result.nails,
-                    landmarks = result.landmarks,
-                    showDebug = result.debugEnabled,
-                )
-            }
-            if (plan.useEllipsePaint && landmarks != null && mappedAnchors != null) {
-                val painted = DetectedNailPolishApplier.apply(
-                    source = snapshot.workingBitmap,
-                    anchors = mappedAnchors,
-                    polishColor = polishColor,
-                )
-                if (painted != null) {
-                    return TryOnPreviewData(
-                        bitmap = painted,
-                        anchors = emptyList(),
-                        mode = TryOnMode.APPROXIMATE,
-                        landmarks = landmarks,
-                        showDebug = pipeline.debugEnabled,
-                    )
-                }
-                val display = ownedPreviewBitmap(
-                    candidate = snapshot.workingBitmap,
-                    protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
-                )
-                return TryOnPreviewData(
-                    bitmap = display,
-                    anchors = if (plan.useCanvasAnchors) mappedAnchors else emptyList(),
-                    mode = TryOnMode.APPROXIMATE,
-                    landmarks = landmarks,
-                    showDebug = pipeline.debugEnabled,
-                )
-            }
-            val display = ownedPreviewBitmap(
-                candidate = snapshot.workingBitmap,
-                protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
-            )
-            return TryOnPreviewData(
-                bitmap = display,
-                anchors = emptyList(),
-                mode = TryOnMode.APPROXIMATE,
+    return when (plan.mode) {
+        UserTryOnRenderMode.NONE ->
+            paintUserNotDetected(assets, snapshot, pipeline.debugEnabled)
+        UserTryOnRenderMode.FULL ->
+            paintUserFull(checkNotNull(snapshot), assets, polishColor, pipeline)
+        UserTryOnRenderMode.APPROXIMATE ->
+            paintUserApproximate(
+                snapshot = checkNotNull(snapshot),
+                assets = assets,
+                polishColor = polishColor,
+                pipeline = pipeline,
+                plan = plan,
                 landmarks = landmarks,
-                showDebug = pipeline.debugEnabled,
+                mappedAnchors = mappedAnchors,
             )
-        }
     }
+}
+
+private fun paintUserNotDetected(
+    assets: TryOnBaseAssets,
+    snapshot: NailDetectionSnapshot?,
+    showDebug: Boolean,
+): TryOnPreviewData {
+    val displaySource = snapshot?.workingBitmap ?: assets.decoded
+    val display = ownedPreviewBitmap(
+        candidate = displaySource,
+        protected = listOfNotNull(snapshot?.workingBitmap, assets.decoded),
+    )
+    return TryOnPreviewData(
+        bitmap = display,
+        anchors = emptyList(),
+        mode = TryOnMode.NOT_DETECTED,
+        nails = emptyList(),
+        landmarks = null,
+        showDebug = showDebug,
+    )
+}
+
+private fun paintUserFull(
+    snapshot: NailDetectionSnapshot,
+    assets: TryOnBaseAssets,
+    polishColor: Color,
+    pipeline: NailTryOnPipeline,
+): TryOnPreviewData {
+    val result = pipeline.recolor(snapshot, polishColor)
+    val painted = ownedPreviewBitmap(
+        candidate = result.bitmap,
+        protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
+    )
+    return TryOnPreviewData(
+        bitmap = painted,
+        anchors = emptyList(),
+        mode = TryOnMode.DETECTED,
+        nails = result.nails,
+        landmarks = result.landmarks,
+        showDebug = result.debugEnabled,
+    )
+}
+
+private fun paintUserApproximate(
+    snapshot: NailDetectionSnapshot,
+    assets: TryOnBaseAssets,
+    polishColor: Color,
+    pipeline: NailTryOnPipeline,
+    plan: UserTryOnRenderPlan,
+    landmarks: HandLandmarks?,
+    mappedAnchors: List<NailOverlayAnchor>?,
+): TryOnPreviewData {
+    if (plan.useNailMasks && snapshot.nails.isNotEmpty()) {
+        return paintUserFull(snapshot, assets, polishColor, pipeline).copy(mode = TryOnMode.APPROXIMATE)
+    }
+    val ellipsePainted =
+        if (plan.useEllipsePaint && landmarks != null && mappedAnchors != null) {
+            DetectedNailPolishApplier.apply(
+                source = snapshot.workingBitmap,
+                anchors = mappedAnchors,
+                polishColor = polishColor,
+            )
+        } else {
+            null
+        }
+    if (ellipsePainted != null) {
+        return TryOnPreviewData(
+            bitmap = ellipsePainted,
+            anchors = emptyList(),
+            mode = TryOnMode.APPROXIMATE,
+            landmarks = landmarks,
+            showDebug = pipeline.debugEnabled,
+        )
+    }
+    val canvasAnchors =
+        if (plan.useCanvasAnchors && mappedAnchors != null) mappedAnchors else emptyList()
+    val display = ownedPreviewBitmap(
+        candidate = snapshot.workingBitmap,
+        protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
+    )
+    return TryOnPreviewData(
+        bitmap = display,
+        anchors = canvasAnchors,
+        mode = TryOnMode.APPROXIMATE,
+        landmarks = landmarks,
+        showDebug = pipeline.debugEnabled,
+    )
 }
 
 /** Garante bitmap que a UI pode reciclar sem tocar no cache de detecção. */
