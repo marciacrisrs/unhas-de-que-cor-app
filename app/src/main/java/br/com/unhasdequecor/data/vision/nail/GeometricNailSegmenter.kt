@@ -199,13 +199,32 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         }
     }
 
+    /**
+     * Eixo cutícula→ponta do **almond** (não o eixo landmark PIP/MCP→tip),
+     * para trim/boost coincidir com a placa pintada.
+     */
     private fun axisProjection(roi: NailRoi, bounds: ImageCoordinates.PixelRect): AxisProjection {
-        val from = roi.axisFromDip
-        val to = roi.axisToTip
-        val ox = from.x - bounds.left
-        val oy = from.y - bounds.top
-        val dx = to.x - from.x
-        val dy = to.y - from.y
+        val poly = roi.polygon
+        val tip = if (poly.size >= 6) {
+            PixelPoint(
+                x = (poly[0].x + poly[5].x) * 0.5f,
+                y = (poly[0].y + poly[5].y) * 0.5f,
+            )
+        } else {
+            roi.axisToTip
+        }
+        val cuticle = if (poly.size >= 4) {
+            PixelPoint(
+                x = (poly[2].x + poly[3].x) * 0.5f,
+                y = (poly[2].y + poly[3].y) * 0.5f,
+            )
+        } else {
+            roi.axisFromDip
+        }
+        val ox = cuticle.x - bounds.left
+        val oy = cuticle.y - bounds.top
+        val dx = tip.x - cuticle.x
+        val dy = tip.y - cuticle.y
         val len = hypot(dx.toDouble(), dy.toDouble()).toFloat().coerceAtLeast(1f)
         return AxisProjection(ox, oy, dx / len, dy / len, len)
     }

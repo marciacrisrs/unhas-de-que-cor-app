@@ -46,6 +46,7 @@ import br.com.unhasdequecor.data.vision.nail.NailDetectionSnapshot
 import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchors
+import br.com.unhasdequecor.data.vision.nail.NailPlateCalibration
 import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.data.vision.nail.PolishMaskRecolorer
 import br.com.unhasdequecor.data.vision.nail.TryOnHandReliability
@@ -64,6 +65,8 @@ private data class TryOnPreviewData(
     val nails: List<DetectedNail> = emptyList(),
     val landmarks: HandLandmarks? = null,
     val showDebug: Boolean = false,
+    /** Foto da usuária: Canvas usa o mesmo tamanho da elipse (não a âncora cheia). */
+    val matchEllipsePlate: Boolean = false,
 )
 
 /** Cache de detecção/máscara independente da cor do esmalte. */
@@ -227,7 +230,11 @@ private fun TryOnPreviewContent(
     if (data.mode != TryOnMode.MASK && data.anchors.isNotEmpty()) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             data.anchors.forEach { anchor ->
-                drawPolishNail(anchor = anchor, polishColor = polishColor)
+                drawPolishNail(
+                    anchor = anchor,
+                    polishColor = polishColor,
+                    matchEllipsePlate = data.matchEllipsePlate,
+                )
             }
         }
     }
@@ -466,6 +473,7 @@ private fun paintUserApproximate(
         mode = TryOnMode.APPROXIMATE,
         landmarks = landmarks,
         showDebug = pipeline.debugEnabled,
+        matchEllipsePlate = canvasAnchors.isNotEmpty(),
     )
 }
 
@@ -487,11 +495,27 @@ private fun recycleQuietly(bitmap: Bitmap?) {
 private fun DrawScope.drawPolishNail(
     anchor: NailOverlayAnchor,
     polishColor: Color,
+    matchEllipsePlate: Boolean,
 ) {
-    val nailWidth = size.width * anchor.width
-    val nailHeight = size.height * anchor.height
+    val widthNorm = if (matchEllipsePlate) {
+        NailPlateCalibration.canvasNailWidthNorm(anchor.width)
+    } else {
+        anchor.width
+    }
+    val heightNorm = if (matchEllipsePlate) {
+        NailPlateCalibration.canvasNailHeightNorm(anchor.height)
+    } else {
+        anchor.height
+    }
+    val nailWidth = size.width * widthNorm
+    val nailHeight = size.height * heightNorm
     val center = Offset(size.width * anchor.centerX, size.height * anchor.centerY)
-    val topLeft = Offset(center.x - nailWidth / 2f, center.y - nailHeight / 2f)
+    val biasY = if (matchEllipsePlate) {
+        nailHeight * NailPlateCalibration.ELLIPSE_CENTER_Y_BIAS
+    } else {
+        0f
+    }
+    val topLeft = Offset(center.x - nailWidth / 2f, center.y - nailHeight / 2f + biasY)
     val nailSize = Size(nailWidth, nailHeight)
     val radius = CornerRadius(nailWidth * 0.48f, nailHeight * 0.42f)
     rotate(degrees = anchor.rotationDegrees, pivot = center) {
@@ -524,7 +548,7 @@ private fun DrawScope.drawPolishNail(
             ),
             topLeft = Offset(
                 center.x - nailWidth * 0.12f,
-                center.y - nailHeight * 0.42f,
+                center.y - nailHeight * 0.42f + biasY,
             ),
             size = Size(nailWidth * 0.22f, nailHeight * 0.72f),
             cornerRadius = CornerRadius(nailWidth * 0.16f, nailHeight * 0.2f),

@@ -11,15 +11,12 @@ import androidx.compose.ui.graphics.Color
  * Pinta esmalte na foto própria a partir das âncoras MediaPipe:
  * máscara elíptica suave por unha + [PolishMaskRecolorer]
  * (mesma lógica visual das amostras com máscara).
+ *
+ * Fatores da elipse vêm de [NailPlateCalibration] (paridade com a placa ROI).
  */
 object DetectedNailPolishApplier {
-    private const val ELLIPSE_RX_FACTOR = 0.50f
-    private const val ELLIPSE_RY_FACTOR = 0.52f
     private const val MIN_RX = 4f
     private const val MIN_RY = 5f
-    /** Neutro: bias negativo empurrava o núcleo opaco além da ponta da unha. */
-    private const val ELLIPSE_CENTER_Y_BIAS = 0.04f
-    private const val ELLIPSE_OPAQUE_STOP = 0.78f
 
     fun apply(
         source: Bitmap,
@@ -48,19 +45,20 @@ object DetectedNailPolishApplier {
         for (anchor in anchors) {
             val cx = anchor.centerX * width
             val cy = anchor.centerY * height
-            // Elipse de unha um pouco mais longa e com núcleo opaco maior.
-            val rx = (anchor.width * width * ELLIPSE_RX_FACTOR).coerceAtLeast(MIN_RX)
-            val ry = (anchor.height * height * ELLIPSE_RY_FACTOR).coerceAtLeast(MIN_RY)
+            val rx = NailPlateCalibration.ellipseRadiusX(anchor.width, width)
+                .coerceAtLeast(MIN_RX)
+            val ry = NailPlateCalibration.ellipseRadiusY(anchor.height, height)
+                .coerceAtLeast(MIN_RY)
             paint.shader = RadialGradient(
                 0f,
-                ELLIPSE_CENTER_Y_BIAS,
+                NailPlateCalibration.ELLIPSE_CENTER_Y_BIAS,
                 1f,
                 intArrayOf(
                     android.graphics.Color.WHITE,
                     android.graphics.Color.WHITE,
                     android.graphics.Color.TRANSPARENT,
                 ),
-                floatArrayOf(0f, ELLIPSE_OPAQUE_STOP, 1f),
+                floatArrayOf(0f, NailPlateCalibration.ELLIPSE_OPAQUE_STOP, 1f),
                 Shader.TileMode.CLAMP,
             )
             canvas.save()
