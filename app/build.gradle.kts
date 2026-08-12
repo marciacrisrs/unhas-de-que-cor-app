@@ -37,13 +37,8 @@ android {
                 ?.trim('"', '\'', '\u201C', '\u201D', '\u2018', '\u2019')
                 ?.takeIf { it.isNotBlank() }
             if (storeFilePath != null) {
-                val resolved = java.io.File(storeFilePath)
-                storeFile = if (resolved.isAbsolute) {
-                    resolved
-                } else {
-                    // Relativo à raiz do repo (não ao módulo :app).
-                    rootProject.file(storeFilePath)
-                }
+                // rootProject.file: absoluto fica absoluto; relativo à raiz do repo (não :app).
+                storeFile = rootProject.file(storeFilePath)
                 storePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
                     ?: System.getenv("RELEASE_STORE_PASSWORD")
                 keyAlias = (project.findProperty("RELEASE_KEY_ALIAS") as String?)
