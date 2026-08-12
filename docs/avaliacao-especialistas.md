@@ -4,26 +4,27 @@
 **Base inicial:** `master` @ `5a8663b`  
 **Fonte de verdade:** `.github/agents/*` + `.github/copilot-instructions.md`
 
-## Painel (pós follow-ups + UX #35 + vision #36)
+## Painel (atual — 2026-08-12f)
 
-| Especialista | Veredito atualizado (12e) |
+| Especialista | Veredito atualizado (12f) |
 |--------------|---------------------|
-| Android Engineer | Aprovado c/ ressalvas (#35/#36) |
-| Architecture Reviewer | Aprovado (#36) / ressalvas (#35 Result→Home) |
-| Test Engineer | Aprovado c/ ressalvas (flash coberto; paint paths abertos) |
-| Quality Reviewer | Aprovado c/ ressalvas — merge após QG verde |
-| Performance Reviewer | Aprovado |
+| Android Engineer | Aprovado c/ ressalvas (fallbacks try-on; guarda HOME aberta) |
+| Architecture Reviewer | Aprovado |
+| Test Engineer | Aprovado c/ ressalvas (Enhancer 100%; paint paths abertos) |
+| Quality Reviewer | Aprovado — QG Sonar verde pós-#42 em master |
+| Performance Reviewer | Aprovado c/ ressalvas (N variantes Bitmap em falha) |
 | Security Reviewer | Aprovado |
-| Accessibility Reviewer | Aprovado c/ ressalvas (banner try-on; maxLines convite) |
-| UI Reviewer | Aprovado (#36) / ressalvas (#35 chrome Favoritos) |
-| Documentation Reviewer | Aprovado c/ ressalvas (este painel 12e) |
-| Release Manager | Aprovado c/ ressalvas — smoke try-on em device antes de store |
-| CI/CD Reviewer | Aprovado c/ ressalvas — Verify #35/#36 em andamento |
-| Vision Try-On Reviewer | **Novo** — especialista em unhas humanas das mãos + try-on |
+| Accessibility Reviewer | Aprovado c/ ressalvas (banner + maxLines convite) |
+| UI Reviewer | Aprovado c/ ressalvas (rótulos honestos; chrome Favoritos) |
+| Documentation Reviewer | Aprovado c/ ressalvas (CHANGELOG 1.0.5 aberto) |
+| Release Manager | Aprovado c/ ressalvas — smoke device antes de ampliar loja |
+| CI/CD Reviewer | Aprovado — Verify master verde pós-#42 |
+| Vision Try-On Reviewer | Aprovado c/ ressalvas (falha honesta; falta floor confiança) |
 
-**Síntese:** pedidos de UX (#35) e correção do overlay DEFAULT (#36) aprováveis
-após CI/QG verdes. Reavaliação completa em **2026-08-12e**. Resta operação de loja
-(keystore + listing) e validação visual em device (`OUT_OF_REPO`).
+**Síntese:** master @ `f23cec0` (1.0.5 / 6) com try-on mais resiliente (#41),
+QG Sonar recuperado (#42) e símbolos nativos instrumentados (#40). Aprovado com
+ressalvas para teste interno — **smoke em device** e piso de confiança ainda
+pendentes. Reavaliação **2026-08-12f**.
 
 ---
 
@@ -276,3 +277,60 @@ de paint path; constantes mágicas sem ground-truth.
 | P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Aberto |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
 | — | A11y Scanner + smoke try-on em device | **OUT_OF_REPO** |
+
+---
+
+## Reavaliação 2026-08-12f — pós #40 / #41 / #42
+
+**Base:** `origin/master` @ `f23cec0` · versão **1.0.5 (6)** · PRs abertos: nenhum  
+**CI:** Verify em master **sucesso** após merge do #42.
+
+### Veredito global
+
+**Aprovado com ressalvas** para faixa interna / validação em device. Sem bloqueio
+de produto. Try-on mais resiliente a contraluz sem overlay `DEFAULT` mentiroso;
+QG Sonar recuperado; símbolos nativos instrumentados (aviso Play pode persistir
+porque MediaPipe já vem stripped).
+
+### O que entrou desde 12e
+
+| PR | Escopo | Avaliação |
+|----|--------|-----------|
+| [#40](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/40) | `ndk.debugSymbolLevel` + NDK CI + upload condicional | Correto; limitação MediaPipe documentada |
+| [#41](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/41) | Enhancer + Variants; limiar 0.10; copy contraluz | Melhora recall; risco FP sem floor pós-detecção |
+| [#42](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/42) | JaCoCo Enhancer + exclusão Variants no Sonar | QG `new_coverage` recuperado |
+
+### Vision Try-On — checklist
+
+| Item | Status |
+|------|--------|
+| Sem landmarks → zero overlay DEFAULT | Ok |
+| Rótulos DETECTED / aproximada / não detectada | Ok (+ “evite contraluz”) |
+| Fallbacks contraste / gamma / espelho / rotação | Ok |
+| Floor `presenceScore` além do limiar 0.10 | **Aberto (P1)** |
+| Smoke device (luz frontal vs contraluz) | **OUT_OF_REPO** |
+
+### Backlog residual (pós 12f)
+
+| Pri | Item | Status |
+|-----|------|--------|
+| P0 | QG Sonar #35/#36/#41 | **Feito** (#42 + Verify master verde) |
+| P1 | Floor de confiança pós-detecção | Aberto |
+| P1 | Testes `paintUserPreview` / empty anchors | Aberto |
+| P1 | Guarda `getBackStackEntry(HOME)` | Aberto |
+| P1 | A11y banner try-on + convite `maxLines` | Aberto |
+| P1 | CHANGELOG / whatsnew 1.0.5 | Aberto |
+| P2 | Result→mão destino; chrome Favoritos | Aberto |
+| P2 | `DetectedNailPolishApplier` tests; DRY constantes | Aberto |
+| P2 | Custo N variantes Bitmap (medir) | Aberto |
+| — | Keystore + listing Play | **OUT_OF_REPO** |
+| — | Smoke try-on + A11y Scanner em device | **OUT_OF_REPO** |
+| — | Aviso Play símbolos (libs stripped) | Aceito / documentado |
+
+### Top 5 próximos passos
+
+1. Smoke em device com 1.0.5 (luz frontal vs contraluz).
+2. Piso de `presenceScore` antes de rotular “Prévia na sua mão”.
+3. CHANGELOG / whatsnew 1.0.5.
+4. Guarda HOME + a11y banner/convite.
+5. Play listing/keystore só após smoke ok.
