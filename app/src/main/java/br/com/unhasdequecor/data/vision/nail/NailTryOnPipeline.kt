@@ -105,12 +105,22 @@ class NailTryOnPipeline @Inject constructor(
         }
         // Garante que snapshot não retenha unhas abaixo do piso de pintura.
         val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
+        // Uma única unha paintable (assimétrico vs mapper ≥2): não claim STRONG.
+        val adjustedReliability =
+            if (reliability == TryOnReliability.STRONG &&
+                nails.size in 1 until NailLandmarkMapper.MIN_PLAUSIBLE_NAILS &&
+                !DetectionConfidenceFloor.meetsFullNailFloor(nails)
+            ) {
+                TryOnReliability.WEAK
+            } else {
+                reliability
+            }
         return NailDetectionSnapshot(
             workingBitmap = working,
             nails = nails,
             landmarks = landmarks,
             ownsWorkingBitmap = working !== image,
-            reliability = reliability,
+            reliability = adjustedReliability,
         )
     }
 

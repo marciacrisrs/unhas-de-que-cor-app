@@ -19,6 +19,8 @@ internal data class HandInferenceVariant(
 /**
  * Tentativas extras quando a foto “crua” não detecta mão
  * (contraluz, **flash/overexposure**, pele retinta, espelho, orientação).
+ *
+ * Ordem: raw → flash (se cena estourada) → stretch → contraluz → espelho → rotação.
  */
 internal object HandInferenceVariants {
 
@@ -26,18 +28,38 @@ internal object HandInferenceVariants {
     private const val STRONG_SHADOW_GAMMA = 0.50f
     /** Gamma &gt; 1 recupera midtones estourados pelo flash. */
     private const val FLASH_GAMMA_MILD = 1.45f
-    private const val FLASH_GAMMA_STRONG = 1.80f
     private const val FLASH_EXPOSURE = 0.70f
     private const val FLASH_HIGHLIGHT_COMPRESS = 0.60f
+    /** Só gasta variantes de flash se ≥ este share de highlights. */
+    const val FLASH_HIGHLIGHT_SHARE_MIN = 0.12f
+    private const val SAMPLE_STEP = 17
     private val ROTATION_DEGREES = floatArrayOf(90f, 270f, 180f)
 
     fun forSource(source: Bitmap): Sequence<HandInferenceVariant> = sequence {
         yield(HandInferenceVariant(source, source))
+        if (shouldTryFlashRecovery(source)) {
+            yieldAll(flashRecovery(source, display = source))
+        }
         yieldAll(baseEnhancements(source))
-        yieldAll(flashRecovery(source, display = source))
         yieldAll(shadowRecovery(source, display = source))
         yieldAll(mirroredVariants(source))
         yieldAll(rotatedVariants(source))
+    }
+
+    /** Cena com highlights estourados (flash / overexposure). */
+    fun shouldTryFlashRecovery(source: Bitmap): Boolean {
+        if (source.width <= 0 || source.height <= 0) return false
+        return runCatching {
+            val w = source.width
+            val h = source.height
+            val pixels = IntArray(w * h)
+            source.getPixels(pixels, 0, w, 0, 0, w, h)
+            HandInferenceEnhancer.highlightShareArgb(
+                pixels = pixels,
+                threshold = HandInferenceEnhancer.HIGHLIGHT_GATE_LUM,
+                sampleStep = SAMPLE_STEP,
+            ) >= FLASH_HIGHLIGHT_SHARE_MIN
+        }.getOrDefault(false)
     }
 
     private fun baseEnhancements(source: Bitmap): Sequence<HandInferenceVariant> = sequence {
@@ -49,20 +71,11 @@ internal object HandInferenceVariants {
         display: Bitmap,
         remap: (ImageCoordinates.NormPoint) -> ImageCoordinates.NormPoint = { it },
     ): Sequence<HandInferenceVariant> = sequence {
-        // Clarear piora cena já estourada — estas variantes vão cedo na fila.
+        // Receitas enxutas: gamma, exposure, highlights+stretch.
         enhance(inferenceBase, gamma = FLASH_GAMMA_MILD)?.let {
             yield(HandInferenceVariant(it, display, remap))
         }
-        enhance(inferenceBase, gamma = FLASH_GAMMA_STRONG)?.let {
-            yield(HandInferenceVariant(it, display, remap))
-        }
         enhance(inferenceBase, exposure = FLASH_EXPOSURE)?.let {
-            yield(HandInferenceVariant(it, display, remap))
-        }
-        enhance(inferenceBase, highlights = FLASH_HIGHLIGHT_COMPRESS)?.let {
-            yield(HandInferenceVariant(it, display, remap))
-        }
-        enhance(inferenceBase, stretch = true, gamma = FLASH_GAMMA_MILD)?.let {
             yield(HandInferenceVariant(it, display, remap))
         }
         enhance(inferenceBase, highlights = FLASH_HIGHLIGHT_COMPRESS, stretch = true)?.let {
@@ -101,7 +114,9 @@ internal object HandInferenceVariants {
         enhance(mirrored, stretch = true)?.let {
             yield(HandInferenceVariant(it, source, remap))
         }
-        yieldAll(flashRecovery(mirrored, display = source, remap = remap).take(2))
+        if (shouldTryFlashRecovery(source)) {
+            yieldAll(flashRecovery(mirrored, display = source, remap = remap).take(2))
+        }
         enhance(mirrored, stretch = true, gamma = SHADOW_LIFT_GAMMA)?.let {
             yield(HandInferenceVariant(it, source, remap))
         }
@@ -123,7 +138,9 @@ internal object HandInferenceVariants {
         enhance(rotated, stretch = true)?.let {
             yield(HandInferenceVariant(it, rotated))
         }
-        yieldAll(flashRecovery(rotated, display = rotated).take(2))
+        if (shouldTryFlashRecovery(source)) {
+            yieldAll(flashRecovery(rotated, display = rotated).take(2))
+        }
         enhance(rotated, stretch = true, gamma = SHADOW_LIFT_GAMMA)?.let {
             yield(HandInferenceVariant(it, rotated))
         }

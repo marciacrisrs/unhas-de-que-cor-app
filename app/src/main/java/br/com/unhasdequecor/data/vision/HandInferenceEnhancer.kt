@@ -154,5 +154,31 @@ object HandInferenceEnhancer {
         return ((LUM_R * r + LUM_G * g + LUM_B * b) shr LUM_SHIFT).coerceIn(0, CHANNEL_MAX)
     }
 
+    /**
+     * Fração de pixels com luminância ≥ [threshold] (0..1).
+     * Usado para decidir se vale tentar variantes de flash/overexposure.
+     */
+    fun highlightShareArgb(
+        pixels: IntArray,
+        threshold: Int = HIGHLIGHT_GATE_LUM,
+        sampleStep: Int = 1,
+    ): Float {
+        require(pixels.isNotEmpty())
+        require(threshold in 0..CHANNEL_MAX)
+        require(sampleStep >= 1)
+        var bright = 0
+        var n = 0
+        var i = 0
+        while (i < pixels.size) {
+            if (luminance(pixels[i]) >= threshold) bright += 1
+            n += 1
+            i += sampleStep
+        }
+        return if (n == 0) 0f else bright.toFloat() / n.toFloat()
+    }
+
     fun mirrorXNormalized(x: Float): Float = (1f - x).coerceIn(0f, 1f)
+
+    /** Limiar de luminância para considerar highlight (flash / estouro). */
+    const val HIGHLIGHT_GATE_LUM = 220
 }

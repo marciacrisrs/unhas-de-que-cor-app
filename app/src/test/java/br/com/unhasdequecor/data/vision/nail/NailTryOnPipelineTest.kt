@@ -260,14 +260,14 @@ class NailTryOnPipelineTest {
     }
 
     @Test
-    fun `detect marks strong reliability when presence is high`() {
+    fun `detect marks strong reliability when presence is high and tips are open`() {
         val image = mockk<Bitmap>(relaxed = true) {
             every { width } returns 200
             every { height } returns 300
             every { isRecycled } returns false
         }
         val landmarks = HandLandmarks(
-            points = List(21) { NormPoint(0.5f, 0.5f) },
+            points = openHandPoints(),
             imageWidth = 200,
             imageHeight = 300,
             presenceScore = 0.80f,
@@ -281,6 +281,64 @@ class NailTryOnPipelineTest {
 
         assertThat(snapshot).isNotNull()
         assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.STRONG)
+    }
+
+    @Test
+    fun `detect demotes strong presence with collapsed tips to weak`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.90f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        every { roiEstimator.estimateAll(landmarks) } returns emptyList()
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.WEAK)
+    }
+
+    @Test
+    fun `detect demotes strong to weak when fewer than two paintable nails`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = openHandPoints(),
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        val roi = sampleRoi(geometricConfidence = 0.30f)
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(roi)
+        val alpha = ByteArray(20 * 40) { i -> if (i < 80) 255.toByte() else 0 }
+        every { segmenter.segment(image, roi) } returns NailMask(
+            width = 20,
+            height = 40,
+            alpha = alpha,
+            originX = 90,
+            originY = 40,
+        )
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.nails).hasSize(1)
+        assertThat(snapshot.reliability).isEqualTo(TryOnReliability.WEAK)
     }
 
     @Test
@@ -380,6 +438,16 @@ class NailTryOnPipelineTest {
         assertThat(conf).isAtLeast(DetectionConfidenceFloor.NAIL_COMBINED_MIN)
         assertThat(conf).isLessThan(DetectionConfidenceFloor.NAIL_FULL_MIN)
         assertThat(DetectionConfidenceFloor.meetsFullNailFloor(snapshot.nails)).isFalse()
+    }
+
+    private fun openHandPoints(): List<NormPoint> {
+        val pts = MutableList(21) { NormPoint(0.5f, 0.5f) }
+        pts[4] = NormPoint(0.22f, 0.40f)
+        pts[8] = NormPoint(0.38f, 0.26f)
+        pts[12] = NormPoint(0.50f, 0.22f)
+        pts[16] = NormPoint(0.62f, 0.26f)
+        pts[20] = NormPoint(0.74f, 0.32f)
+        return pts
     }
 
     private fun sampleRoi(geometricConfidence: Float): NailRoi = NailRoi(

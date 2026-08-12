@@ -17,7 +17,6 @@ class TryOnPreviewLabelsTest {
     fun contentDescription_fullUser_claimsUserHand() {
         val cd = TryOnPreviewLabels.contentDescription("Nude", TryOnPreviewClaim.FULL_USER)
         assertThat(cd).contains("sua mão")
-        assertThat(cd).contains(TryOnPreviewLabels.status(TryOnPreviewClaim.FULL_USER))
     }
 
     @Test
@@ -25,6 +24,7 @@ class TryOnPreviewLabelsTest {
         val cd = TryOnPreviewLabels.contentDescription("Rosa", TryOnPreviewClaim.APPROXIMATE)
         assertThat(cd).doesNotContain("sua mão")
         assertThat(cd).contains("aproximada")
+        assertThat(cd).contains(TryOnPreviewLabels.LIGHTING_HINT)
     }
 
     @Test
@@ -32,8 +32,7 @@ class TryOnPreviewLabelsTest {
         val cd = TryOnPreviewLabels.contentDescription("Preto", TryOnPreviewClaim.NOT_DETECTED)
         assertThat(cd).doesNotContain("sua mão")
         assertThat(cd).contains("não detectada")
-        assertThat(TryOnPreviewLabels.status(TryOnPreviewClaim.NOT_DETECTED))
-            .contains("sem flash")
+        assertThat(cd).contains(TryOnPreviewLabels.LIGHTING_HINT)
     }
 
     @Test
@@ -41,6 +40,14 @@ class TryOnPreviewLabelsTest {
         val cd = TryOnPreviewLabels.contentDescription("Coral", TryOnPreviewClaim.SAMPLE_MASK)
         assertThat(cd).contains("exemplo")
         assertThat(cd).doesNotContain("sua mão")
+    }
+
+    @Test
+    fun status_approximateAndNotDetected_shareLightingHint() {
+        assertThat(TryOnPreviewLabels.status(TryOnPreviewClaim.APPROXIMATE))
+            .contains(TryOnPreviewLabels.LIGHTING_HINT)
+        assertThat(TryOnPreviewLabels.status(TryOnPreviewClaim.NOT_DETECTED))
+            .contains(TryOnPreviewLabels.LIGHTING_HINT)
     }
 
     @Test
