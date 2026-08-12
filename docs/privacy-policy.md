@@ -45,7 +45,7 @@ O app não é direcionado a menores de 13 anos e não coleta dados pessoais inte
 
 ## Contato
 
-Para dúvidas sobre privacidade: **[preencher e-mail de contato da desenvolvedora]**
+Para dúvidas sobre privacidade: **marciacrisrs@gmail.com**
 
 ## Alterações
 
