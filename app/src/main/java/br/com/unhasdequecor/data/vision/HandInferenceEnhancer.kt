@@ -2,7 +2,7 @@ package br.com.unhasdequecor.data.vision
 
 /**
  * Pré-processamento de pixels para MediaPipe em fotos difíceis
- * (contra-luz, mão escura, cena com pouco contraste unha–pele).
+ * (contra-luz, flash/overexposure, mão escura, pouco contraste unha–pele).
  *
  * Operações puras (testáveis sem Bitmap Android).
  */
@@ -12,6 +12,8 @@ object HandInferenceEnhancer {
     private const val HIST_BINS = 256
     private const val MIN_STRETCH_SPAN = 8
     private const val MIN_GAMMA = 0.05f
+    private const val MIN_EXPOSURE_FACTOR = 0.05f
+    private const val HIGHLIGHT_MID = 128
     private const val LUM_R = 77
     private const val LUM_G = 150
     private const val LUM_B = 29
@@ -105,6 +107,44 @@ object HandInferenceEnhancer {
             val nb = (b + (CHANNEL_MAX - b) * amount).toInt().coerceIn(0, CHANNEL_MAX)
             pixels[i] = (a shl ALPHA_SHIFT) or (nr shl RED_SHIFT) or (ng shl GREEN_SHIFT) or nb
         }
+    }
+
+    /**
+     * Escurece a cena (flash / overexposure). [factor] em (0, 1]: multiplica canais.
+     */
+    fun scaleExposureArgb(pixels: IntArray, factor: Float) {
+        require(factor in MIN_EXPOSURE_FACTOR..1f)
+        if (factor == 1f) return
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val a = p ushr ALPHA_SHIFT and BYTE_MASK
+            val r = ((p ushr RED_SHIFT and BYTE_MASK) * factor).toInt().coerceIn(0, CHANNEL_MAX)
+            val g = ((p ushr GREEN_SHIFT and BYTE_MASK) * factor).toInt().coerceIn(0, CHANNEL_MAX)
+            val b = ((p and BYTE_MASK) * factor).toInt().coerceIn(0, CHANNEL_MAX)
+            pixels[i] = (a shl ALPHA_SHIFT) or (r shl RED_SHIFT) or (g shl GREEN_SHIFT) or b
+        }
+    }
+
+    /**
+     * Comprime highlights: canais acima do meio tom são puxados para baixo.
+     * [amount] 0..1 — útil quando o flash estoura a pele e as tips.
+     */
+    fun compressHighlightsArgb(pixels: IntArray, amount: Float) {
+        require(amount in 0f..1f)
+        if (amount == 0f) return
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val a = p ushr ALPHA_SHIFT and BYTE_MASK
+            val r = compressHighlightChannel(p ushr RED_SHIFT and BYTE_MASK, amount)
+            val g = compressHighlightChannel(p ushr GREEN_SHIFT and BYTE_MASK, amount)
+            val b = compressHighlightChannel(p and BYTE_MASK, amount)
+            pixels[i] = (a shl ALPHA_SHIFT) or (r shl RED_SHIFT) or (g shl GREEN_SHIFT) or b
+        }
+    }
+
+    private fun compressHighlightChannel(value: Int, amount: Float): Int {
+        if (value <= HIGHLIGHT_MID) return value
+        return (value - (value - HIGHLIGHT_MID) * amount).toInt().coerceIn(0, CHANNEL_MAX)
     }
 
     fun luminance(argb: Int): Int {

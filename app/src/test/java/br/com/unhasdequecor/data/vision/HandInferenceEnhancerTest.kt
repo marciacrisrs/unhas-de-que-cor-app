@@ -66,4 +66,32 @@ class HandInferenceEnhancerTest {
         HandInferenceEnhancer.liftBrightnessArgb(pixels, amount = 0f)
         assertThat(pixels[0]).isEqualTo(before)
     }
+
+    @Test
+    fun `gamma above one darkens midtones for flash recovery`() {
+        val mid = 0xFFC0C0C0.toInt()
+        val pixels = intArrayOf(mid, mid, mid, mid)
+        HandInferenceEnhancer.applyGammaArgb(pixels, gamma = 1.45f)
+        assertThat(HandInferenceEnhancer.luminance(pixels[0])).isLessThan(0xC0)
+    }
+
+    @Test
+    fun `scaleExposure darkens all channels`() {
+        val bright = 0xFFE0E0E0.toInt()
+        val pixels = intArrayOf(bright, bright)
+        HandInferenceEnhancer.scaleExposureArgb(pixels, factor = 0.70f)
+        assertThat(HandInferenceEnhancer.luminance(pixels[0])).isLessThan(0xE0)
+        assertThat(HandInferenceEnhancer.luminance(pixels[0])).isGreaterThan(0x80)
+    }
+
+    @Test
+    fun `compressHighlights_pullsOnlyBrightChannels`() {
+        val dark = 0xFF404040.toInt()
+        val bright = 0xFFF0F0F0.toInt()
+        val pixels = intArrayOf(dark, bright)
+        HandInferenceEnhancer.compressHighlightsArgb(pixels, amount = 0.60f)
+        assertThat(pixels[0]).isEqualTo(dark)
+        assertThat(HandInferenceEnhancer.luminance(pixels[1])).isLessThan(0xF0)
+        assertThat(HandInferenceEnhancer.luminance(pixels[1])).isGreaterThan(0x80)
+    }
 }

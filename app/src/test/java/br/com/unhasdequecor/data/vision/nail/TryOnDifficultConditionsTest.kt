@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.HandLandmarkQuality
 import br.com.unhasdequecor.data.vision.HandLandmarks
+import br.com.unhasdequecor.data.vision.HandPresenceScoring
 import br.com.unhasdequecor.data.vision.Handedness
 import br.com.unhasdequecor.data.vision.OrientedHandLandmarks
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.NormPoint
@@ -16,9 +17,17 @@ import org.junit.Test
 
 /**
  * Bateria de condições difíceis (JVM): presence fraca, mid-presence, foto pequena,
- * punho/oclusão, ranking de variantes e recolor sem unhas.
+ * punho/oclusão, flash (tip glare), ranking de variantes e recolor sem unhas.
  */
 class TryOnDifficultConditionsTest {
+
+    @Test
+    fun flashTipGlare_presenceComHandednessClara_naoRejeita() {
+        val score = HandPresenceScoring.score(handednessScore = 0.68f, tipPresence = 0.04f)
+        assertThat(score).isAtLeast(DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT)
+        assertThat(TryOnHandReliability.classify(score)).isNotEqualTo(TryOnReliability.REJECTED)
+    }
+
 
     @Test
     fun presenceAbaixoDoFloor_detectRejeitaSemRoiNemSegmentacao() {

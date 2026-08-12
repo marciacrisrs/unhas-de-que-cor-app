@@ -32,6 +32,8 @@ class TryOnPreviewLabelsTest {
         val cd = TryOnPreviewLabels.contentDescription("Preto", TryOnPreviewClaim.NOT_DETECTED)
         assertThat(cd).doesNotContain("sua mão")
         assertThat(cd).contains("não detectada")
+        assertThat(TryOnPreviewLabels.status(TryOnPreviewClaim.NOT_DETECTED))
+            .contains("sem flash")
     }
 
     @Test

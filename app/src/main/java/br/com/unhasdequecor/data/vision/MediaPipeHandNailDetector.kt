@@ -105,7 +105,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                         ?.score()
                         ?: 0f
                     val tipScore = averageTipPresence(handLandmarks)
-                    val combined = handScore * 0.35f + tipScore * 0.65f
+                    val combined = HandPresenceScoring.score(handScore, tipScore)
                     if (combined > bestScore) {
                         bestScore = combined
                         bestIndex = i
@@ -120,9 +120,8 @@ class MediaPipeHandNailDetector @Inject constructor(
                     else -> Handedness.UNKNOWN
                 }
                 val handednessScore = handednessCat?.score() ?: 0f
-                val tipPresence = averageTipPresence(landmarks).takeIf { it > 0f } ?: handednessScore
-                val presenceScore = maxOf(handednessScore * 0.35f + tipPresence * 0.65f, tipPresence)
-                    .coerceIn(0f, 1f)
+                val tipPresence = averageTipPresence(landmarks)
+                val presenceScore = HandPresenceScoring.score(handednessScore, tipPresence)
                 HandLandmarks(
                     points = landmarks.map {
                         remap(ImageCoordinates.NormPoint(it.x(), it.y()))

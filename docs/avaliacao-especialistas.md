@@ -358,9 +358,10 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 
 Detecção (falsos negativos em fotos reais): escolhe a **melhor** variante MediaPipe
 (`HandLandmarkQuality` = presence + span das tips), não a primeira nem a primeira
-só “forte”; early-stop só com presence ≥ 0.82; variantes extras (stretch+gamma,
-brilho, rotação+espelho); mapper/ROI aceitam só placas usáveis (≥2 unhas);
-limiar MediaPipe 0.08.
+só “forte”; early-stop só com presence alta **e** tip-span; variantes extras
+(stretch, **flash/highlight compress / gamma&gt;1 / exposure**, contraluz, brilho,
+rotação+espelho); `HandPresenceScoring` não deixa tip-glare anular handedness;
+mapper/ROI aceitam só placas usáveis (≥2 unhas); limiar MediaPipe 0.08.
 
 ### Reavaliação especialistas (pós-PR #44) — melhorias aplicadas
 
