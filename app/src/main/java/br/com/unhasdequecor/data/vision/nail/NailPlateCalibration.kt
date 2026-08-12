@@ -104,9 +104,14 @@ object NailPlateCalibration {
         else -> CENTER_ALONG
     }
 
+    /** Piso absoluto do limiar tip–dip (fração de [SHORT_TIP_DIP_PX]). */
+    private const val FACING_TIP_DIP_ABS_FLOOR = 0.5f
+    /** Comprimento mínimo aceito vs [MIN_NAIL_LEN_PX] para placa usável. */
+    private const val USABLE_LENGTH_MIN_FACTOR = 0.85f
+
     /** Limiar tip–dip (px) para considerar unha de frente — relativo a tip–pip. */
     fun facingTipDipThresholdPx(tipPipPx: Float): Float =
-        maxOf(SHORT_TIP_DIP_PX * 0.5f, tipPipPx * FACING_TIP_DIP_RATIO)
+        maxOf(SHORT_TIP_DIP_PX * FACING_TIP_DIP_ABS_FLOOR, tipPipPx * FACING_TIP_DIP_RATIO)
 
     fun isFacing(thumbMode: Boolean, tipDipPx: Float, tipPipPx: Float): Boolean =
         !thumbMode && tipDipPx < facingTipDipThresholdPx(tipPipPx)
@@ -122,7 +127,8 @@ object NailPlateCalibration {
             plate.facing -> MIN_AXIS_FACING_PX
             else -> MIN_AXIS_OPEN_PX
         }
-        return axisLen >= minAxis && plate.lengthPx >= MIN_NAIL_LEN_PX * 0.85f
+        return axisLen >= minAxis &&
+            plate.lengthPx >= MIN_NAIL_LEN_PX * USABLE_LENGTH_MIN_FACTOR
     }
 
     fun ellipseRadiusX(anchorWidthNorm: Float, imageWidth: Int): Float =
