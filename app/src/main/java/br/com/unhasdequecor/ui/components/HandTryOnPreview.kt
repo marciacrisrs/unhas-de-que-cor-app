@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.ui.components
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -15,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
@@ -39,6 +41,7 @@ import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
+import br.com.unhasdequecor.data.vision.nail.NailDetectionSnapshot
 import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchors
@@ -59,6 +62,14 @@ private data class TryOnPreviewData(
     val showDebug: Boolean = false,
 )
 
+/** Cache de detecção/máscara independente da cor do esmalte. */
+private data class TryOnBaseAssets(
+    val decoded: Bitmap,
+    val snapshot: NailDetectionSnapshot? = null,
+    val sampleMask: Bitmap? = null,
+    val sampleId: String? = null,
+)
+
 private enum class TryOnMode {
     MASK,
     DETECTED,
@@ -76,61 +87,103 @@ fun HandTryOnPreview(
     nailPipeline: NailTryOnPipeline? = null,
 ) {
     val context = LocalContext.current
-    val pipeline = nailPipeline ?: remember(context) {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            NailPipelineEntryPoint::class.java,
-        ).nailTryOnPipeline().also {
-            // Debug só em builds debug; não polui a UI de release.
-            it.debugEnabled = BuildConfig.DEBUG && BuildConfig.DEBUG_NAIL_OVERLAY
-        }
-    }
-    val preview by produceState<TryOnPreviewData?>(
-        initialValue = null,
-        imagePath,
-        revision,
-        sampleId,
-        polishColor,
-        pipeline,
-    ) {
-        value = withContext(Dispatchers.Default) {
-            var decoded: Bitmap? = null
-            try {
-                decoded = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 1280)
-                    ?: return@withContext null
-                val resolved = resolvePreview(
-                    context = context.applicationContext,
-                    bitmap = decoded,
-                    polishColor = polishColor,
-                    sampleId = sampleId,
-                    pipeline = pipeline,
-                )
-                // decodeFile sempre cria bitmap nova; se o pipeline devolveu outra, libera a fonte.
-                if (resolved.bitmap !== decoded) {
-                    recycleQuietly(decoded)
-                    decoded = null
-                }
-                resolved
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                recycleQuietly(decoded)
-                throw cancelled
-            }
-        }
-    }
+    val pipeline = rememberTryOnPipeline(context, nailPipeline)
+    val base by rememberTryOnBaseAssets(imagePath, revision, sampleId, pipeline, context)
+    DisposeTryOnBaseAssets(base)
+    val preview by rememberPaintedPreview(base, polishColor, pipeline)
+    DisposeTryOnPreview(preview)
+    TryOnPreviewFrame(
+        preview = preview,
+        polishColor = polishColor,
+        colorName = colorName,
+        sampleId = sampleId,
+        modifier = modifier,
+    )
+}
 
-    // Recicla bitmap ao trocar de prévia ou ao sair da composição.
+@Composable
+private fun rememberTryOnPipeline(
+    context: Context,
+    nailPipeline: NailTryOnPipeline?,
+): NailTryOnPipeline = nailPipeline ?: remember(context) {
+    EntryPointAccessors.fromApplication(
+        context.applicationContext,
+        NailPipelineEntryPoint::class.java,
+    ).nailTryOnPipeline().also {
+        it.debugEnabled = BuildConfig.DEBUG && BuildConfig.DEBUG_NAIL_OVERLAY
+    }
+}
+
+@Composable
+private fun rememberTryOnBaseAssets(
+    imagePath: String,
+    revision: Long,
+    sampleId: String?,
+    pipeline: NailTryOnPipeline,
+    context: Context,
+): State<TryOnBaseAssets?> = produceState(
+    initialValue = null,
+    imagePath,
+    revision,
+    sampleId,
+    pipeline,
+) {
+    value = withContext(Dispatchers.Default) {
+        loadTryOnBaseAssets(
+            imagePath = imagePath,
+            sampleId = sampleId,
+            pipeline = pipeline,
+            appContext = context.applicationContext,
+        )
+    }
+}
+
+@Composable
+private fun rememberPaintedPreview(
+    base: TryOnBaseAssets?,
+    polishColor: Color,
+    pipeline: NailTryOnPipeline,
+): State<TryOnPreviewData?> = produceState(
+    initialValue = null,
+    base,
+    polishColor,
+) {
+    val assets = base
+    if (assets == null) {
+        value = null
+        return@produceState
+    }
+    value = withContext(Dispatchers.Default) {
+        paintPreview(assets, polishColor, pipeline)
+    }
+}
+
+@Composable
+private fun DisposeTryOnBaseAssets(base: TryOnBaseAssets?) {
+    DisposableEffect(base) {
+        val held = base
+        onDispose { recycleTryOnBaseAssets(held) }
+    }
+}
+
+@Composable
+private fun DisposeTryOnPreview(preview: TryOnPreviewData?) {
     DisposableEffect(preview) {
         val held = preview
-        onDispose {
-            recycleQuietly(held?.bitmap)
-        }
+        onDispose { recycleQuietly(held?.bitmap) }
     }
+}
 
-    val aspect = preview?.bitmap?.let { bmp ->
-        if (bmp.height > 0) bmp.width.toFloat() / bmp.height.toFloat() else NailLandmarkMapper.PREVIEW_ASPECT
-    } ?: NailLandmarkMapper.PREVIEW_ASPECT
+@Composable
+private fun TryOnPreviewFrame(
+    preview: TryOnPreviewData?,
+    polishColor: Color,
+    colorName: String,
+    sampleId: String?,
+    modifier: Modifier,
+) {
+    val aspect = previewAspect(preview)
     val statusLabel = previewStatusLabel(mode = preview?.mode, isUserPhoto = sampleId == null)
-
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -196,6 +249,15 @@ private fun TryOnPreviewContent(
     }
 }
 
+private fun previewAspect(preview: TryOnPreviewData?): Float {
+    val bmp = preview?.bitmap ?: return NailLandmarkMapper.PREVIEW_ASPECT
+    return if (bmp.height > 0) {
+        bmp.width.toFloat() / bmp.height.toFloat()
+    } else {
+        NailLandmarkMapper.PREVIEW_ASPECT
+    }
+}
+
 private fun previewStatusLabel(mode: TryOnMode?, isUserPhoto: Boolean): String = when {
     mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
     mode == TryOnMode.DETECTED -> "Prévia na sua mão"
@@ -204,74 +266,75 @@ private fun previewStatusLabel(mode: TryOnMode?, isUserPhoto: Boolean): String =
     else -> "Prévia aproximada"
 }
 
-private fun resolvePreview(
-    context: android.content.Context,
-    bitmap: Bitmap,
-    polishColor: Color,
+private fun loadTryOnBaseAssets(
+    imagePath: String,
     sampleId: String?,
     pipeline: NailTryOnPipeline,
-): TryOnPreviewData {
-    val isUserPhoto = sampleId == null
-    return when {
-        isUserPhoto -> resolveUserPreview(
-            bitmap = bitmap,
-            polishColor = polishColor,
-            pipeline = pipeline,
-        )
-        else -> resolveSamplePreview(
-            context = context,
-            bitmap = bitmap,
-            polishColor = polishColor,
-            sampleId = checkNotNull(sampleId),
-        )
+    appContext: Context,
+): TryOnBaseAssets? {
+    var decoded: Bitmap? = null
+    var sampleMask: Bitmap? = null
+    return try {
+        decoded = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 1280) ?: return null
+        if (sampleId != null && NailOverlayAnchors.hasMaskAsset(sampleId)) {
+            sampleMask = PolishMaskRecolorer.loadMask(appContext, sampleId)
+        }
+        val snapshot = if (sampleId == null) {
+            pipeline.detect(decoded, stabilize = false)
+        } else {
+            null
+        }
+        TryOnBaseAssets(
+            decoded = decoded,
+            snapshot = snapshot,
+            sampleMask = sampleMask,
+            sampleId = sampleId,
+        ).also { decoded = null }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        recycleQuietly(decoded)
+        recycleQuietly(sampleMask)
+        throw cancelled
     }
 }
 
-private fun resolveUserPreview(
-    bitmap: Bitmap,
+private fun recycleTryOnBaseAssets(held: TryOnBaseAssets?) {
+    held?.snapshot?.let { snap ->
+        if (snap.ownsWorkingBitmap &&
+            snap.workingBitmap !== held.decoded &&
+            !snap.workingBitmap.isRecycled
+        ) {
+            recycleQuietly(snap.workingBitmap)
+        }
+    }
+    recycleQuietly(held?.sampleMask)
+    recycleQuietly(held?.decoded)
+}
+
+/**
+ * Produz bitmap pintado a partir do cache de detecção/máscara.
+ * O bitmap devolvido é sempre uma cópia/pintura nova (ou a decoded se APPROXIMATE sem paint).
+ */
+private fun paintPreview(
+    assets: TryOnBaseAssets,
     polishColor: Color,
     pipeline: NailTryOnPipeline,
 ): TryOnPreviewData {
-    val result = pipeline.process(
-        image = bitmap,
-        polishColor = polishColor,
-        stabilize = false,
-    )
-    if (result != null && result.nails.isNotEmpty()) {
-        return TryOnPreviewData(
-            bitmap = result.bitmap,
-            anchors = emptyList(),
-            mode = TryOnMode.DETECTED,
-            nails = result.nails,
-            landmarks = result.landmarks,
-            showDebug = result.debugEnabled,
-        )
+    val sampleId = assets.sampleId
+    return if (sampleId != null) {
+        paintSamplePreview(assets, polishColor, sampleId)
+    } else {
+        paintUserPreview(assets, polishColor, pipeline)
     }
-    // Sem detecção confiável: overlay DEFAULT (mão aberta) — melhor que zero pintura.
-    val displayBitmap = result?.bitmap ?: bitmap
-    return TryOnPreviewData(
-        bitmap = displayBitmap,
-        anchors = NailOverlayAnchors.DEFAULT,
-        mode = TryOnMode.APPROXIMATE,
-        nails = result?.nails.orEmpty(),
-        landmarks = result?.landmarks,
-        showDebug = result?.debugEnabled == true,
-    )
 }
 
-private fun resolveSamplePreview(
-    context: android.content.Context,
-    bitmap: Bitmap,
+private fun paintSamplePreview(
+    assets: TryOnBaseAssets,
     polishColor: Color,
     sampleId: String,
 ): TryOnPreviewData {
-    if (NailOverlayAnchors.hasMaskAsset(sampleId)) {
-        val mask = PolishMaskRecolorer.loadMask(context, sampleId)
-        val recolored = mask?.let { PolishMaskRecolorer.recolor(bitmap, it, polishColor) }
-        if (mask != null && mask !== recolored && !mask.isRecycled) {
-            // loadMask devolve bitmap própria; recolor escala/copia — libera a máscara.
-            recycleQuietly(mask)
-        }
+    val mask = assets.sampleMask
+    if (mask != null) {
+        val recolored = PolishMaskRecolorer.recolor(assets.decoded, mask, polishColor)
         if (recolored != null) {
             return TryOnPreviewData(
                 bitmap = recolored,
@@ -280,11 +343,60 @@ private fun resolveSamplePreview(
             )
         }
     }
+    val display = ownedPreviewBitmap(
+        candidate = assets.decoded,
+        protected = listOf(assets.decoded),
+    )
     return TryOnPreviewData(
-        bitmap = bitmap,
+        bitmap = display,
         anchors = NailOverlayAnchors.forSample(sampleId),
         mode = TryOnMode.APPROXIMATE,
     )
+}
+
+private fun paintUserPreview(
+    assets: TryOnBaseAssets,
+    polishColor: Color,
+    pipeline: NailTryOnPipeline,
+): TryOnPreviewData {
+    val snapshot = assets.snapshot
+    if (snapshot != null && snapshot.nails.isNotEmpty()) {
+        val result = pipeline.recolor(snapshot, polishColor)
+        val painted = ownedPreviewBitmap(
+            candidate = result.bitmap,
+            protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
+        )
+        return TryOnPreviewData(
+            bitmap = painted,
+            anchors = emptyList(),
+            mode = TryOnMode.DETECTED,
+            nails = result.nails,
+            landmarks = result.landmarks,
+            showDebug = result.debugEnabled,
+        )
+    }
+    val displaySource = snapshot?.workingBitmap ?: assets.decoded
+    val display = ownedPreviewBitmap(
+        candidate = displaySource,
+        protected = listOfNotNull(snapshot?.workingBitmap, assets.decoded),
+    )
+    return TryOnPreviewData(
+        bitmap = display,
+        anchors = NailOverlayAnchors.DEFAULT,
+        mode = TryOnMode.APPROXIMATE,
+        nails = snapshot?.nails.orEmpty(),
+        landmarks = snapshot?.landmarks,
+        showDebug = pipeline.debugEnabled,
+    )
+}
+
+/** Garante bitmap que a UI pode reciclar sem tocar no cache de detecção. */
+private fun ownedPreviewBitmap(
+    candidate: Bitmap,
+    protected: List<Bitmap>,
+): Bitmap {
+    if (protected.none { it === candidate }) return candidate
+    return candidate.copy(Bitmap.Config.ARGB_8888, false) ?: candidate
 }
 
 private fun recycleQuietly(bitmap: Bitmap?) {

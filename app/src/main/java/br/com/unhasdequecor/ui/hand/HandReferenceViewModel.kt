@@ -180,8 +180,11 @@ class HandReferenceViewModel @Inject constructor(
     }
 
     fun discardPendingUserPhoto() {
-        _uiState.update {
-            it.copy(pendingUserPreviewPath = null, isSaving = false)
+        viewModelScope.launch {
+            fileStore.clearCaptureCache()
+            _uiState.update {
+                it.copy(pendingUserPreviewPath = null, isSaving = false)
+            }
         }
     }
 
@@ -221,6 +224,7 @@ class HandReferenceViewModel @Inject constructor(
                     }
                 }
                 is HandReferenceSaveOutcome.Rejected -> {
+                    fileStore.clearCaptureCache()
                     _uiState.update {
                         it.copy(
                             isSaving = false,
@@ -258,6 +262,7 @@ class HandReferenceViewModel @Inject constructor(
                 }
             }
             is HandReferenceSaveOutcome.Rejected -> {
+                fileStore.clearCaptureCache()
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -277,5 +282,10 @@ class HandReferenceViewModel @Inject constructor(
             "A foto é muito grande. Escolha uma imagem de até 15 MB."
         HandReferenceRejection.IO_ERROR ->
             "Não foi possível salvar a foto. Tente de novo."
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        fileStore.clearCaptureCacheNow()
     }
 }

@@ -9,7 +9,7 @@ import kotlin.math.pow
 
 /**
  * Aplica cor de esmalte só nos pixels da [NailMask], preservando luminância/brilho.
- * Reutiliza a mesma filosofia de [br.com.unhasdequecor.data.vision.nail.PolishMaskRecolorer].
+ * Núcleo de pixel compartilhado com [PolishMaskRecolorer.polishPixel].
  */
 @Singleton
 class NailColorApplier @Inject constructor() {

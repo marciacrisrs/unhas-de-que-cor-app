@@ -45,6 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -377,6 +379,7 @@ private fun SimilarColorsSection(
     primary: NailColor,
     similar: List<NailColor>,
 ) {
+    val names = (listOf(primary) + similar).joinToString { it.name }
     Text(
         text = "CORES PARECIDAS",
         style = MaterialTheme.typography.labelMedium,
@@ -385,7 +388,11 @@ private fun SimilarColorsSection(
     Spacer(modifier = Modifier.height(12.dp))
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        modifier = Modifier
+            .horizontalScroll(rememberScrollState())
+            .semantics {
+                contentDescription = "Cores parecidas (visualização): $names"
+            },
     ) {
         (listOf(primary) + similar).forEach { item ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -394,6 +401,7 @@ private fun SimilarColorsSection(
                     colorName = item.name,
                     width = 48.dp,
                     height = 72.dp,
+                    decorative = true,
                     modifier = Modifier.border(
                         width = if (item.id == primary.id) 2.dp else 0.dp,
                         color = MaterialTheme.colorScheme.primary,

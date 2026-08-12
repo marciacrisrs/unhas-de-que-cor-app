@@ -106,8 +106,13 @@ class HandReferenceFileStore @Inject constructor(
     }
 
     suspend fun clearCaptureCache() = withContext(ioDispatcher) {
+        clearCaptureCacheNow()
+    }
+
+    /** Limpeza síncrona para teardown de ViewModel (`onCleared`). */
+    fun clearCaptureCacheNow() {
         val cacheDir = File(context.cacheDir, CACHE_DIR)
-        if (!cacheDir.isDirectory) return@withContext
+        if (!cacheDir.isDirectory) return
         cacheDir.listFiles()?.forEach(::deleteQuietly)
     }
 

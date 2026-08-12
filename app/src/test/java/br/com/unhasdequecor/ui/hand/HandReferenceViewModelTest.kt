@@ -41,6 +41,7 @@ class HandReferenceViewModelTest {
     fun setUp() {
         coEvery { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         coEvery { fileStore.clearCaptureCache() } just runs
+        every { fileStore.clearCaptureCacheNow() } just runs
         // Espelha UnhasDeQueCorApp.onCreate → ensureDefaultHandReference.
         runBlocking { repository.ensureDefaultSample() }
     }

@@ -37,14 +37,6 @@ import br.com.unhasdequecor.ui.components.HistoryRowModel
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
-enum class HistoryScreenMode {
-    /** Aba Histórico: filtros Todas / Favoritas + banner de stats. */
-    FULL,
-
-    /** Aba Favoritos: só favoritas, sem tabs. */
-    FAVORITES_ONLY,
-}
-
 @Composable
 fun HistoryScreen(
     onOpenResult: (HistoryRowUi) -> Unit,

@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.scale
-import kotlin.math.pow
 
 /**
  * Recolore a região da máscara de unha como esmalte:
@@ -107,35 +106,15 @@ object PolishMaskRecolorer {
         tb: Int,
         meanNailLum: Float,
     ): Int {
-        val sr = channelRed(src)
-        val sg = channelGreen(src)
-        val sb = channelBlue(src)
-        val sa = channelAlpha(src)
-        val lum = luminance(sr, sg, sb)
-
-        val shade = (lum / meanNailLum).coerceIn(MIN_SHADE, MAX_SHADE)
-        var nr = (tr * shade).toInt().coerceIn(0, 255)
-        var ng = (tg * shade).toInt().coerceIn(0, 255)
-        var nb = (tb * shade).toInt().coerceIn(0, 255)
-
-        val specular = specularAmount(lum, meanNailLum)
-        if (specular > 0f) {
-            nr = mixChannel(nr, 255, specular)
-            ng = mixChannel(ng, 255, specular)
-            nb = mixChannel(nb, 255, specular)
-        }
-
-        val vivid = vividize(nr, ng, nb, tr, tg, tb, 0.18f)
-        nr = vivid[0]
-        ng = vivid[1]
-        nb = vivid[2]
-
-        val blend = coverage.pow(0.85f).coerceIn(0f, 1f)
-        return packArgb(
-            sa,
-            mixChannel(sr, nr, blend),
-            mixChannel(sg, ng, blend),
-            mixChannel(sb, nb, blend),
+        // Núcleo único com [NailColorApplier.transformPixel] (shade + specular + vivid).
+        val maskAlpha = (coverage * 255f).toInt().coerceIn(0, 255)
+        return NailColorApplier.transformPixel(
+            srcArgb = src,
+            maskAlpha = maskAlpha,
+            targetR = tr,
+            targetG = tg,
+            targetB = tb,
+            meanLum = meanNailLum,
         )
     }
 
@@ -158,37 +137,9 @@ object PolishMaskRecolorer {
         return (minOf(alpha, gray) / 255f).coerceIn(0f, 1f)
     }
 
-    private fun specularAmount(lum: Float, meanNailLum: Float): Float {
-        val absolute = ((lum - SPECULAR_LUMA_START) / SPECULAR_LUMA_RANGE).coerceIn(0f, 1f)
-        val relative = (((lum / meanNailLum) - 1.12f) / 0.55f).coerceIn(0f, 1f)
-        return maxOf(absolute, relative * 0.75f)
-    }
-
-    private fun vividize(
-        r: Int,
-        g: Int,
-        b: Int,
-        tr: Int,
-        tg: Int,
-        tb: Int,
-        amount: Float,
-    ): IntArray {
-        val mixedR = mixChannel(r, tr, amount * 0.35f)
-        val mixedG = mixChannel(g, tg, amount * 0.35f)
-        val mixedB = mixChannel(b, tb, amount * 0.35f)
-        return intArrayOf(mixedR, mixedG, mixedB)
-    }
-
-    private fun mixChannel(from: Int, to: Int, t: Float): Int =
-        (from + (to - from) * t).toInt().coerceIn(0, 255)
-
     private fun luminance(r: Int, g: Int, b: Int): Float =
         0.299f * r + 0.587f * g + 0.114f * b
 
     private const val MIN_COVERAGE = 0.08f
     private const val MAX_MASK_COVERAGE_RATIO = 0.18f
-    private const val MIN_SHADE = 0.42f
-    private const val MAX_SHADE = 1.65f
-    private const val SPECULAR_LUMA_START = 188f
-    private const val SPECULAR_LUMA_RANGE = 67f
 }

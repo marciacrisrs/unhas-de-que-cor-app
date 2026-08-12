@@ -6,11 +6,13 @@
         <include domain="database" path="unhas_de_que_cor.db-shm" />
         <include domain="database" path="unhas_de_que_cor.db-wal" />
         <include domain="file" path="datastore/" />
+        <exclude domain="file" path="hand_reference/" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="unhas_de_que_cor.db" />
         <include domain="database" path="unhas_de_que_cor.db-shm" />
         <include domain="database" path="unhas_de_que_cor.db-wal" />
         <include domain="file" path="datastore/" />
+        <exclude domain="file" path="hand_reference/" />
     </device-transfer>
 </data-extraction-rules>
