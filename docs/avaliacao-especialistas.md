@@ -4,26 +4,25 @@
 **Base inicial:** `master` @ `5a8663b`  
 **Fonte de verdade:** `.github/agents/*` + `.github/copilot-instructions.md`
 
-## Painel (pós follow-ups + UX #35)
+## Painel (pós follow-ups + UX #35 + vision #36)
 
 | Especialista | Veredito atualizado |
 |--------------|---------------------|
-| Android Engineer | Ressalvas P0 tratadas; UX #35 aprovada com ajustes P1 aplicados |
-| Architecture Reviewer | Ciclo data↔ui, higiene de telas e DIP tratados; `navigateHome` ok |
-| Test Engineer | Gate domain + app ≥80%; pipeline try-on + VM mão cobertos |
+| Android Engineer | Ressalvas P0 tratadas; overlay DEFAULT removido (#36) |
+| Architecture Reviewer | Ciclo data↔ui, higiene e DIP tratados; flash Home via SavedStateHandle |
+| Test Engineer | Gate domain/app ≥80%; flash Home + pipeline cobertos |
 | Quality Reviewer | QG Sonar bloqueante; recolor unificado |
-| Performance Reviewer | Recycle + detect/recolor separados |
-| Security Reviewer | Allowlist path; limpeza `hand_capture`; backup explícito; Sobre via HTTPS GitHub |
-| Accessibility Reviewer | Contraste/FilterTab/CD try-on tratados; Favoritos com Voltar |
-| UI Reviewer | AsyncContent + Favoritos + Home compacta + mark alinhado ao logo |
-| Documentation Reviewer | README/release/AGENTS/CHANGELOG + este painel |
+| Performance Reviewer | Recycle + detect/recolor; sem Canvas DEFAULT sem detecção |
+| Security Reviewer | Allowlist path; limpeza `hand_capture`; Sobre → GitHub HTTPS |
+| Accessibility Reviewer | Contraste/FilterTab; Favoritos Voltar; banner try-on refinado |
+| UI Reviewer | AsyncContent + Home compacta + mark alinhado ao logo |
+| Documentation Reviewer | README/release/AGENTS/CHANGELOG + painéis 12c/12d |
 | Release Manager | Docs + workflow AAB + bump; keystore/Console = Márcia |
 | CI/CD Reviewer | QG, artefatos JaCoCo, Release AAB → internal |
 
-**Síntese:** recomendações de código dos especialistas foram aplicadas. UX do PR #35
-avaliada por todos os agentes (sem Bloqueio); P1 de feedback e overflow da Home
-tratados no follow-up da mesma branch. Resta operação de loja (keystore + listing),
-fora do repositório.
+**Síntese:** recomendações de código dos especialistas foram aplicadas. UX (#35) e
+alinhamento do try-on (#36) reavaliados em 2026-08-12d. Resta operação de loja
+(keystore + listing), fora do repositório.
 
 ---
 
@@ -136,44 +135,65 @@ Inversion apontadas pelo Architecture Reviewer (ViewModels resolvendo dependênc
 
 ---
 
-## Follow-up UX (2026-08-12c) — avaliação conjunta PR #35
+## Follow-up UX+vision (2026-08-12d) — reavaliação conjunta
 
-Branch `cursor/ux-home-favoritos-sobre-535f`. Pedidos da Márcia avaliados por **todos** os
-especialistas em `.github/agents/*`.
+Reavaliação dos PRs abertos vs `origin/master`, contra `.github/agents/*` +
+`.github/copilot-instructions.md`:
 
-### Painel do PR
+- **#35** `cursor/ux-home-favoritos-sobre-535f` — Home / Favoritos / Sobre / logo / Minha mão  
+- **#36** `cursor/fix-nail-overlay-offset-535f` — esmalte longe das unhas (DEFAULT + bias)
+
+Sem overlap de arquivos entre os dois PRs.
+
+### Painel
 
 | Especialista | Veredito | Notas |
 |--------------|----------|-------|
-| Android Engineer | Ressalvas → tratadas | Home compacta; flash pós-mão na Home |
-| Architecture Reviewer | OK | `navigateHome` + `SavedStateHandle` flash; sem Nav no VM |
-| Test Engineer | Ressalvas | VM mão coberto; wiring Compose/nav sem teste (aceitável) |
-| Quality Reviewer | OK | detekt + unit; mark vetorial mais denso mas legível |
-| Performance Reviewer | OK | sem regressão |
-| Security Reviewer | OK | Sobre → GitHub HTTPS; e-mail fora do APK |
-| Accessibility Reviewer | Ressalvas → mitigadas | Voltar em Favoritos; scroll de segurança na Home |
-| UI Reviewer | Ressalvas → mitigadas | layout compacto; snackbar na Home após confirmar mão |
-| Documentation Reviewer | OK | `design/guia` + este painel; privacidade Play mantém e-mail |
-| Release Manager | OK | sem bump; `OUT_OF_REPO` intacto |
-| CI/CD Reviewer | OK | pipeline inalterada |
+| Android Engineer | Ressalvas | Overlay DEFAULT removido; `FACING_CENTER` unificado 0.82 |
+| Architecture Reviewer | Ressalvas | Flash `SavedStateHandle` correto; Result→mão → Home |
+| Test Engineer | Ressalvas | Flash Home coberto; paint paths try-on ainda privados |
+| Quality Reviewer | Ressalvas (#35 QG coverage) → alvo: testes HomeViewModel |
+| Performance Reviewer | OK | Menos Canvas sem detecção |
+| Security Reviewer | OK | Sobre → GitHub HTTPS |
+| Accessibility Reviewer | Ressalvas | Banner try-on: CD+texto; contraste semi-transparente |
+| UI Reviewer | Ressalvas | Pedidos UX atendidos; chrome Favoritos ≠ Histórico |
+| Documentation Reviewer | OK | Este painel |
+| Release Manager | Ressalvas | Sem bump; `OUT_OF_REPO` intacto |
+| CI/CD Reviewer | Ressalvas | #35 bloqueado por QG até coverage; pipeline ok |
 
-**Veredito global:** aprovável, **sem Bloqueio**.
+**Veredito global:** #36 aprovável (correção de alinhamento válida). #35 aprovável
+após `new_coverage` ≥ 80% (lacuna: ~6 linhas do `HomeViewModel` flash). Sem Bloqueio
+de produto no bug das ovais flutuantes.
 
-### Itens do pedido
+### PR #35 — UX
 
 | Pedido | Status |
 |--------|--------|
-| Sem rolagem na primeira página | Compactação (logo 64 / heroes 136); scroll só se altura insuficiente |
-| Favoritos com voltar | TopAppBar → Home |
-| Sobre: GitHub no lugar do e-mail | Feito + nota apontando contato da política Play |
-| Ajustar logo / esmalte vetorizado | `NailPolishMark` alinhado ao `logo-icone` |
-| Minha mão → Home após “OK, usar esta” | `navigateHome` + snackbar flash na Home |
+| Home compacta / scroll só se necessário | Feito |
+| Favoritos com Voltar | Feito |
+| Sobre: GitHub no lugar do e-mail | Feito + nota privacidade Play |
+| `NailPolishMark` ≈ logo oficial | Feito |
+| Minha mão → Home + feedback | Feito (`navigateHome` + flash) |
 
-### Backlog residual deste follow-up
+### PR #36 — vision
+
+| Mudança | Avaliação |
+|---------|-----------|
+| Sem landmarks → `anchors = emptyList()` (não DEFAULT) | Correto |
+| Status approximate-with-anchors vs não-detectada | Melhora textual |
+| Centro 0.58 / overshoot 0.02 / bias elipse +0.04 | Coerente |
+| `FACING_CENTER` mapper↔ROI | Unificado em 0.82 |
+
+### Backlog residual (pós 12d)
 
 | Pri | Item | Status |
 |-----|------|--------|
-| P2 | Chrome Favoritos (AppBar) vs Histórico (só header) | Aceito por pedido explícito de Voltar em Favoritos |
-| P3 | Teste de wiring nav Home flash / Favoritos back | Opcional |
+| P0 | Testes `HomeViewModel` flash p/ QG #35 | Em andamento |
+| P1 | Testes ramos `paintUserPreview` (extrair se preciso) | Aberto |
+| P1 | A11y banner try-on (semantics/contraste) | Aberto |
+| P2 | Smells HistoryScreen / HandReferenceEffects | Aberto |
+| P2 | `DetectedNailPolishApplier` unit tests | Aberto |
+| P2 | Result→mão: destino pós-save (Home vs Result) | Aberto |
+| P2 | Chrome Favoritos vs Histórico | Aceito / residual |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
-| — | A11y Scanner em device | **OUT_OF_REPO** / device |
+| — | A11y Scanner em device | **OUT_OF_REPO** |
