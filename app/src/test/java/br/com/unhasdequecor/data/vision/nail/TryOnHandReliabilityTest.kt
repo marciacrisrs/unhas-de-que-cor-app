@@ -7,8 +7,15 @@ class TryOnHandReliabilityTest {
 
     @Test
     fun classify_whenPresenceBelowAcceptFloor_isRejected() {
-        assertThat(TryOnHandReliability.classify(0.20f))
+        assertThat(TryOnHandReliability.classify(0.10f))
             .isEqualTo(TryOnReliability.REJECTED)
+    }
+
+    @Test
+    fun classify_whenPresenceWasPreviouslyRejectedFloor_isNowWeak() {
+        // Fotos reais com tip presence ~0.20 devem pintar (APPROXIMATE), não sumir.
+        assertThat(TryOnHandReliability.classify(0.20f))
+            .isEqualTo(TryOnReliability.WEAK)
     }
 
     @Test

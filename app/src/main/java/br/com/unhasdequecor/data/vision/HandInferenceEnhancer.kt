@@ -87,6 +87,26 @@ object HandInferenceEnhancer {
         }
     }
 
+    /**
+     * Clareia linearmente (pele retinta / flash desigual).
+     * [amount] em 0..1: quanto puxar cada canal em direção a 255.
+     */
+    fun liftBrightnessArgb(pixels: IntArray, amount: Float) {
+        require(amount in 0f..1f)
+        if (amount == 0f) return
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val a = p ushr ALPHA_SHIFT and BYTE_MASK
+            val r = p ushr RED_SHIFT and BYTE_MASK
+            val g = p ushr GREEN_SHIFT and BYTE_MASK
+            val b = p and BYTE_MASK
+            val nr = (r + (CHANNEL_MAX - r) * amount).toInt().coerceIn(0, CHANNEL_MAX)
+            val ng = (g + (CHANNEL_MAX - g) * amount).toInt().coerceIn(0, CHANNEL_MAX)
+            val nb = (b + (CHANNEL_MAX - b) * amount).toInt().coerceIn(0, CHANNEL_MAX)
+            pixels[i] = (a shl ALPHA_SHIFT) or (nr shl RED_SHIFT) or (ng shl GREEN_SHIFT) or nb
+        }
+    }
+
     fun luminance(argb: Int): Int {
         val r = argb ushr RED_SHIFT and BYTE_MASK
         val g = argb ushr GREEN_SHIFT and BYTE_MASK

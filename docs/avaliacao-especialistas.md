@@ -285,10 +285,14 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 
 | Regra | Comportamento |
 |-------|----------------|
-| `presenceScore` &lt; 0.28 | `REJECTED` → `detect` retorna `null` (sem claim) |
-| 0.28–0.55 | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” (mesmo com ≥3 máscaras) |
+| `presenceScore` &lt; 0.12 | `REJECTED` → `detect` retorna `null` (sem claim) |
+| 0.12–0.55 | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” (mesmo com ≥3 máscaras) |
 | ≥0.55 **e** ≥3 máscaras | `STRONG` + `FULL` → “Prévia na sua mão” |
 | Elipse / poucas máscaras | Nunca `FULL` — modo ≈ qualidade |
+
+Detecção (falsos negativos em fotos reais): escolhe a **melhor** variante MediaPipe
+(presence), não a primeira; variantes extras (stretch+gamma, brilho, rotação+espelho);
+mapper aceita ≥2 unhas plausíveis; limiar MediaPipe 0.08.
 
 ### Reavaliação especialistas (pós-PR #44) — melhorias aplicadas
 
