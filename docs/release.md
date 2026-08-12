@@ -48,6 +48,12 @@ Dispare **Actions → Release AAB → Run workflow**.
 
 Versão atual: `versionName 1.0.0` / `versionCode 1` (`app/build.gradle.kts`).
 
+No Windows, se o build falhar em `aapt2-…-windows.jar` com dependency verification, atualize o `gradle/verification-metadata.xml` (o CI Linux só gera o artefato linux por padrão). Use também `--no-configuration-cache` se o cache reclamar:
+
+```bash
+gradlew :app:bundleRelease --no-configuration-cache
+```
+
 ## 3. Play Console (ordem sugerida)
 
 1. Criar app + preencher [`play-listing.md`](play-listing.md)
