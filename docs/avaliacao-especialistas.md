@@ -101,7 +101,7 @@ Branch `cursor/especialistas-p2-higiene-535f`:
 | Unificar recolor | Feito — `polishPixel` → `NailColorApplier.transformPixel` |
 | Cache detect vs recolor | Feito — `detect`/`recolor` + prévia em 2 fases |
 | Limpeza `hand_capture` | Feito — discard/reject/`onCleared` |
-| Backup `hand_reference/` | Feito — exclude explícito + observe trata path órfão |
+| Backup `hand_reference/` | Feito — include-only (fora do backup) + observe trata path órfão |
 | `verify-metadata=true` | Feito |
 | Path CI `reports/coverage/` | Feito (já ausente no workflow) |
 | Cores parecidas não interativas | Feito — `NailSwatch(decorative)` + CD de seção |
