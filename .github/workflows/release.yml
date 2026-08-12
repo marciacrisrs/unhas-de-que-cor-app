@@ -100,7 +100,8 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
-          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0'
+          # NDK: strip + empacota native debug symbols (aviso Play / MediaPipe .so).
+          packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0 ndk;28.2.13676358'
 
       - name: Write local.properties
         run: echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > local.properties
@@ -126,6 +127,28 @@ jobs:
           name: app-release-aab-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
+
+      # MediaPipe/.so de terceiros costumam vir já stripped → zip pode não existir.
+      - name: Locate native debug symbols
+        id: native_symbols
+        run: |
+          set -euo pipefail
+          zip="app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip"
+          if [ -f "$zip" ]; then
+            echo "path=$zip" >> "$GITHUB_OUTPUT"
+            echo "Found $zip ($(wc -c < "$zip") bytes)"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "::warning::Sem native-debug-symbols.zip (deps .so já stripped, ex. MediaPipe). O aviso da Play pode continuar; mapping.txt (R8) cobre stack Kotlin/Java."
+          fi
+
+      - name: Upload native debug symbols artifact
+        if: ${{ steps.native_symbols.outputs.path != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: native-debug-symbols-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}
+          path: ${{ steps.native_symbols.outputs.path }}
+          if-no-files-found: ignore
 
       # Commit antes do upload: se a Play falhar, a versão já fica gravada e o próximo
       # run não reutiliza o mesmo versionCode.
@@ -157,6 +180,7 @@ jobs:
           status: ${{ env.PLAY_RELEASE_STATUS }}
           releaseName: ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})
           mappingFile: app/build/outputs/mapping/release/mapping.txt
+          debugSymbols: ${{ steps.native_symbols.outputs.path }}
           whatsNewDirectory: distribution/whatsnew
 
       - name: Scrub keystore
