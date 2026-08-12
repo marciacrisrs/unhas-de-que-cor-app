@@ -245,7 +245,7 @@ private fun previewStatusLabel(mode: TryOnMode?, isUserPhoto: Boolean): String =
     mode == TryOnMode.MASK -> "Prévia na mão de exemplo"
     mode == TryOnMode.DETECTED -> "Prévia na sua mão"
     mode == TryOnMode.APPROXIMATE && isUserPhoto ->
-        "Mão não detectada — unhas à mostra, boa luz, dedos abertos"
+        "Mão não detectada — frente à câmera, boa luz na mão (evite contraluz)"
     else -> "Prévia aproximada"
 }
 
@@ -256,7 +256,7 @@ private fun previewStatusLabel(
 ): String {
     val mode = data?.mode
     if (mode == TryOnMode.APPROXIMATE && isUserPhoto && data.anchors.isNotEmpty()) {
-        return "Prévia aproximada — posicione unhas à mostra e boa luz"
+        return "Prévia aproximada — unhas à mostra, luz na mão (evite contraluz)"
     }
     return previewStatusLabel(mode, isUserPhoto)
 }
