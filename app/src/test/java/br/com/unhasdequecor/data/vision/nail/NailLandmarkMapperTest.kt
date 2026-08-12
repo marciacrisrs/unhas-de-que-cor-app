@@ -35,10 +35,11 @@ class NailLandmarkMapperTest {
             imageHeight = 1200,
         )
         requireNotNull(anchors)
-        // Indicador: tip=8 (0.38,0.26), dip=7 (0.40,0.36) — centro mais perto da tip, sem passar.
+        // Indicador: tip=8 (0.38,0.26), dip=7 (0.40,0.36) — centro no meio proximal, sem passar da tip.
         val index = anchors[1]
         assertThat(index.centerY).isLessThan(0.36f)
-        assertThat(index.centerY).isAtLeast(0.26f)
+        assertThat(index.centerY).isGreaterThan(0.26f)
+        assertThat(index.centerY).isWithin(0.04f).of(0.30f)
         assertThat(index.centerX).isWithin(0.08f).of(0.39f)
     }
 
@@ -74,9 +75,10 @@ class NailLandmarkMapperTest {
             imageHeight = 1200,
         )
         assertThat(anchors).isNotNull()
-        // Centro colapsa na tip (y≈0.295), não no meio tip–dip.
+        // Facing: eixo tip–pip com centro proximal à tip (não no meio tip–dip).
         anchors!!.forEach { nail ->
-            assertThat(nail.centerY).isWithin(0.02f).of(0.295f)
+            assertThat(nail.centerY).isAtMost(0.34f)
+            assertThat(nail.centerY).isAtLeast(0.28f)
         }
     }
 

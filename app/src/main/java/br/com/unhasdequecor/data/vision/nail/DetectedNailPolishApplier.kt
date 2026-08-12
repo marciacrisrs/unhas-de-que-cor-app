@@ -13,11 +13,12 @@ import androidx.compose.ui.graphics.Color
  * (mesma lógica visual das amostras com máscara).
  */
 object DetectedNailPolishApplier {
-    private const val ELLIPSE_RX_FACTOR = 0.52f
-    private const val ELLIPSE_RY_FACTOR = 0.56f
+    private const val ELLIPSE_RX_FACTOR = 0.50f
+    private const val ELLIPSE_RY_FACTOR = 0.52f
     private const val MIN_RX = 4f
     private const val MIN_RY = 5f
-    private const val ELLIPSE_CENTER_Y_BIAS = -0.08f
+    /** Neutro: bias negativo empurrava o núcleo opaco além da ponta da unha. */
+    private const val ELLIPSE_CENTER_Y_BIAS = 0.04f
     private const val ELLIPSE_OPAQUE_STOP = 0.78f
 
     fun apply(

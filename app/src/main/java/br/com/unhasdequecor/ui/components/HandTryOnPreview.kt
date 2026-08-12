@@ -166,7 +166,7 @@ private fun TryOnPreviewFrame(
     modifier: Modifier,
 ) {
     val aspect = previewAspect(preview)
-    val statusLabel = previewStatusLabel(mode = preview?.mode, isUserPhoto = sampleId == null)
+    val statusLabel = previewStatusLabel(data = preview, isUserPhoto = sampleId == null)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -247,6 +247,18 @@ private fun previewStatusLabel(mode: TryOnMode?, isUserPhoto: Boolean): String =
     mode == TryOnMode.APPROXIMATE && isUserPhoto ->
         "Mão não detectada — unhas à mostra, boa luz, dedos abertos"
     else -> "Prévia aproximada"
+}
+
+/** Rótulo mais preciso quando há landmarks mas a pintura ainda é aproximada (Canvas). */
+private fun previewStatusLabel(
+    data: TryOnPreviewData?,
+    isUserPhoto: Boolean,
+): String {
+    val mode = data?.mode
+    if (mode == TryOnMode.APPROXIMATE && isUserPhoto && data.anchors.isNotEmpty()) {
+        return "Prévia aproximada — posicione unhas à mostra e boa luz"
+    }
+    return previewStatusLabel(mode, isUserPhoto)
 }
 
 private fun loadTryOnBaseAssets(
@@ -399,9 +411,10 @@ private fun paintUserPreview(
         candidate = displaySource,
         protected = listOfNotNull(snapshot?.workingBitmap, assets.decoded),
     )
+    // Sem landmarks: não pinta âncoras estáticas (DEFAULT) — elas ficam longe das unhas reais.
     return TryOnPreviewData(
         bitmap = display,
-        anchors = NailOverlayAnchors.DEFAULT,
+        anchors = emptyList(),
         mode = TryOnMode.APPROXIMATE,
         nails = snapshot?.nails.orEmpty(),
         landmarks = snapshot?.landmarks,
