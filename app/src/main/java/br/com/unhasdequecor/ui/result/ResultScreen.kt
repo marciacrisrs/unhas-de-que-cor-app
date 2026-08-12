@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.NailColor
 import br.com.unhasdequecor.ui.components.EmptyContent
@@ -96,6 +97,7 @@ fun ResultScreen(
                 ResultSuccessContent(
                     state = state,
                     recommendation = recommendation,
+                    nailTryOnPipeline = viewModel.nailTryOnPipeline,
                     onOpenHandReference = onOpenHandReference,
                     onToggleFavorite = viewModel::onToggleFavorite,
                     onRecommendAgain = viewModel::recommendAgain,
@@ -131,6 +133,7 @@ private fun ResultTopBar(onBack: () -> Unit) {
 private fun ResultSuccessContent(
     state: ResultUiState,
     recommendation: ColorRecommendation,
+    nailTryOnPipeline: NailTryOnPipeline,
     onOpenHandReference: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRecommendAgain: () -> Unit,
@@ -154,6 +157,7 @@ private fun ResultSuccessContent(
                 state = state,
                 color = color,
                 rationale = recommendation.rationale,
+                nailTryOnPipeline = nailTryOnPipeline,
                 onToggleFavorite = onToggleFavorite,
                 onOpenHandReference = onOpenHandReference,
             )
@@ -204,6 +208,7 @@ private fun ResultHeroCard(
     state: ResultUiState,
     color: NailColor,
     rationale: String,
+    nailTryOnPipeline: NailTryOnPipeline,
     onToggleFavorite: () -> Unit,
     onOpenHandReference: () -> Unit,
 ) {
@@ -217,6 +222,7 @@ private fun ResultHeroCard(
                 state = state,
                 polishColor = Color(color.hex),
                 colorName = color.name,
+                nailTryOnPipeline = nailTryOnPipeline,
                 onToggleFavorite = onToggleFavorite,
             )
             if (!state.hasHandReference || state.isSampleHand) {
@@ -274,6 +280,7 @@ private fun ResultHandPreview(
     state: ResultUiState,
     polishColor: Color,
     colorName: String,
+    nailTryOnPipeline: NailTryOnPipeline,
     onToggleFavorite: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -285,6 +292,7 @@ private fun ResultHandPreview(
                 polishColor = polishColor,
                 colorName = colorName,
                 sampleId = state.handSampleId.takeIf { state.isSampleHand },
+                nailPipeline = nailTryOnPipeline,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp),

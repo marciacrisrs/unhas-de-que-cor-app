@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +36,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
@@ -48,9 +46,7 @@ import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchors
 import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.data.vision.nail.PolishMaskRecolorer
-import br.com.unhasdequecor.di.NailPipelineEntryPoint
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
-import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -84,14 +80,13 @@ fun HandTryOnPreview(
     polishColor: Color,
     colorName: String,
     sampleId: String?,
+    nailPipeline: NailTryOnPipeline,
     modifier: Modifier = Modifier,
-    nailPipeline: NailTryOnPipeline? = null,
 ) {
     val context = LocalContext.current
-    val pipeline = rememberTryOnPipeline(context, nailPipeline)
-    val base by rememberTryOnBaseAssets(imagePath, revision, sampleId, pipeline, context)
+    val base by rememberTryOnBaseAssets(imagePath, revision, sampleId, nailPipeline, context)
     DisposeTryOnBaseAssets(base)
-    val preview by rememberPaintedPreview(base, polishColor, pipeline)
+    val preview by rememberPaintedPreview(base, polishColor, nailPipeline)
     DisposeTryOnPreview(preview)
     TryOnPreviewFrame(
         preview = preview,
@@ -100,19 +95,6 @@ fun HandTryOnPreview(
         sampleId = sampleId,
         modifier = modifier,
     )
-}
-
-@Composable
-private fun rememberTryOnPipeline(
-    context: Context,
-    nailPipeline: NailTryOnPipeline?,
-): NailTryOnPipeline = nailPipeline ?: remember(context) {
-    EntryPointAccessors.fromApplication(
-        context.applicationContext,
-        NailPipelineEntryPoint::class.java,
-    ).nailTryOnPipeline().also {
-        it.debugEnabled = BuildConfig.DEBUG && BuildConfig.DEBUG_NAIL_OVERLAY
-    }
 }
 
 @Composable

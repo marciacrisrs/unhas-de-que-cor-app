@@ -9,7 +9,7 @@
 | Especialista | Veredito atualizado |
 |--------------|---------------------|
 | Android Engineer | Ressalvas P0 tratadas |
-| Architecture Reviewer | Ciclo data↔ui e higiene de telas tratados |
+| Architecture Reviewer | Ciclo data↔ui, higiene de telas e DIP (EntryPoint/Context em ViewModel) tratados |
 | Test Engineer | Gate domain + app ≥80%; pipeline try-on coberto |
 | Quality Reviewer | QG Sonar bloqueante; recolor unificado |
 | Performance Reviewer | Recycle + detect/recolor separados |
@@ -105,3 +105,28 @@ Branch `cursor/especialistas-p2-higiene-535f`:
 | `verify-metadata=true` | Feito |
 | Path CI `reports/coverage/` | Feito (já ausente no workflow) |
 | Cores parecidas não interativas | Feito — `NailSwatch(decorative)` + CD de seção |
+
+---
+
+## Follow-up Architecture DIP (2026-08-12b)
+
+Branch `cursor/especialistas-completo-535f` — fecha as últimas violações de Dependency
+Inversion apontadas pelo Architecture Reviewer (ViewModels resolvendo dependências de
+`data`/`android.*` diretamente em vez de receber via construtor/domínio):
+
+| Item | Status |
+|------|--------|
+| `HandTryOnPreview` resolvia `NailTryOnPipeline` via `EntryPointAccessors` (Hilt EntryPoint) dentro do Composable | Feito — `NailPipelineEntryPoint` removido; `ResultViewModel` injeta `NailTryOnPipeline` via `@Inject constructor` e repassa como parâmetro (`ResultScreen` → `HandTryOnPreview(nailPipeline = ...)`) |
+| `HandReferenceViewModel` dependia de `@ApplicationContext Context` + `HandReferenceFileStore` (I/O de arquivo/`ContentResolver` direto na camada de apresentação) | Feito — `HandReferenceRepository` ganhou `stageFromContentUri`/`stageSampleAsset`/`createCameraCapturePath`/`clearStagingCache`/`clearStagingCacheNow` (paths como `String`, sem `Uri`/`Context` no domínio); `HandReferenceViewModel` agora só depende de use cases + `HandReferenceRepository` |
+| `save()` duplicava limpeza do cache de staging em cada call site do ViewModel | Feito — `HandReferenceRepositoryImpl.save()` limpa o cache de staging uma única vez, tanto em `Saved` quanto em `Rejected` |
+| Cobertura dos casos de erro do `ResultViewModel` (`generateAndSave` falhando, `restoreRecommendation` retornando null) | Feito — novos testes em `ResultViewModelTest` |
+| Cobertura de `HandReferenceRepositoryImpl` (arquivo órfão no `observe()`, limpeza de staging no `save()`) | Feito — `HandReferenceRepositoryImplTest` novo em `data/repository/` |
+| Licença das fontes bundladas (Playfair/Poppins) | Feito — `app/src/main/assets/font/OFL.txt` (SIL OFL 1.1); `res/font/` só aceita `.ttf/.otf/.ttc/.xml`, por isso o pointer de licença vive em `assets/` |
+| KDoc em interfaces de repositório sem documentação | Feito — `HandReferenceRepository`, `HistoryRepository`, `ColorCatalogRepository` |
+| Tela "Sobre" (About) | Feito — `ui/about/AboutScreen.kt` + rota; entrada no Perfil |
+| Máscaras de amostra (3 faltantes) | Feito — PNG em `hand_nail_masks/` para todas as 5 amostras |
+
+**Fora do repositório (`OUT_OF_REPO`, operação de loja/infra — não resolvível em código):**
+
+- Keystore de upload assinado nos secrets do CI (`RELEASE_*`/`ANDROID_*`), para gerar AAB de release assinado fora do debug-signing fallback.
+- Publicação/atualização do listing na Google Play Console (screenshots, descrição, política de privacidade hospedada) — conteúdo já preparado em `docs/play-listing.md`/`docs/privacy-policy.md`.
