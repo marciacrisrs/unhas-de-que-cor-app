@@ -7,13 +7,15 @@ import br.com.unhasdequecor.data.vision.HandLandmarks
  *
  * MediaPipe pode devolver landmarks fracos (limiar baixo / contraluz).
  * Esta camada evita rotular elipse frágil como “Prévia na sua mão”.
+ *
+ * Pisos numéricos: [DetectionConfidenceFloor].
  */
 enum class TryOnReliability {
     /** Descartar — tratar como mão não detectada. */
     REJECTED,
     /** Landmarks usable só como prévia aproximada. */
     WEAK,
-    /** Presence forte — claim FULL só se também houver máscaras suficientes. */
+    /** Presence forte — claim FULL só se também houver máscaras de qualidade. */
     STRONG,
 }
 
@@ -34,13 +36,9 @@ data class UserTryOnRenderPlan(
 )
 
 object TryOnHandReliability {
-    /** Abaixo disso: ruído típico — descartar. Alinhado ao limiar MediaPipe (~0.08). */
-    const val MIN_PRESENCE_ACCEPT = 0.12f
-
-    /** Acima disso: claim FULL permitido (com ≥ [MIN_MASKS_FOR_FULL] máscaras). */
-    const val MIN_PRESENCE_STRONG = 0.55f
-
-    const val MIN_MASKS_FOR_FULL = 3
+    const val MIN_PRESENCE_ACCEPT = DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT
+    const val MIN_PRESENCE_STRONG = DetectionConfidenceFloor.HAND_PRESENCE_STRONG
+    const val MIN_MASKS_FOR_FULL = DetectionConfidenceFloor.MIN_MASKS_FOR_FULL
 
     /**
      * Classifica só por presence. Máscaras **não** elevam para STRONG —
@@ -48,8 +46,12 @@ object TryOnHandReliability {
      */
     fun classify(presenceScore: Float): TryOnReliability {
         val score = presenceScore.coerceIn(0f, 1f)
-        if (score < MIN_PRESENCE_ACCEPT) return TryOnReliability.REJECTED
-        if (score >= MIN_PRESENCE_STRONG) return TryOnReliability.STRONG
+        if (!DetectionConfidenceFloor.acceptsHandPresence(score)) {
+            return TryOnReliability.REJECTED
+        }
+        if (DetectionConfidenceFloor.isStrongHandPresence(score)) {
+            return TryOnReliability.STRONG
+        }
         return TryOnReliability.WEAK
     }
 
@@ -58,18 +60,23 @@ object TryOnHandReliability {
 
     /**
      * Plano de renderização honesto (modo ≡ qualidade).
-     * FULL exige STRONG **e** ≥ [MIN_MASKS_FOR_FULL] máscaras. Elipse sozinha nunca é FULL.
+     * FULL exige STRONG **e** ≥ [MIN_MASKS_FOR_FULL] unhas com confiança ≥ [DetectionConfidenceFloor.NAIL_FULL_MIN].
+     * Elipse sozinha nunca é FULL.
+     *
+     * @param paintableNailCount unhas ≥ [DetectionConfidenceFloor.NAIL_COMBINED_MIN]
+     * @param fullQualityNailCount unhas ≥ [DetectionConfidenceFloor.NAIL_FULL_MIN]
      */
     fun planRender(
         reliability: TryOnReliability?,
-        nailCount: Int,
+        paintableNailCount: Int,
         hasMappableAnchors: Boolean,
+        fullQualityNailCount: Int = paintableNailCount,
     ): UserTryOnRenderPlan {
         if (reliability == null || reliability == TryOnReliability.REJECTED) {
             return nonePlan()
         }
-        val masksOk = nailCount >= MIN_MASKS_FOR_FULL
-        val anyMask = nailCount > 0
+        val masksOk = fullQualityNailCount >= MIN_MASKS_FOR_FULL
+        val anyMask = paintableNailCount > 0
         return when (reliability) {
             TryOnReliability.STRONG -> when {
                 masksOk -> UserTryOnRenderPlan(
@@ -104,6 +111,17 @@ object TryOnHandReliability {
             TryOnReliability.REJECTED -> error("handled above")
         }
     }
+
+    fun planRender(
+        reliability: TryOnReliability?,
+        nails: List<DetectedNail>,
+        hasMappableAnchors: Boolean,
+    ): UserTryOnRenderPlan = planRender(
+        reliability = reliability,
+        paintableNailCount = DetectionConfidenceFloor.countPaintable(nails),
+        hasMappableAnchors = hasMappableAnchors,
+        fullQualityNailCount = DetectionConfidenceFloor.countFullQuality(nails),
+    )
 
     private fun nonePlan() = UserTryOnRenderPlan(
         mode = UserTryOnRenderMode.NONE,

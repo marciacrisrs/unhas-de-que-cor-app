@@ -13,7 +13,6 @@ class TryOnHandReliabilityTest {
 
     @Test
     fun classify_whenPresenceWasPreviouslyRejectedFloor_isNowWeak() {
-        // Fotos reais com tip presence ~0.20 devem pintar (APPROXIMATE), não sumir.
         assertThat(TryOnHandReliability.classify(0.20f))
             .isEqualTo(TryOnReliability.WEAK)
     }
@@ -47,7 +46,7 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.REJECTED,
-                nailCount = 5,
+                paintableNailCount = 5,
                 hasMappableAnchors = true,
             )
 
@@ -62,7 +61,7 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = null,
-                nailCount = 0,
+                paintableNailCount = 0,
                 hasMappableAnchors = false,
             )
 
@@ -74,8 +73,9 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.WEAK,
-                nailCount = 5,
+                paintableNailCount = 5,
                 hasMappableAnchors = true,
+                fullQualityNailCount = 5,
             )
 
         assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.APPROXIMATE)
@@ -87,7 +87,7 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.WEAK,
-                nailCount = 0,
+                paintableNailCount = 0,
                 hasMappableAnchors = false,
             )
 
@@ -96,12 +96,13 @@ class TryOnHandReliabilityTest {
     }
 
     @Test
-    fun planRender_whenStrongWithEnoughMasks_isFull() {
+    fun planRender_whenStrongWithEnoughFullQualityMasks_isFull() {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.STRONG,
-                nailCount = TryOnHandReliability.MIN_MASKS_FOR_FULL,
+                paintableNailCount = TryOnHandReliability.MIN_MASKS_FOR_FULL,
                 hasMappableAnchors = true,
+                fullQualityNailCount = TryOnHandReliability.MIN_MASKS_FOR_FULL,
             )
 
         assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.FULL)
@@ -110,11 +111,26 @@ class TryOnHandReliabilityTest {
     }
 
     @Test
+    fun planRender_whenStrongButOnlyWeakMasks_isApproximateNotFull() {
+        // 5 paintable below FULL floor → não claim “Prévia na sua mão”.
+        val plan =
+            TryOnHandReliability.planRender(
+                reliability = TryOnReliability.STRONG,
+                paintableNailCount = 5,
+                hasMappableAnchors = true,
+                fullQualityNailCount = 1,
+            )
+
+        assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.APPROXIMATE)
+        assertThat(plan.useNailMasks).isTrue()
+    }
+
+    @Test
     fun planRender_whenStrongWithoutMasks_ellipseIsApproximateNotFull() {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.STRONG,
-                nailCount = 0,
+                paintableNailCount = 0,
                 hasMappableAnchors = true,
             )
 
@@ -129,7 +145,7 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.STRONG,
-                nailCount = 0,
+                paintableNailCount = 0,
                 hasMappableAnchors = false,
             )
 
@@ -141,8 +157,9 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.STRONG,
-                nailCount = 2,
+                paintableNailCount = 2,
                 hasMappableAnchors = false,
+                fullQualityNailCount = 2,
             )
 
         assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.APPROXIMATE)
@@ -154,13 +171,22 @@ class TryOnHandReliabilityTest {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = null,
-                nailCount = 0,
+                paintableNailCount = 0,
                 hasMappableAnchors = false,
             )
-        // Contrato: sem detecção → zero paint / zero Canvas (UI não deve usar DEFAULT).
         assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.NONE)
         assertThat(plan.useEllipsePaint).isFalse()
         assertThat(plan.useCanvasAnchors).isFalse()
         assertThat(plan.useNailMasks).isFalse()
+    }
+
+    @Test
+    fun presenceAliases_matchDetectionConfidenceFloor() {
+        assertThat(TryOnHandReliability.MIN_PRESENCE_ACCEPT)
+            .isEqualTo(DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT)
+        assertThat(TryOnHandReliability.MIN_PRESENCE_STRONG)
+            .isEqualTo(DetectionConfidenceFloor.HAND_PRESENCE_STRONG)
+        assertThat(NailColorApplier.MIN_CONFIDENCE)
+            .isEqualTo(DetectionConfidenceFloor.NAIL_COMBINED_MIN)
     }
 }

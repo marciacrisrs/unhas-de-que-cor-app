@@ -19,12 +19,12 @@
 | Documentation Reviewer | Aprovado c/ ressalvas (CHANGELOG 1.0.5 aberto) |
 | Release Manager | Aprovado c/ ressalvas — smoke device antes de ampliar loja |
 | CI/CD Reviewer | Aprovado — Verify master verde pós-#42 |
-| Vision Try-On Reviewer | Aprovado c/ ressalvas (falha honesta; falta floor confiança) |
+| Vision Try-On Reviewer | Aprovado c/ ressalvas (falha honesta; floor confiança → `DetectionConfidenceFloor`) |
 
 **Síntese:** master @ `f23cec0` (1.0.5 / 6) com try-on mais resiliente (#41),
 QG Sonar recuperado (#42) e símbolos nativos instrumentados (#40). Aprovado com
-ressalvas para teste interno — **smoke em device** e piso de confiança ainda
-pendentes. Reavaliação **2026-08-12f**.
+ressalvas para teste interno — **smoke em device** ainda pendente; piso de
+confiança unificado em `DetectionConfidenceFloor`. Reavaliação **2026-08-12f**.
 
 ---
 
@@ -277,6 +277,23 @@ de paint path; constantes mágicas sem ground-truth.
 | P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Feito (`NailPlateCalibration` + testes) |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
 | — | A11y Scanner + smoke try-on em device | **OUT_OF_REPO** |
+
+---
+
+## Implementação — Floor de confiança da detecção
+
+`DetectionConfidenceFloor` centraliza limiares (mão + unha):
+
+| Piso | Valor | Uso |
+|------|-------|-----|
+| `MEDIAPIPE_MIN` | 0.08 | Hand Landmarker |
+| `HAND_PRESENCE_ACCEPT` | 0.12 | Aceitar mão / variantes |
+| `HAND_PRESENCE_STRONG` | 0.55 | Eligibility FULL |
+| `ROI_GEOMETRIC_MIN` | 0.24 | ROI → segmentar |
+| `NAIL_COMBINED_MIN` | 0.32 | Pintar / contar máscara |
+| `NAIL_FULL_MIN` | 0.45 | Contar para “Prévia na sua mão” |
+
+FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas → APPROXIMATE).
 
 ---
 
