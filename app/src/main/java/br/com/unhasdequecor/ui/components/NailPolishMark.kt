@@ -13,7 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -29,8 +32,8 @@ import br.com.unhasdequecor.ui.theme.BrandAction
 import br.com.unhasdequecor.ui.theme.BrandFun
 
 /**
- * Mark compacto para toolbars/listas: frasco + anel quebrado + sparkles em chip circular.
- * O lockup oficial completo fica em [BrandLogoLockup] / [BrandHeader] (Home/Perfil).
+ * Mark compacto alinhado ao [logo_mark] oficial: tampa alta, corpo bulboso,
+ * anel com aberturas e sparkles. Tintável via [polishColor] (inspiração / resultado).
  */
 @Composable
 fun NailPolishMark(
@@ -69,78 +72,119 @@ fun NailPolishMark(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawTintedPolishMark(polishColor = resolvedPolish, outline = outline)
+            drawOfficialPolishMark(polishColor = resolvedPolish, outline = outline)
         }
     }
 }
 
-private fun DrawScope.drawTintedPolishMark(
+private fun DrawScope.drawOfficialPolishMark(
     polishColor: Color,
     outline: Color,
 ) {
-    val stroke = Stroke(width = size.minDimension * 0.04f, cap = StrokeCap.Round)
+    val strokeWidth = size.minDimension * 0.035f
+    val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
     val cx = size.width / 2f
     val cy = size.height / 2f
-    val radius = size.minDimension * 0.42f
+    val radius = size.minDimension * 0.40f
     val ring = Brush.sweepGradient(listOf(BrandFun, BrandAction, BrandFun))
-    val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+    val arcSize = Size(radius * 2f, radius * 2f)
     val topLeft = Offset(cx - radius, cy - radius)
 
+    // Anel incompleto (aberturas no topo-direita e base-esquerda), como no logo_icone.
     drawArc(
         brush = ring,
-        startAngle = -35f,
-        sweepAngle = 250f,
+        startAngle = -20f,
+        sweepAngle = 195f,
         useCenter = false,
         topLeft = topLeft,
         size = arcSize,
         style = stroke,
     )
     drawArc(
-        color = outline.copy(alpha = 0.45f),
-        startAngle = 230f,
-        sweepAngle = 50f,
+        color = outline.copy(alpha = 0.55f),
+        startAngle = 200f,
+        sweepAngle = 95f,
         useCenter = false,
         topLeft = topLeft,
         size = arcSize,
         style = stroke,
     )
-
-    val bottleTop = cy - radius * 0.55f
-    val bottleBottom = cy + radius * 0.52f
-    val bottleHalf = radius * 0.28f
-    val bottlePath = Path().apply {
-        moveTo(cx - bottleHalf * 0.55f, bottleTop)
-        lineTo(cx + bottleHalf * 0.55f, bottleTop)
-        lineTo(cx + bottleHalf * 0.7f, bottleTop + radius * 0.2f)
-        lineTo(cx + bottleHalf, bottleTop + radius * 0.28f)
-        lineTo(cx + bottleHalf, bottleBottom)
-        quadraticTo(cx, bottleBottom + radius * 0.12f, cx - bottleHalf, bottleBottom)
-        lineTo(cx - bottleHalf, bottleTop + radius * 0.28f)
-        lineTo(cx - bottleHalf * 0.7f, bottleTop + radius * 0.2f)
-        close()
-    }
-    drawPath(
-        path = bottlePath,
-        brush = Brush.verticalGradient(
-            colors = listOf(polishColor.copy(alpha = 0.55f), polishColor),
-            startY = bottleTop,
-            endY = bottleBottom,
+    // Ponto decorativo perto da abertura superior.
+    drawCircle(
+        color = outline.copy(alpha = 0.7f),
+        radius = strokeWidth * 0.85f,
+        center = Offset(
+            cx + radius * kotlin.math.cos(Math.toRadians(-28.0)).toFloat(),
+            cy + radius * kotlin.math.sin(Math.toRadians(-28.0)).toFloat(),
         ),
     )
-    drawPath(path = bottlePath, color = outline, style = stroke)
-    drawMarkSparkles(cx = cx, cy = cy, radius = radius)
+
+    val bottle = officialBottlePath(cx = cx, cy = cy, radius = radius)
+    val fillTop = cy + radius * 0.02f
+    val fillBottom = cy + radius * 0.58f
+    drawPath(
+        path = bottle,
+        brush = Brush.verticalGradient(
+            colors = listOf(polishColor.copy(alpha = 0.35f), polishColor),
+            startY = fillTop,
+            endY = fillBottom,
+        ),
+    )
+    drawPath(path = bottle, color = outline, style = stroke)
+    drawOfficialSparkles(cx = cx, cy = cy, radius = radius, color = outline.copy(alpha = 0.85f))
 }
 
-private fun DrawScope.drawMarkSparkles(
+private fun officialBottlePath(cx: Float, cy: Float, radius: Float): Path {
+    val capHalf = radius * 0.18f
+    val capTop = cy - radius * 0.62f
+    val capBottom = cy - radius * 0.28f
+    val neckY = cy - radius * 0.18f
+    val shoulderY = cy - radius * 0.05f
+    val bodyBottom = cy + radius * 0.55f
+    val bodyHalf = radius * 0.34f
+    val shoulderHalf = radius * 0.26f
+
+    return Path().apply {
+        // Tampa alta retangular (logo oficial).
+        addRoundRect(
+            RoundRect(
+                left = cx - capHalf,
+                top = capTop,
+                right = cx + capHalf,
+                bottom = capBottom,
+                cornerRadius = CornerRadius(capHalf * 0.35f, capHalf * 0.35f),
+            ),
+        )
+        // Pescoço curto.
+        moveTo(cx - capHalf * 0.7f, capBottom)
+        lineTo(cx + capHalf * 0.7f, capBottom)
+        lineTo(cx + capHalf * 0.55f, neckY)
+        lineTo(cx - capHalf * 0.55f, neckY)
+        close()
+        // Corpo bulboso.
+        moveTo(cx - shoulderHalf, neckY)
+        lineTo(cx + shoulderHalf, neckY)
+        quadraticTo(cx + bodyHalf, shoulderY, cx + bodyHalf, cy + radius * 0.15f)
+        quadraticTo(cx + bodyHalf * 0.95f, bodyBottom, cx, bodyBottom)
+        quadraticTo(cx - bodyHalf * 0.95f, bodyBottom, cx - bodyHalf, cy + radius * 0.15f)
+        quadraticTo(cx - bodyHalf, shoulderY, cx - shoulderHalf, neckY)
+        close()
+    }
+}
+
+private fun DrawScope.drawOfficialSparkles(
     cx: Float,
     cy: Float,
     radius: Float,
+    color: Color,
 ) {
     listOf(
-        Offset(cx + radius * 0.55f, cy - radius * 0.35f) to radius * 0.11f,
-        Offset(cx - radius * 0.58f, cy + radius * 0.08f) to radius * 0.08f,
-        Offset(cx + radius * 0.18f, cy + radius * 0.52f) to radius * 0.07f,
-        Offset(cx - radius * 0.18f, cy - radius * 0.52f) to radius * 0.06f,
+        Offset(cx + radius * 0.52f, cy - radius * 0.42f) to radius * 0.10f,
+        Offset(cx - radius * 0.55f, cy - radius * 0.22f) to radius * 0.08f,
+        Offset(cx + radius * 0.58f, cy + radius * 0.12f) to radius * 0.07f,
+        Offset(cx - radius * 0.48f, cy + radius * 0.28f) to radius * 0.09f,
+        Offset(cx + radius * 0.22f, cy + radius * 0.52f) to radius * 0.06f,
+        Offset(cx - radius * 0.12f, cy - radius * 0.55f) to radius * 0.05f,
     ).forEach { (center, s) ->
         val sparklePath = Path().apply {
             moveTo(center.x, center.y - s)
@@ -153,6 +197,6 @@ private fun DrawScope.drawMarkSparkles(
             lineTo(center.x - s * 0.22f, center.y - s * 0.22f)
             close()
         }
-        drawPath(path = sparklePath, color = BrandFun)
+        drawPath(path = sparklePath, color = color)
     }
 }

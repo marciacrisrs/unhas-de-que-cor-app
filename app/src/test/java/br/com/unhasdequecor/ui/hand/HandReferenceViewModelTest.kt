@@ -59,7 +59,8 @@ class HandReferenceViewModelTest {
 
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.USER)
         assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
-        assertThat(viewModel.uiState.value.message).contains("sucesso")
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
+        assertThat(viewModel.uiState.value.homeFlashMessage).contains("sucesso")
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
     }
 
@@ -93,7 +94,8 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.reference?.sampleId).isEqualTo("retinta_vinho")
         assertThat(viewModel.uiState.value.isSample).isTrue()
         assertThat(viewModel.uiState.value.sampleTitle).isEqualTo("Pele retinta")
-        assertThat(viewModel.uiState.value.message).contains("Pele retinta")
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
+        assertThat(viewModel.uiState.value.homeFlashMessage).contains("Pele retinta")
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
     }
 
@@ -173,12 +175,30 @@ class HandReferenceViewModelTest {
     }
 
     @Test
-    fun `consumeMessage clears snackbar text`() = runTest {
+    fun `consumeNavigateHome clears home navigation flag`() = runTest {
         repository.nextOutcome = HandReferenceSaveOutcome.Saved(
             HandReference("/files/hand.jpg", 1L),
         )
         val viewModel = viewModel()
         viewModel.importFromCameraCapture(File("/tmp/ok.jpg"))
+        advanceUntilIdle()
+        viewModel.confirmPendingUserPhoto()
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
+
+        viewModel.consumeNavigateHome()
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.navigateHome).isFalse()
+    }
+
+    @Test
+    fun `consumeMessage clears snackbar text`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        repository.reject(HandReferenceRejection.IO_ERROR)
+
+        viewModel.importFromCameraCapture(File("/tmp/bad.jpg"))
         advanceUntilIdle()
         viewModel.confirmPendingUserPhoto()
         advanceUntilIdle()
