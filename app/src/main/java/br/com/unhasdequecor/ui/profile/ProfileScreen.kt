@@ -55,7 +55,7 @@ fun ProfileScreen(
             .padding(20.dp),
     ) {
         Spacer(modifier = Modifier.height(12.dp))
-        BrandLogoLockup()
+        BrandLogoLockup(height = 96.dp)
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "Perfil",

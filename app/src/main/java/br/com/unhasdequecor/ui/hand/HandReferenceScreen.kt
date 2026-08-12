@@ -27,6 +27,7 @@ import java.io.File
 @Composable
 fun HandReferenceScreen(
     onBack: () -> Unit,
+    onHandSelected: () -> Unit = onBack,
     viewModel: HandReferenceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -34,6 +35,19 @@ fun HandReferenceScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
     var cameraPermissionDenied by remember { mutableStateOf(false) }
+
+    HandReferenceMessageEffects(
+        message = state.message,
+        navigateHome = state.navigateHome,
+        cameraPermissionDenied = cameraPermissionDenied,
+        snackbarHostState = snackbarHostState,
+        onMessageConsumed = viewModel::consumeMessage,
+        onNavigateHomeConsumed = {
+            viewModel.consumeNavigateHome()
+            onHandSelected()
+        },
+        onPermissionDeniedConsumed = { cameraPermissionDenied = false },
+    )
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -96,14 +110,6 @@ fun HandReferenceScreen(
             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
         )
     }
-
-    HandReferenceMessageEffects(
-        message = state.message,
-        cameraPermissionDenied = cameraPermissionDenied,
-        snackbarHostState = snackbarHostState,
-        onMessageConsumed = viewModel::consumeMessage,
-        onPermissionDeniedConsumed = { cameraPermissionDenied = false },
-    )
 
     if (state.showReplaceSheet) {
         ReplaceHandSheet(

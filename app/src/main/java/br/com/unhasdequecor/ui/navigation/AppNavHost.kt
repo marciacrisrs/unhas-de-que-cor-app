@@ -98,7 +98,12 @@ fun AppNavHost() {
                 StyleScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.HAND_REFERENCE) {
-                HandReferenceScreen(onBack = { navController.popBackStack() })
+                HandReferenceScreen(
+                    onBack = { navController.popBackStack() },
+                    onHandSelected = {
+                        navController.popBackStack(Routes.HOME, inclusive = false)
+                    },
+                )
             }
             composable(
                 route = Routes.RESULT,
@@ -128,6 +133,15 @@ fun AppNavHost() {
                 HistoryScreen(
                     onOpenResult = ::openResultFromHistory,
                     mode = HistoryScreenMode.FAVORITES_ONLY,
+                    onBack = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
             composable(Routes.PROFILE) {

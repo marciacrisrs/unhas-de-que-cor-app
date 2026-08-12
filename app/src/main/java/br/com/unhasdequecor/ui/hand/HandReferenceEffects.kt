@@ -7,11 +7,18 @@ import androidx.compose.runtime.LaunchedEffect
 @Composable
 internal fun HandReferenceMessageEffects(
     message: String?,
+    navigateHome: Boolean,
     cameraPermissionDenied: Boolean,
     snackbarHostState: SnackbarHostState,
     onMessageConsumed: () -> Unit,
+    onNavigateHomeConsumed: () -> Unit,
     onPermissionDeniedConsumed: () -> Unit,
 ) {
+    LaunchedEffect(navigateHome) {
+        if (navigateHome) {
+            onNavigateHomeConsumed()
+        }
+    }
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(text)

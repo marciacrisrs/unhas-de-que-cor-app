@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -47,9 +45,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.domain.model.HistoryEntry
 import br.com.unhasdequecor.ui.components.BrandHeader
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.theme.RecommendationCardShape
@@ -80,17 +80,15 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 20.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .alpha(alpha),
     ) {
-        BrandHeader()
-        Spacer(modifier = Modifier.height(28.dp))
+        BrandHeader(lockupHeight = 64.dp)
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Duas CTAs hero — estrutura das imagens guia
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             HeroActionCard(
                 title = "Escolher minha cor",
@@ -111,7 +109,7 @@ fun HomeScreen(
         }
 
         state.inspiration?.let { inspiration ->
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             InspirationCard(
                 title = inspiration.name,
                 subtitle = inspiration.description,
@@ -120,16 +118,16 @@ fun HomeScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "CONTINUE EXPLORANDO",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ExploreTile("Por contexto", Icons.Outlined.Event, onChooseByContext, Modifier.weight(1f))
             ExploreTile("Estilo", Icons.Outlined.Checkroom, onOpenStyle, Modifier.weight(1f))
@@ -138,7 +136,7 @@ fun HomeScreen(
         }
 
         if (state.showHandInvite) {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             HandReferenceInviteCard(
                 isSampleHand = state.isSampleHand,
                 onClick = onOpenHandReference,
@@ -146,51 +144,64 @@ fun HomeScreen(
         }
 
         if (state.recentColors.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(28.dp))
-            Surface(
-                shape = SoftSurfaceShape,
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenHistory)
-                    .semantics {
-                        role = Role.Button
-                        contentDescription = "Ver suas últimas escolhas"
-                    },
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Suas últimas escolhas",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(
-                            text = "Veja e inspire-se novamente.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(-RecentSwatchOverlap)) {
-                        state.recentColors.forEach { entry ->
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(entry.colorHex))
-                                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                                    .semantics {
-                                        contentDescription = "Cor recente ${entry.colorName}"
-                                    },
-                            )
-                        }
-                    }
+            Spacer(modifier = Modifier.height(10.dp))
+            RecentChoicesCard(
+                recentColors = state.recentColors,
+                onOpenHistory = onOpenHistory,
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun RecentChoicesCard(
+    recentColors: List<br.com.unhasdequecor.domain.model.HistoryEntry>,
+    onOpenHistory: () -> Unit,
+) {
+    Surface(
+        shape = SoftSurfaceShape,
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenHistory)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Ver suas últimas escolhas"
+            },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Suas últimas escolhas",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = "Veja e inspire-se novamente.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(-RecentSwatchOverlap)) {
+                recentColors.forEach { entry ->
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(Color(entry.colorHex))
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                            .semantics {
+                                contentDescription = "Cor recente ${entry.colorName}"
+                            },
+                    )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(28.dp))
     }
 }
 
@@ -227,7 +238,7 @@ private fun HeroActionCard(
 
     Column(
         modifier = modifier
-            .height(200.dp)
+            .height(136.dp)
             .clip(shape)
             .background(background)
             .then(
@@ -238,7 +249,7 @@ private fun HeroActionCard(
                 },
             )
             .clickable(onClick = onClick)
-            .padding(16.dp)
+            .padding(12.dp)
             .semantics {
                 role = Role.Button
                 contentDescription = title
@@ -247,29 +258,33 @@ private fun HeroActionCard(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(34.dp)
                 .clip(CircleShape)
                 .background(contentColor.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = contentColor)
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
         }
         Column {
             Text(
                 text = title.uppercase(),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelLarge,
                 color = contentColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = contentColor.copy(alpha = 0.92f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(
                         if (emphasized) {
@@ -284,7 +299,7 @@ private fun HeroActionCard(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
@@ -310,36 +325,32 @@ private fun InspirationCard(
             },
     ) {
         Row(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "INSPIRAÇÃO DO DIA",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "VER CORES ›",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            NailPolishMark(markSize = 72.dp, polishColor = polishColor, decorative = true)
+            NailPolishMark(markSize = 48.dp, polishColor = polishColor, decorative = true)
         }
     }
 }
@@ -370,15 +381,17 @@ private fun HandReferenceInviteCard(
                 contentDescription = title
             },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -396,7 +409,7 @@ private fun ExploreTile(
             .clip(SoftSurfaceShape)
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
-            .padding(vertical = 16.dp, horizontal = 4.dp)
+            .padding(vertical = 12.dp, horizontal = 4.dp)
             .semantics {
                 role = Role.Button
                 contentDescription = label
@@ -404,11 +417,13 @@ private fun ExploreTile(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
