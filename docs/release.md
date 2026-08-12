@@ -89,8 +89,20 @@ Sem `PLAY_SERVICE_ACCOUNT_JSON`, o AAB é gerado e fica como artifact, mas **nã
 
 - AAB: `app/build/outputs/bundle/release/app-release.aab`
 - APK: `app/build/outputs/apk/release/app-release.apk`
+- Símbolos nativos: `app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip` (quando existirem)
 
-Versão atual: `versionName 1.0.0` / `versionCode 1` (`app/build.gradle.kts`).
+### Aviso da Play: “não fez upload dos símbolos de depuração”
+
+O AAB inclui `.so` (MediaPipe Hand Landmarker, etc.). O release usa
+`ndk.debugSymbolLevel = SYMBOL_TABLE` e o workflow tenta enviar o zip +
+`mapping.txt` (R8) na publicação.
+
+**Limitação:** as libs nativas do MediaPipe / AndroidX já vêm **stripped**
+(sem `.symtab` / `.debug_*`). Nesse caso o AGP não gera o zip e o aviso da
+Play pode **continuar** — é recomendação, não bloqueio. Crashes em Kotlin/Java
+continuam simbolicáveis via `mapping.txt`.
+
+Versão atual: ver `versionName` / `versionCode` em `app/build.gradle.kts`.
 
 No Windows, se o build falhar em `aapt2-…-windows.jar` com dependency verification, atualize o `gradle/verification-metadata.xml` (o CI Linux só gera o artefato linux por padrão). Use também `--no-configuration-cache` se o cache reclamar:
 

@@ -60,6 +60,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // MediaPipe (.so) → Play pede símbolos nativos p/ crashes/ANRs.
+            // SYMBOL_TABLE: nomes de função (suficiente; FULL estoura tamanho fácil).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             val releaseSigning = signingConfigs.getByName("release")
             signingConfig = if (releaseSigning.storeFile != null) {
                 releaseSigning
