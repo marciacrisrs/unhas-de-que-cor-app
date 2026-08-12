@@ -50,20 +50,19 @@ class MediaPipeHandNailDetector @Inject constructor(
                     displayWidth = variant.displayBitmap.width,
                     displayHeight = variant.displayBitmap.height,
                     remap = variant.remapPoint,
-                ) ?: continue
-                if (!HandInferenceVariants.isAcceptablePresence(landmarks.presenceScore)) {
-                    continue
-                }
-                if (landmarks.presenceScore > bestScore) {
+                )
+                if (landmarks != null &&
+                    HandInferenceVariants.isAcceptablePresence(landmarks.presenceScore) &&
+                    landmarks.presenceScore > bestScore
+                ) {
                     bestScore = landmarks.presenceScore
                     best = OrientedHandLandmarks(
                         bitmap = variant.displayBitmap,
                         landmarks = landmarks,
                     )
-                    // Já é claim forte: não precisa gastar mais variantes.
-                    if (landmarks.presenceScore >= TryOnHandReliability.MIN_PRESENCE_STRONG) {
-                        break
-                    }
+                }
+                if (bestScore >= TryOnHandReliability.MIN_PRESENCE_STRONG) {
+                    break
                 }
             }
             // Mantém o display vencedor; o finally recicla o restante.
