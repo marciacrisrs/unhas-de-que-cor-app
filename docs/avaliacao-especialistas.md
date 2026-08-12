@@ -4,23 +4,25 @@
 **Base inicial:** `master` @ `5a8663b`  
 **Fonte de verdade:** `.github/agents/*` + `.github/copilot-instructions.md`
 
-## Painel (pós follow-ups)
+## Painel (pós follow-ups + UX #35 + vision #36)
 
 | Especialista | Veredito atualizado |
 |--------------|---------------------|
-| Android Engineer | Ressalvas P0 tratadas |
-| Architecture Reviewer | Ciclo data↔ui, higiene de telas e DIP (EntryPoint/Context em ViewModel) tratados |
-| Test Engineer | Gate domain + app ≥80%; pipeline try-on coberto |
+| Android Engineer | Ressalvas P0 tratadas; overlay DEFAULT removido (#36) |
+| Architecture Reviewer | Ciclo data↔ui, higiene e DIP tratados; flash Home via SavedStateHandle |
+| Test Engineer | Gate domain/app ≥80%; flash Home + pipeline cobertos |
 | Quality Reviewer | QG Sonar bloqueante; recolor unificado |
-| Performance Reviewer | Recycle + detect/recolor separados |
-| Security Reviewer | Allowlist path; limpeza `hand_capture`; backup explícito; `verify-metadata=true` |
-| Accessibility Reviewer | Contraste/FilterTab/CD try-on tratados |
-| UI Reviewer | AsyncContent + Favoritos dedupe + telas fatiadas |
-| Documentation Reviewer | README/release/AGENTS/CHANGELOG atualizados |
+| Performance Reviewer | Recycle + detect/recolor; sem Canvas DEFAULT sem detecção |
+| Security Reviewer | Allowlist path; limpeza `hand_capture`; Sobre → GitHub HTTPS |
+| Accessibility Reviewer | Contraste/FilterTab; Favoritos Voltar; banner try-on refinado |
+| UI Reviewer | AsyncContent + Home compacta + mark alinhado ao logo |
+| Documentation Reviewer | README/release/AGENTS/CHANGELOG + painéis 12c/12d |
 | Release Manager | Docs + workflow AAB + bump; keystore/Console = Márcia |
-| CI/CD Reviewer | QG, artefatos JaCoCo, Release AAB |
+| CI/CD Reviewer | QG, artefatos JaCoCo, Release AAB → internal |
 
-**Síntese:** recomendações de código dos especialistas foram aplicadas. Resta operação de loja (keystore de upload nos secrets + listing no Play Console), fora do repositório.
+**Síntese:** recomendações de código dos especialistas foram aplicadas. UX (#35) e
+alinhamento do try-on (#36) reavaliados em 2026-08-12d. Resta operação de loja
+(keystore + listing), fora do repositório.
 
 ---
 
@@ -130,3 +132,68 @@ Inversion apontadas pelo Architecture Reviewer (ViewModels resolvendo dependênc
 
 - Keystore de upload assinado nos secrets do CI (`RELEASE_*`/`ANDROID_*`), para gerar AAB de release assinado fora do debug-signing fallback.
 - Publicação/atualização do listing na Google Play Console (screenshots, descrição, política de privacidade hospedada) — conteúdo já preparado em `docs/play-listing.md`/`docs/privacy-policy.md`.
+
+---
+
+## Follow-up UX+vision (2026-08-12d) — reavaliação conjunta
+
+Reavaliação dos PRs abertos vs `origin/master`, contra `.github/agents/*` +
+`.github/copilot-instructions.md`:
+
+- **#35** `cursor/ux-home-favoritos-sobre-535f` — Home / Favoritos / Sobre / logo / Minha mão  
+- **#36** `cursor/fix-nail-overlay-offset-535f` — esmalte longe das unhas (DEFAULT + bias)
+
+Sem overlap de arquivos entre os dois PRs.
+
+### Painel
+
+| Especialista | Veredito | Notas |
+|--------------|----------|-------|
+| Android Engineer | Ressalvas | Overlay DEFAULT removido; `FACING_CENTER` unificado 0.82 |
+| Architecture Reviewer | Ressalvas | Flash `SavedStateHandle` correto; Result→mão → Home |
+| Test Engineer | Ressalvas | Flash Home coberto; paint paths try-on ainda privados |
+| Quality Reviewer | Ressalvas (#35 QG coverage) → alvo: testes HomeViewModel |
+| Performance Reviewer | OK | Menos Canvas sem detecção |
+| Security Reviewer | OK | Sobre → GitHub HTTPS |
+| Accessibility Reviewer | Ressalvas | Banner try-on: CD+texto; contraste semi-transparente |
+| UI Reviewer | Ressalvas | Pedidos UX atendidos; chrome Favoritos ≠ Histórico |
+| Documentation Reviewer | OK | Este painel |
+| Release Manager | Ressalvas | Sem bump; `OUT_OF_REPO` intacto |
+| CI/CD Reviewer | Ressalvas | #35 bloqueado por QG até coverage; pipeline ok |
+
+**Veredito global:** #36 aprovável (correção de alinhamento válida). #35 aprovável
+após `new_coverage` ≥ 80% (lacuna: ~6 linhas do `HomeViewModel` flash). Sem Bloqueio
+de produto no bug das ovais flutuantes.
+
+### PR #35 — UX
+
+| Pedido | Status |
+|--------|--------|
+| Home compacta / scroll só se necessário | Feito |
+| Favoritos com Voltar | Feito |
+| Sobre: GitHub no lugar do e-mail | Feito + nota privacidade Play |
+| `NailPolishMark` ≈ logo oficial | Feito |
+| Minha mão → Home + feedback | Feito (`navigateHome` + flash) |
+
+### PR #36 — vision
+
+| Mudança | Avaliação |
+|---------|-----------|
+| Sem landmarks → `anchors = emptyList()` (não DEFAULT) | Correto |
+| Status approximate-with-anchors vs não-detectada | Melhora textual |
+| Centro 0.58 / overshoot 0.02 / bias elipse +0.04 | Coerente |
+| `FACING_CENTER` mapper↔ROI | Unificado em 0.82 |
+
+### Backlog residual (pós 12d)
+
+| Pri | Item | Status |
+|-----|------|--------|
+| P0 | Testes `HomeViewModel` flash p/ QG #35 | Em andamento |
+| P1 | Testes ramos `paintUserPreview` (extrair se preciso) | Aberto |
+| P1 | A11y banner try-on (semantics/contraste) | Aberto |
+| P2 | Smells HistoryScreen / HandReferenceEffects | Aberto |
+| P2 | `DetectedNailPolishApplier` unit tests | Aberto |
+| P2 | Result→mão: destino pós-save (Home vs Result) | Aberto |
+| P2 | Chrome Favoritos vs Histórico | Aceito / residual |
+| — | Keystore + listing Play | **OUT_OF_REPO** |
+| — | A11y Scanner em device | **OUT_OF_REPO** |
