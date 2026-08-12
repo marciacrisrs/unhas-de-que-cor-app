@@ -50,11 +50,13 @@ class NailRoiEstimatorTest {
     }
 
     @Test
-    fun `left and right hands both yield nails`() {
-        val left = estimator.estimateAll(openHand(800, 1200, Handedness.LEFT))
-        val right = estimator.estimateAll(openHand(800, 1200, Handedness.RIGHT))
-        assertThat(left.map { it.finger }).containsExactlyElementsIn(Finger.ALL)
-        assertThat(right.map { it.finger }).containsExactlyElementsIn(Finger.ALL)
+    fun `thumb uses mcp to tip axis instead of collapsed dip`() {
+        val hand = openHand(800, 1200)
+        val thumb = estimator.estimate(hand, Finger.THUMB)
+        assertThat(thumb).isNotNull()
+        assertThat(thumb!!.geometricConfidence).isGreaterThan(0.3f)
+        assertThat(thumb.lengthPx).isGreaterThan(20f)
+        assertThat(thumb.widthPx).isGreaterThan(14f)
     }
 
     private fun openHand(

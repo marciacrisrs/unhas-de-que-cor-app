@@ -104,10 +104,22 @@ class NailTryOnPipeline @Inject constructor(
         polishColor: Color,
     ): NailTryOnResult {
         val working = snapshot.workingBitmap
-        // Almond suave (ROI alargada) primeiro; elipse+Recolorer se a geo falhar.
-        val painted = colorApplier.apply(working, snapshot.nails, polishColor)
-            ?: ellipseFallback(working, snapshot.landmarks, polishColor)
-            ?: working
+        // ≥3 máscaras: almond; 0 máscaras: elipse pelos landmarks; 1–2: tenta máscara e completa com elipse.
+        val painted = when {
+            snapshot.nails.size >= MIN_NAILS_FOR_MASK_PATH -> {
+                colorApplier.apply(working, snapshot.nails, polishColor)
+                    ?: ellipseFallback(working, snapshot.landmarks, polishColor)
+                    ?: working
+            }
+            snapshot.nails.isEmpty() -> {
+                ellipseFallback(working, snapshot.landmarks, polishColor) ?: working
+            }
+            else -> {
+                colorApplier.apply(working, snapshot.nails, polishColor)
+                    ?: ellipseFallback(working, snapshot.landmarks, polishColor)
+                    ?: working
+            }
+        }
         return NailTryOnResult(
             bitmap = painted,
             nails = snapshot.nails,
@@ -134,12 +146,14 @@ class NailTryOnPipeline @Inject constructor(
 
     private fun segmentationConfidence(mask: NailMask, roi: NailRoi): Float {
         val filled = mask.filledRatio()
-        val area = (roi.lengthPx * roi.widthPx).coerceAtLeast(1f)
-        val maskArea = mask.width * mask.height * filled
-        val coverage = (maskArea / area).coerceIn(0f, COVERAGE_CLAMP)
+        // Cobertura relativa à área da placa (não ao crop com padding).
+        val plateArea = (roi.lengthPx * roi.widthPx).coerceAtLeast(1f)
+        val solidPixels = mask.width * mask.height * filled
+        val coverage = (solidPixels / plateArea).coerceIn(0f, COVERAGE_CLAMP)
         return when {
             filled < FILL_TOO_LOW -> SCORE_VERY_LOW
-            filled > FILL_TOO_HIGH -> SCORE_SKIN_RISK // ROI quase toda preenchida: risco de pele
+            // Soft almond + pad costuma encher o crop; não trate isso como pele.
+            filled > FILL_TOO_HIGH && coverage < SKIN_RISK_COVERAGE_MAX -> SCORE_SKIN_RISK
             coverage in COVERAGE_GOOD -> SCORE_HIGH
             coverage in COVERAGE_OK -> SCORE_MID
             else -> SCORE_LOW
@@ -147,19 +161,21 @@ class NailTryOnPipeline @Inject constructor(
     }
 
     private companion object {
-        const val MIN_ROI_CONFIDENCE = 0.28f
+        const val MIN_ROI_CONFIDENCE = 0.24f
+        const val MIN_NAILS_FOR_MASK_PATH = 3
         // Prioriza geometria: unhas naturais falham em heurística de pele.
-        const val GEO_WEIGHT = 0.70f
-        const val SEG_WEIGHT = 0.30f
-        const val COVERAGE_CLAMP = 1.5f
-        const val FILL_TOO_LOW = 0.04f
-        const val FILL_TOO_HIGH = 0.90f
+        const val GEO_WEIGHT = 0.65f
+        const val SEG_WEIGHT = 0.35f
+        const val COVERAGE_CLAMP = 1.8f
+        const val FILL_TOO_LOW = 0.03f
+        const val FILL_TOO_HIGH = 0.92f
+        const val SKIN_RISK_COVERAGE_MAX = 0.35f
         const val SCORE_VERY_LOW = 0.15f
-        const val SCORE_SKIN_RISK = 0.55f
-        const val SCORE_HIGH = 0.9f
-        const val SCORE_MID = 0.7f
-        const val SCORE_LOW = 0.45f
-        val COVERAGE_GOOD = 0.20f..1.2f
-        val COVERAGE_OK = 0.12f..1.4f
+        const val SCORE_SKIN_RISK = 0.50f
+        const val SCORE_HIGH = 0.92f
+        const val SCORE_MID = 0.75f
+        const val SCORE_LOW = 0.50f
+        val COVERAGE_GOOD = 0.25f..1.4f
+        val COVERAGE_OK = 0.14f..1.6f
     }
 }

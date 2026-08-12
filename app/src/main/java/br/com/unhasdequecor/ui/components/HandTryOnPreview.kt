@@ -41,6 +41,7 @@ import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
+import br.com.unhasdequecor.data.vision.nail.DetectedNailPolishApplier
 import br.com.unhasdequecor.data.vision.nail.NailDetectionSnapshot
 import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
@@ -373,6 +374,42 @@ private fun paintUserPreview(
             nails = result.nails,
             landmarks = result.landmarks,
             showDebug = result.debugEnabled,
+        )
+    }
+    // Sem máscaras confiáveis: ainda assim posiciona esmalte pelos landmarks (não DEFAULT estático).
+    val landmarks = snapshot?.landmarks
+    val mappedAnchors = landmarks?.let {
+        NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = it.points.map { p -> NailLandmarkMapper.NormalizedPoint(p.x, p.y) },
+            imageWidth = it.imageWidth,
+            imageHeight = it.imageHeight,
+        )
+    }
+    if (landmarks != null && mappedAnchors != null) {
+        val painted = DetectedNailPolishApplier.apply(
+            source = snapshot.workingBitmap,
+            anchors = mappedAnchors,
+            polishColor = polishColor,
+        )
+        if (painted != null) {
+            return TryOnPreviewData(
+                bitmap = painted,
+                anchors = emptyList(),
+                mode = TryOnMode.DETECTED,
+                landmarks = landmarks,
+                showDebug = pipeline.debugEnabled,
+            )
+        }
+        val display = ownedPreviewBitmap(
+            candidate = snapshot.workingBitmap,
+            protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
+        )
+        return TryOnPreviewData(
+            bitmap = display,
+            anchors = mappedAnchors,
+            mode = TryOnMode.APPROXIMATE,
+            landmarks = landmarks,
+            showDebug = pipeline.debugEnabled,
         )
     }
     val displaySource = snapshot?.workingBitmap ?: assets.decoded

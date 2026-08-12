@@ -13,8 +13,8 @@ import javax.inject.Singleton
 /**
  * Estima ROI + polígono almond da unha a partir de MCP/PIP/DIP/TIP.
  *
- * Largura alinhada ao [br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper]
- * (proporcional ao comprimento tip–DIP), não a uma heurística estreita de falange.
+ * Largura alinhada ao [NailLandmarkMapper] (proporcional ao comprimento tip–DIP).
+ * Polegar usa eixo MCP→TIP (sem DIP distinto no MediaPipe).
  */
 @Singleton
 class NailRoiEstimator @Inject constructor() {
@@ -25,24 +25,32 @@ class NailRoiEstimator @Inject constructor() {
     fun estimate(hand: HandLandmarks, finger: Finger): NailRoi? {
         val w = hand.imageWidth
         val h = hand.imageHeight
+        val mcp = ImageCoordinates.toPixel(hand.point(finger.mcpIndex), w, h)
         val pip = ImageCoordinates.toPixel(hand.point(finger.pipIndex), w, h)
         val dip = ImageCoordinates.toPixel(hand.point(finger.dipIndex), w, h)
         val tip = ImageCoordinates.toPixel(hand.point(finger.tipIndex), w, h)
 
         val tipDip = ImageCoordinates.distancePx(tip, dip)
         val tipPip = ImageCoordinates.distancePx(tip, pip)
-        val facing = tipDip < SHORT_TIP_DIP_PX
+        val tipMcp = ImageCoordinates.distancePx(tip, mcp)
         val scales = scalesFor(finger)
 
-        val nailLen = if (facing) {
-            (tipPip * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
-        } else {
-            (tipDip * scales.lengthScale).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
+        // Polegar: DIP=PIP no MediaPipe → tipDip colapsa com frequência; usa MCP→TIP.
+        val thumbMode = finger == Finger.THUMB
+        val facing = !thumbMode && tipDip < SHORT_TIP_DIP_PX
+
+        val nailLen = when {
+            thumbMode -> (tipMcp * THUMB_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
+            facing -> (tipPip * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
+            else -> (tipDip * scales.lengthScale).coerceIn(MIN_NAIL_LEN, MAX_NAIL_LEN)
         }
-        // Largura ≈ proporção da placa (mapper histórico). Evita heurística estreita de falange.
         val nailWidth = (nailLen * scales.widthScale).coerceIn(MIN_NAIL_W, MAX_NAIL_W)
 
-        val axisStart = if (facing) pip else dip
+        val axisStart = when {
+            thumbMode -> mcp
+            facing -> pip
+            else -> dip
+        }
         val dirX = tip.x - axisStart.x
         val dirY = tip.y - axisStart.y
         val dirLen = hypot(dirX.toDouble(), dirY.toDouble()).toFloat().coerceAtLeast(1f)
@@ -52,9 +60,14 @@ class NailRoiEstimator @Inject constructor() {
         val py = ux
 
         // Centro proximal à ponta; leve overshoot da tip landmark (placa real passa um pouco).
-        val centerT = if (facing) FACING_CENTER else CENTER_ALONG
-        val cx = axisStart.x + (tip.x - axisStart.x) * centerT + ux * tipDip * TIP_OVERSHOOT
-        val cy = axisStart.y + (tip.y - axisStart.y) * centerT + uy * tipDip * TIP_OVERSHOOT
+        val centerT = when {
+            thumbMode -> THUMB_CENTER
+            facing -> FACING_CENTER
+            else -> CENTER_ALONG
+        }
+        val overshootBase = if (thumbMode) tipMcp else tipDip
+        val cx = axisStart.x + (tip.x - axisStart.x) * centerT + ux * overshootBase * TIP_OVERSHOOT
+        val cy = axisStart.y + (tip.y - axisStart.y) * centerT + uy * overshootBase * TIP_OVERSHOOT
 
         val halfLen = nailLen * 0.50f
         val halfWBase = nailWidth * 0.50f
@@ -99,8 +112,10 @@ class NailRoiEstimator @Inject constructor() {
         val geometricConfidence = geometricConfidence(
             tipDip = tipDip,
             tipPip = tipPip,
+            tipMcp = tipMcp,
             nailLen = nailLen,
             nailWidth = nailWidth,
+            thumbMode = thumbMode,
             facing = facing,
             presence = hand.presenceScore,
         )
@@ -119,22 +134,29 @@ class NailRoiEstimator @Inject constructor() {
     }
 
     private fun scalesFor(finger: Finger): FingerScale = when (finger) {
-        Finger.THUMB -> FingerScale(widthScale = 0.78f, lengthScale = 0.88f)
-        Finger.INDEX -> FingerScale(widthScale = 0.70f, lengthScale = 0.90f)
-        Finger.MIDDLE -> FingerScale(widthScale = 0.72f, lengthScale = 0.92f)
-        Finger.RING -> FingerScale(widthScale = 0.68f, lengthScale = 0.90f)
-        Finger.PINKY -> FingerScale(widthScale = 0.64f, lengthScale = 0.86f)
+        // Ligeiramente mais largas/longas: landmarks tendem a subestimar a placa real.
+        Finger.THUMB -> FingerScale(widthScale = 0.82f, lengthScale = 0.90f)
+        Finger.INDEX -> FingerScale(widthScale = 0.74f, lengthScale = 0.96f)
+        Finger.MIDDLE -> FingerScale(widthScale = 0.76f, lengthScale = 0.98f)
+        Finger.RING -> FingerScale(widthScale = 0.72f, lengthScale = 0.96f)
+        Finger.PINKY -> FingerScale(widthScale = 0.68f, lengthScale = 0.92f)
     }
 
     private fun geometricConfidence(
         tipDip: Float,
         tipPip: Float,
+        tipMcp: Float,
         nailLen: Float,
         nailWidth: Float,
+        thumbMode: Boolean,
         facing: Boolean,
         presence: Float,
     ): Float {
-        val axisOk = if (facing) tipPip > 12f else tipDip > 10f
+        val axisOk = when {
+            thumbMode -> tipMcp > 16f
+            facing -> tipPip > 12f
+            else -> tipDip > 10f
+        }
         if (!axisOk) return 0.15f
         val aspect = nailLen / nailWidth.coerceAtLeast(1f)
         val aspectScore = when {
@@ -157,25 +179,28 @@ class NailRoiEstimator @Inject constructor() {
     private data class FingerScale(val widthScale: Float, val lengthScale: Float)
 
     private companion object {
-        const val SHORT_TIP_DIP_PX = 18f
-        const val FACING_LENGTH_SCALE = 0.42f
-        const val FACING_CENTER = 0.92f
-        const val CENTER_ALONG = 0.78f
-        const val TIP_OVERSHOOT = 0.06f
-        const val TIP_WIDTH_FACTOR = 0.78f
-        const val MID_WIDTH_FACTOR = 1.08f
-        const val CUTICLE_WIDTH_FACTOR = 0.82f
-        const val TIP_POINT_FACTOR = 0.62f
-        const val CUTICLE_BACK = 0.88f
-        const val MID_FORWARD = 0.18f
-        const val PAD_SCALE = 0.28f
-        const val PAD_EXTRA = 3f
+        const val SHORT_TIP_DIP_PX = 16f
+        const val FACING_LENGTH_SCALE = 0.48f
+        const val THUMB_LENGTH_SCALE = 0.38f
+        const val FACING_CENTER = 0.90f
+        const val THUMB_CENTER = 0.82f
+        /** Alinhado ao [NailLandmarkMapper.NAIL_CENTER_ALONG]. */
+        const val CENTER_ALONG = 0.74f
+        const val TIP_OVERSHOOT = 0.10f
+        const val TIP_WIDTH_FACTOR = 0.82f
+        const val MID_WIDTH_FACTOR = 1.12f
+        const val CUTICLE_WIDTH_FACTOR = 0.86f
+        const val TIP_POINT_FACTOR = 0.70f
+        const val CUTICLE_BACK = 0.90f
+        const val MID_FORWARD = 0.20f
+        const val PAD_SCALE = 0.22f
+        const val PAD_EXTRA = 2f
         const val MIN_NAIL_LEN = 14f
         const val MAX_NAIL_LEN = 160f
         const val MIN_NAIL_W = 10f
         const val MAX_NAIL_W = 110f
-        const val PRESENCE_WEIGHT = 0.35f
-        const val ASPECT_WEIGHT = 0.35f
+        const val PRESENCE_WEIGHT = 0.30f
+        const val ASPECT_WEIGHT = 0.40f
         const val SIZE_WEIGHT = 0.30f
     }
 }
