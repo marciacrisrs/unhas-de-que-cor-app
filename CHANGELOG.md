@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 — release Play (versionCode 2)
+
+- Mesmo conteúdo da 1.0.0; bump obrigatório porque o `versionCode 1` já foi usado na Play.
+
 ## 1.0.0 — em preparação
 
 ### App
