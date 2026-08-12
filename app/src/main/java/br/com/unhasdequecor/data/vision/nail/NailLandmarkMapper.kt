@@ -7,7 +7,8 @@ package br.com.unhasdequecor.data.vision.nail
  * da imagem para o preview FillBounds.
  *
  * Placa da unha ≈ do DIP até a ponta; geometria via [NailPlateCalibration]
- * (paridade com [NailRoiEstimator]).
+ * (paridade com [NailRoiEstimator]). Filtra dedos com eixo colapsado (punho /
+ * oclusão) para não pintar elipses flutuantes.
  */
 object NailLandmarkMapper {
 
@@ -21,7 +22,7 @@ object NailLandmarkMapper {
         }
         val w = imageWidth.toFloat()
         val h = imageHeight.toFloat()
-        val anchors = Finger.ALL.map { finger ->
+        val anchors = Finger.ALL.mapNotNull { finger ->
             val tip = landmarks[finger.tipIndex]
             val dip = landmarks[finger.dipIndex]
             val pip = landmarks[finger.pipIndex]
@@ -37,18 +38,19 @@ object NailLandmarkMapper {
                 mcpX = mcp.x * w,
                 mcpY = mcp.y * h,
             )
-            NailOverlayAnchor(
+            if (!NailPlateCalibration.isUsablePlate(plate)) return@mapNotNull null
+            val anchor = NailOverlayAnchor(
                 centerX = (plate.centerX / w).coerceIn(0f, 1f),
                 centerY = (plate.centerY / h).coerceIn(0f, 1f),
                 width = (plate.widthPx / w).coerceIn(MIN_NAIL_WIDTH_NORM, MAX_NAIL_WIDTH_NORM),
                 height = (plate.lengthPx / h).coerceIn(MIN_NAIL_HEIGHT_NORM, MAX_NAIL_HEIGHT_NORM),
                 rotationDegrees = plate.rotationDegrees,
             )
+            anchor.takeIf {
+                it.centerX in PLAUSIBLE_RANGE && it.centerY in PLAUSIBLE_RANGE
+            }
         }
-        val plausible = anchors.count { nail ->
-            nail.centerX in PLAUSIBLE_RANGE && nail.centerY in PLAUSIBLE_RANGE
-        }
-        return anchors.takeIf { plausible >= MIN_PLAUSIBLE_NAILS }
+        return anchors.takeIf { it.size >= MIN_PLAUSIBLE_NAILS }
     }
 
     data class NormalizedPoint(val x: Float, val y: Float)

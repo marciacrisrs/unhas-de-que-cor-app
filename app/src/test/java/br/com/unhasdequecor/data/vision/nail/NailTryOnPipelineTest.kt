@@ -207,6 +207,8 @@ class NailTryOnPipelineTest {
 
         assertThat(snapshot).isNull()
         verify(exactly = 1) { rotated.recycle() }
+        verify(exactly = 0) { roiEstimator.estimateAll(any()) }
+        verify(exactly = 0) { segmenter.segment(any(), any()) }
         verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
     }
 

@@ -48,6 +48,33 @@ class NailPlateCalibrationTest {
     }
 
     @Test
+    fun isFacing_relativeTipDip_scaleInvariantForOpenProportions() {
+        // tipDip/tipPip = 0.4 (open). Em px absolutos tipDip pode ser < SHORT_TIP_DIP_PX.
+        assertThat(
+            NailPlateCalibration.isFacing(thumbMode = false, tipDipPx = 12f, tipPipPx = 30f),
+        ).isFalse()
+        assertThat(
+            NailPlateCalibration.isFacing(thumbMode = false, tipDipPx = 6f, tipPipPx = 120f),
+        ).isTrue()
+    }
+
+    @Test
+    fun isUsablePlate_rejectsCollapsedAxis() {
+        val plate = NailPlateCalibration.plateFromPixels(
+            finger = Finger.RING,
+            tipX = 100f,
+            tipY = 100f,
+            dipX = 100f,
+            dipY = 102f,
+            pipX = 100f,
+            pipY = 104f,
+            mcpX = 100f,
+            mcpY = 110f,
+        )
+        assertThat(NailPlateCalibration.isUsablePlate(plate)).isFalse()
+    }
+
+    @Test
     fun plateFromPixels_facing_widthFromTipPipNotShortLength() {
         val tipPip = 120f
         val plate = NailPlateCalibration.plateFromPixels(

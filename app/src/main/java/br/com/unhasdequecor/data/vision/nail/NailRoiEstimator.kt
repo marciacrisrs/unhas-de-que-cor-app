@@ -39,6 +39,8 @@ class NailRoiEstimator @Inject constructor() {
             mcpX = mcp.x,
             mcpY = mcp.y,
         )
+        // Paridade com mapper: dedo colapsado / ocluído não vira ROI “fantasma”.
+        if (!NailPlateCalibration.isUsablePlate(plate)) return null
         val tipDip = ImageCoordinates.distancePx(tip, dip)
         val tipPip = ImageCoordinates.distancePx(tip, pip)
         val tipMcp = ImageCoordinates.distancePx(tip, mcp)
