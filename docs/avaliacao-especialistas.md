@@ -19,6 +19,7 @@
 | Documentation Reviewer | Aprovado c/ ressalvas (este painel 12e) |
 | Release Manager | Aprovado c/ ressalvas — smoke try-on em device antes de store |
 | CI/CD Reviewer | Aprovado c/ ressalvas — Verify #35/#36 em andamento |
+| Vision Try-On Reviewer | **Novo** — especialista em unhas humanas das mãos + try-on |
 
 **Síntese:** pedidos de UX (#35) e correção do overlay DEFAULT (#36) aprováveis
 após CI/QG verdes. Reavaliação completa em **2026-08-12e**. Resta operação de loja

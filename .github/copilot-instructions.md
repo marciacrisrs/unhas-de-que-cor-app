@@ -36,7 +36,7 @@ Sempre consulte o agente mais apropriado para a alteração sendo realizada.
 
 Sempre siga as regras definidas neste arquivo.
 
-Quando uma tarefa envolver arquitetura, testes, segurança, performance, CI/CD, documentação, acessibilidade ou interface, consulte também o arquivo correspondente em `.github/agents/` antes de responder ou gerar código.
+Quando uma tarefa envolver arquitetura, testes, segurança, performance, CI/CD, documentação, acessibilidade, interface, **try-on / visão / unhas da mão**, consulte também o arquivo correspondente em `.github/agents/` antes de responder ou gerar código.
 
 Especialistas disponíveis:
 
@@ -51,6 +51,9 @@ Especialistas disponíveis:
 - agents/documentation-reviewer.md
 - agents/release-manager.md
 - agents/cicd-reviewer.md
+- agents/vision-tryon-reviewer.md
+
+Quando a alteração tocar `HandTryOnPreview`, `data/vision/nail/**`, máscaras `hand_nail_masks/`, amostras `hand_samples/` ou `HandSampleCatalog`, **consulte obrigatoriamente** `vision-tryon-reviewer` (especialista em unhas humanas das mãos + try-on).
 
 Quando uma alteração envolver mais de uma área, combine as recomendações dos especialistas.
 
