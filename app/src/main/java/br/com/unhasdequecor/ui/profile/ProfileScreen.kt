@@ -30,6 +30,7 @@ import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 fun ProfileScreen(
     onOpenStyle: () -> Unit,
     onOpenHandReference: () -> Unit,
+    onOpenAbout: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -92,7 +93,9 @@ fun ProfileScreen(
         ProfileCard(
             title = "Sobre o app",
             subtitle = "Unhas de Que Cor? · versão ${state.appVersion}\n" +
-                "Assistente de estilo offline. Em breve: try-on e acervo.",
+                "Offline · try-on · histórico no aparelho",
+            onClick = onOpenAbout,
+            contentDescription = "Abrir sobre o app",
         )
         Spacer(modifier = Modifier.height(88.dp))
     }

@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import br.com.unhasdequecor.ui.about.AboutScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceViewModel
 import br.com.unhasdequecor.ui.history.HistoryRowUi
@@ -133,7 +134,11 @@ fun AppNavHost() {
                 ProfileScreen(
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
                     onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
                 )
+            }
+            composable(Routes.ABOUT) {
+                AboutScreen(onBack = { navController.popBackStack() })
             }
         }
     }
