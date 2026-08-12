@@ -27,5 +27,7 @@ data class HandLandmarks(
 
     companion object {
         const val MIN_POINTS = 21
+        /** Tips MediaPipe: polegar, indicador, médio, anelar, mindinho. */
+        val TIP_INDICES = intArrayOf(4, 8, 12, 16, 20)
     }
 }

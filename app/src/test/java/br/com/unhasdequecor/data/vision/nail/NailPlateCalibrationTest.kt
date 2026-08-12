@@ -71,7 +71,62 @@ class NailPlateCalibrationTest {
             mcpX = 100f,
             mcpY = 110f,
         )
+        assertThat(plate.lengthPx).isAtLeast(NailPlateCalibration.MIN_NAIL_LEN_PX)
+        assertThat(plate.rawLengthPx).isLessThan(NailPlateCalibration.MIN_NAIL_LEN_PX)
         assertThat(NailPlateCalibration.isUsablePlate(plate)).isFalse()
+    }
+
+    @Test
+    fun isUsablePlate_acceptsOpenFacingAndThumb() {
+        val open = NailPlateCalibration.plateFromPixels(
+            finger = Finger.INDEX,
+            tipX = 100f,
+            tipY = 40f,
+            dipX = 100f,
+            dipY = 90f,
+            pipX = 100f,
+            pipY = 140f,
+            mcpX = 100f,
+            mcpY = 200f,
+        )
+        assertThat(open.facing).isFalse()
+        assertThat(NailPlateCalibration.isUsablePlate(open)).isTrue()
+
+        val facing = NailPlateCalibration.plateFromPixels(
+            finger = Finger.MIDDLE,
+            tipX = 400f,
+            tipY = 354f,
+            dipX = 400f,
+            dipY = 360f,
+            pipX = 400f,
+            pipY = 480f,
+            mcpX = 400f,
+            mcpY = 600f,
+        )
+        assertThat(facing.facing).isTrue()
+        assertThat(NailPlateCalibration.isUsablePlate(facing)).isTrue()
+
+        val thumb = NailPlateCalibration.plateFromPixels(
+            finger = Finger.THUMB,
+            tipX = 80f,
+            tipY = 100f,
+            dipX = 120f,
+            dipY = 140f,
+            pipX = 140f,
+            pipY = 160f,
+            mcpX = 180f,
+            mcpY = 220f,
+        )
+        assertThat(thumb.thumbMode).isTrue()
+        assertThat(NailPlateCalibration.isUsablePlate(thumb)).isTrue()
+    }
+
+    @Test
+    fun facingTipDipThreshold_usesAbsFloorWhenTipPipSmall() {
+        assertThat(NailPlateCalibration.facingTipDipThresholdPx(0f))
+            .isWithin(0.01f).of(NailPlateCalibration.SHORT_TIP_DIP_PX * 0.5f)
+        assertThat(NailPlateCalibration.facingTipDipThresholdPx(200f))
+            .isWithin(0.01f).of(200f * NailPlateCalibration.FACING_TIP_DIP_RATIO)
     }
 
     @Test

@@ -217,13 +217,13 @@ class TryOnDifficultConditionsTest {
     }
 
     @Test
-    fun rankingVariantes_prefereSpanAbertoAPresenceSoNaFronteiraStrong() {
+    fun rankingVariantes_prefereSpanAbertoMesmoComPresenceMenor() {
         val collapsed =
             HandLandmarks(
                 points = List(21) { NormPoint(0.50f, 0.55f) },
                 imageWidth = 800,
                 imageHeight = 1200,
-                presenceScore = 0.60f,
+                presenceScore = 0.90f,
             )
         val open =
             HandLandmarks(
@@ -236,10 +236,16 @@ class TryOnDifficultConditionsTest {
             .isGreaterThan(HandLandmarkQuality.tipSpanNorm(collapsed.points))
         assertThat(HandLandmarkQuality.rankingScore(open))
             .isGreaterThan(HandLandmarkQuality.rankingScore(collapsed))
-        assertThat(HandLandmarkQuality.shouldStopSearching(0.60f)).isFalse()
         assertThat(
             HandLandmarkQuality.shouldStopSearching(
-                DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP,
+                presenceScore = DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP,
+                tipSpan = 0f,
+            ),
+        ).isFalse()
+        assertThat(
+            HandLandmarkQuality.shouldStopSearching(
+                presenceScore = DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP,
+                tipSpan = HandLandmarkQuality.MIN_TIP_SPAN_FOR_EARLY_STOP,
             ),
         ).isTrue()
     }

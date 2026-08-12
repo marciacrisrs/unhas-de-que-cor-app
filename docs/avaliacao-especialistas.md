@@ -336,6 +336,10 @@ FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas →
 | Early-stop MediaPipe em presence 0.55 | Feito — `HAND_PRESENCE_EARLY_STOP` + ranking tip-span |
 | Reject presence sem gastar ROI/seg | Feito — classify precoce no `detect` |
 | Bateria condições difíceis (JVM) | Feito — `TryOnDifficultConditionsTest` |
+| Early-stop só por presence (span 0) | Feito — stop exige tip-span mínimo / open span |
+| Ranking linear preferia collapsed 0.85 | Feito — soft-gate `p*(0.45+0.55·s)` |
+| `isUsablePlate` length morto (pós-coerce) | Feito — `rawLengthPx` pré-coerce |
+| Selector só no loop MediaPipe | Feito — `HandLandmarkQuality.consider` testável |
 
 Backlog residual: smoke em device; A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
 

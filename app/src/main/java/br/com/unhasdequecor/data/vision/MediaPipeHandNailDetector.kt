@@ -35,8 +35,7 @@ class MediaPipeHandNailDetector @Inject constructor(
     override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
         val created = ArrayList<Bitmap>(16)
         var best: OrientedHandLandmarks? = null
-        var bestRank = -1f
-        var bestPresence = -1f
+        var bestLandmarks: HandLandmarks? = null
         try {
             for (variant in HandInferenceVariants.forSource(bitmap)) {
                 if (variant.inferenceBitmap !== bitmap &&
@@ -53,20 +52,15 @@ class MediaPipeHandNailDetector @Inject constructor(
                     displayHeight = variant.displayBitmap.height,
                     remap = variant.remapPoint,
                 )
-                if (landmarks != null &&
-                    DetectionConfidenceFloor.acceptsHandPresence(landmarks.presenceScore)
-                ) {
-                    val rank = HandLandmarkQuality.rankingScore(landmarks)
-                    if (rank > bestRank) {
-                        bestRank = rank
-                        bestPresence = landmarks.presenceScore
-                        best = OrientedHandLandmarks(
-                            bitmap = variant.displayBitmap,
-                            landmarks = landmarks,
-                        )
-                    }
+                val (nextBest, stop) = HandLandmarkQuality.consider(bestLandmarks, landmarks)
+                if (landmarks != null && nextBest === landmarks) {
+                    bestLandmarks = landmarks
+                    best = OrientedHandLandmarks(
+                        bitmap = variant.displayBitmap,
+                        landmarks = landmarks,
+                    )
                 }
-                if (HandLandmarkQuality.shouldStopSearching(bestPresence)) {
+                if (stop) {
                     break
                 }
             }
@@ -199,7 +193,7 @@ class MediaPipeHandNailDetector @Inject constructor(
     ): Float {
         var sum = 0f
         var count = 0
-        for (idx in TIP_LANDMARK_INDICES) {
+        for (idx in HandLandmarks.TIP_INDICES) {
             if (idx >= landmarks.size) continue
             val optional = landmarks[idx].presence()
             if (optional.isPresent) {
@@ -215,7 +209,5 @@ class MediaPipeHandNailDetector @Inject constructor(
         /** Mais permissivo: fotos com contraluz / mão retinta falhavam em 0.20. */
         private const val MIN_CONFIDENCE = DetectionConfidenceFloor.MEDIAPIPE_MIN
         private const val MAX_INFERENCE_EDGE = 1280
-        /** Tips MediaPipe: polegar, indicador, médio, anelar, mindinho. */
-        private val TIP_LANDMARK_INDICES = intArrayOf(4, 8, 12, 16, 20)
     }
 }

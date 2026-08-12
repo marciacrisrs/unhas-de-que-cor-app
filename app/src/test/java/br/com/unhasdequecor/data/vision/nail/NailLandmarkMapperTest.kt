@@ -55,6 +55,30 @@ class NailLandmarkMapperTest {
     }
 
     @Test
+    fun `returns anchors when exactly two fingers are usable`() {
+        val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.70f) }
+        fun set(i: Int, x: Float, y: Float) {
+            landmarks[i] = NailLandmarkMapper.NormalizedPoint(x, y)
+        }
+        // Indicador + médio estendidos; resto colapsado.
+        set(5, 0.40f, 0.55f)
+        set(6, 0.40f, 0.45f)
+        set(7, 0.40f, 0.35f)
+        set(8, 0.40f, 0.22f)
+        set(9, 0.50f, 0.55f)
+        set(10, 0.50f, 0.45f)
+        set(11, 0.50f, 0.35f)
+        set(12, 0.50f, 0.22f)
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks,
+            imageWidth = 640,
+            imageHeight = 480,
+        )
+        assertThat(anchors).isNotNull()
+        assertThat(anchors).hasSize(2)
+    }
+
+    @Test
     fun `facing camera uses tip as center when tip and dip collapse`() {
         // tip–dip curto relativo a tip–pip → ramo facing.
         val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }

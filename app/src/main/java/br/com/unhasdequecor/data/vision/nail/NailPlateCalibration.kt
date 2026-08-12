@@ -73,6 +73,8 @@ object NailPlateCalibration {
         val overshootPx: Float,
         val thumbMode: Boolean,
         val facing: Boolean,
+        /** Comprimento anatômico antes do coerceIn (para [isUsablePlate]). */
+        val rawLengthPx: Float,
     )
 
     /** Extremos tip/cutícula do almond alinhados à tip landmark (não halfLen a partir do centro). */
@@ -127,8 +129,9 @@ object NailPlateCalibration {
             plate.facing -> MIN_AXIS_FACING_PX
             else -> MIN_AXIS_OPEN_PX
         }
+        // Usa rawLength: lengthPx já passou por coerceIn(MIN_NAIL_LEN_PX) e sempre passaria.
         return axisLen >= minAxis &&
-            plate.lengthPx >= MIN_NAIL_LEN_PX * USABLE_LENGTH_MIN_FACTOR
+            plate.rawLengthPx >= MIN_NAIL_LEN_PX * USABLE_LENGTH_MIN_FACTOR
     }
 
     fun ellipseRadiusX(anchorWidthNorm: Float, imageWidth: Int): Float =
@@ -166,11 +169,12 @@ object NailPlateCalibration {
         val thumbMode = finger == Finger.THUMB
         val facing = isFacing(thumbMode, tipDipPx = tipDip, tipPipPx = tipPip)
 
-        val lengthPx = when {
-            thumbMode -> (tipMcp * THUMB_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
-            facing -> (tipPip * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
-            else -> (tipDip * scales.lengthScale).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
+        val rawLengthPx = when {
+            thumbMode -> tipMcp * THUMB_LENGTH_SCALE
+            facing -> tipPip * FACING_LENGTH_SCALE
+            else -> tipDip * scales.lengthScale
         }
+        val lengthPx = rawLengthPx.coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
         val widthPx = when {
             facing -> (tipPip * FACING_WIDTH_SCALE).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
             else -> (lengthPx * scales.widthScale).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
@@ -218,6 +222,7 @@ object NailPlateCalibration {
             overshootPx = overshootPx,
             thumbMode = thumbMode,
             facing = facing,
+            rawLengthPx = rawLengthPx,
         )
     }
 

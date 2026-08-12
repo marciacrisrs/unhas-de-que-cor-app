@@ -213,6 +213,28 @@ class NailTryOnPipelineTest {
     }
 
     @Test
+    fun `detect rejected with same working bitmap never recycles user photo`() {
+        val source = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.05f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(source)
+        } returns OrientedHandLandmarks(bitmap = source, landmarks = landmarks)
+
+        assertThat(pipeline.detect(source, stabilize = false)).isNull()
+        verify(exactly = 0) { source.recycle() }
+        verify(exactly = 0) { roiEstimator.estimateAll(any()) }
+    }
+
+    @Test
     fun `detect marks weak reliability when presence is mid-range`() {
         val image = mockk<Bitmap>(relaxed = true) {
             every { width } returns 200
