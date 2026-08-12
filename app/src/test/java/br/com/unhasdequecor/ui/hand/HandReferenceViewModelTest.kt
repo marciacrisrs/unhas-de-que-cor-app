@@ -7,7 +7,6 @@ import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
 import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
-import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
@@ -20,6 +19,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -38,9 +38,11 @@ class HandReferenceViewModelTest {
     private val fileStore = mockk<HandReferenceFileStore>(relaxed = true)
 
     @Before
-    fun stubFileStore() {
+    fun setUp() {
         coEvery { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
         coEvery { fileStore.clearCaptureCache() } just runs
+        // Espelha UnhasDeQueCorApp.onCreate → ensureDefaultHandReference.
+        runBlocking { repository.ensureDefaultSample() }
     }
 
     private fun viewModel(): HandReferenceViewModel = HandReferenceViewModel(
@@ -49,7 +51,6 @@ class HandReferenceViewModelTest {
         saveHandReference = SaveHandReferenceUseCase(repository) { FIXED_NOW_MS },
         useSampleHandReference = UseSampleHandReferenceUseCase(repository) { FIXED_NOW_MS },
         clearHandReference = ClearHandReferenceUseCase(repository),
-        ensureDefaultHandReference = EnsureDefaultHandReferenceUseCase(repository),
         fileStore = fileStore,
     )
 

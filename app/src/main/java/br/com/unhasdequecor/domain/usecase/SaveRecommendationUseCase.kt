@@ -13,6 +13,7 @@ class SaveRecommendationUseCase @Inject constructor(
     suspend operator fun invoke(
         recommendation: ColorRecommendation,
         createdAtEpochMs: Long = clock.now(),
+        idempotencyKey: String? = null,
     ): Long {
         val color = recommendation.color
         return historyRepository.save(
@@ -26,6 +27,7 @@ class SaveRecommendationUseCase @Inject constructor(
                 mood = recommendation.context.mood,
                 createdAtEpochMs = createdAtEpochMs,
                 isFavorite = historyRepository.isFavorite(color.id),
+                idempotencyKey = idempotencyKey,
             ),
         )
     }

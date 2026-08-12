@@ -12,7 +12,6 @@ import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.HandSampleCatalog
 import br.com.unhasdequecor.domain.model.HandSampleOption
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
-import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
@@ -51,7 +50,6 @@ class HandReferenceViewModel @Inject constructor(
     private val saveHandReference: SaveHandReferenceUseCase,
     private val useSampleHandReference: UseSampleHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
-    private val ensureDefaultHandReference: EnsureDefaultHandReferenceUseCase,
     private val fileStore: HandReferenceFileStore,
 ) : ViewModel() {
 
@@ -59,9 +57,6 @@ class HandReferenceViewModel @Inject constructor(
     val uiState: StateFlow<HandReferenceUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            ensureDefaultHandReference()
-        }
         viewModelScope.launch {
             observeHandReference().collect { reference ->
                 _uiState.update { it.copy(reference = reference) }

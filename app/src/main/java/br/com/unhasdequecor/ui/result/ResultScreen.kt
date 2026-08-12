@@ -50,8 +50,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.NailColor
+import br.com.unhasdequecor.ui.components.EmptyContent
+import br.com.unhasdequecor.ui.components.ErrorContent
 import br.com.unhasdequecor.ui.components.HandTryOnPreview
 import br.com.unhasdequecor.ui.components.InfoTag
+import br.com.unhasdequecor.ui.components.LoadingContent
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
@@ -81,8 +84,8 @@ fun ResultScreen(
     ) {
         ResultTopBar(onBack = onBack)
         when {
-            state.isLoading -> ResultLoading()
-            state.errorMessage != null -> ResultError(
+            state.isLoading -> LoadingContent()
+            state.errorMessage != null -> ErrorContent(
                 message = state.errorMessage.orEmpty(),
                 onRetry = viewModel::recommendAgain,
             )
@@ -120,28 +123,6 @@ private fun ResultTopBar(onBack: () -> Unit) {
             containerColor = MaterialTheme.colorScheme.background,
         ),
     )
-}
-
-@Composable
-private fun ResultLoading() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-@Composable
-private fun ResultError(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(28.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(message)
-        Spacer(modifier = Modifier.height(16.dp))
-        PrimaryCtaButton(text = "Tentar de novo", onClick = onRetry)
-    }
 }
 
 @Composable

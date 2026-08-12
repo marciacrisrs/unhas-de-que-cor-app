@@ -44,10 +44,10 @@
 
 ### P2 — higiene
 
-- Telas grandes (`HandReferenceScreen`, `BrandComponents`).
-- Duplicação Histórico/Favoritos e `NailColorApplier` ↔ `PolishMaskRecolorer`.
-- `ensureDefaultHandReference` triplicado; `HandNailDetector` / `SaveRecommendationUseCase` sem uso prod.
-- CI: upload APK/AAB, path morto `reports/coverage/`, ordem Sonar vs assemble.
+- Telas grandes (`HandReferenceScreen`, `BrandComponents`) — ainda pendente.
+- Unificar matemática de recolor (`NailColorApplier` ↔ `PolishMaskRecolorer`) — ainda pendente.
+- ~~Duplicação Histórico/Favoritos~~ · ~~`ensureDefaultHandReference` triplicado~~ · ~~`HandNailDetector` / save órfão~~ — feitos no follow-up P2.
+- CI: path morto `reports/coverage/` (Release AAB + bump já em master).
 
 ---
 
@@ -165,3 +165,20 @@ Branch `cursor/especialistas-followups-535f` (inclui smells #17):
 | 6 | Manifest rede | Feito (`INTERNET`/`ACCESS_NETWORK_STATE` removidos no merge) |
 | 7 | CI artefatos / ordem / permissions | Feito (`SONAR_QUALITY_GATE_WAIT=true` por padrão) |
 | 8 | Keystore + AAB + listing Play | Em andamento — docs/listing/privacidade + workflow AAB; falta keystore da Márcia + Console |
+
+---
+
+## Follow-up P2 higiene (2026-08-12)
+
+Branch `cursor/especialistas-p2-higiene-535f`:
+
+| Item P2 | Status |
+|---------|--------|
+| Duplicação Histórico/Favoritos | Feito — aba Favoritos reusa `HistoryScreen(mode = FAVORITES_ONLY)`; `FavoritesScreen`/`FavoritesViewModel` removidos |
+| `ensureDefaultHandReference` triplicado | Feito — só em `UnhasDeQueCorApp.onCreate`; Result/Hand VMs só observam |
+| `HandNailDetector` sem uso prod | Feito — interface e bind Hilt removidos; MediaPipe só como `HandLandmarkProcessor` |
+| `SaveRecommendationUseCase` sem uso | Feito — `GenerateAndSaveRecommendationUseCase` delega save com `idempotencyKey` |
+| Empty/Loading/Error compartilhados | Feito — `ui/components/AsyncContent.kt` (`LoadingContent`, `EmptyContent`, `ErrorContent`); Result usa |
+| Telas grandes (`HandReferenceScreen`, `BrandComponents`) | Pendente — fatiar em composables menores |
+| Unificar `NailColorApplier` ↔ `PolishMaskRecolorer` | Pendente — mesma matemática de recolor; extrair núcleo comum |
+| CI path morto / upload APK | Parcial — Release AAB + bump de versão já em master; path `reports/coverage/` ainda a limpar |

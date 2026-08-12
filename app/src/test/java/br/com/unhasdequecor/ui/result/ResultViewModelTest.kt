@@ -10,7 +10,6 @@ import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.model.RecommendationSource
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceSource
-import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.GenerateAndSaveRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.GeneratedRecommendation
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
@@ -23,8 +22,10 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,7 +40,12 @@ class ResultViewModelTest {
     private val toggleFavorite = mockk<ToggleFavoriteUseCase>(relaxed = true)
     private val handRepository = FakeHandReferenceRepository()
     private val observeHandReference = ObserveHandReferenceUseCase(handRepository)
-    private val ensureDefaultHandReference = EnsureDefaultHandReferenceUseCase(handRepository)
+
+    @Before
+    fun setUp() {
+        // Espelha UnhasDeQueCorApp.onCreate → ensureDefaultHandReference (não mais no Result VM).
+        runBlocking { handRepository.ensureDefaultSample() }
+    }
 
     private fun viewModel(handle: SavedStateHandle) = ResultViewModel(
         savedStateHandle = handle,
@@ -47,7 +53,6 @@ class ResultViewModelTest {
         restoreRecommendation = restoreRecommendation,
         toggleFavorite = toggleFavorite,
         observeHandReference = observeHandReference,
-        ensureDefaultHandReference = ensureDefaultHandReference,
     )
 
     @Test
@@ -116,7 +121,7 @@ class ResultViewModelTest {
     }
 
     @Test
-    fun `ensures default sample hand for try-on preview`() = runTest {
+    fun `observes default sample hand for try-on preview`() = runTest {
         coEvery {
             generateAndSave(any(), any(), any())
         } returns GeneratedRecommendation(
