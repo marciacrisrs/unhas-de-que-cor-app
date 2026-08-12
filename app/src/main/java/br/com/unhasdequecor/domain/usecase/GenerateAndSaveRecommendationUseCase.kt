@@ -1,12 +1,10 @@
 package br.com.unhasdequecor.domain.usecase
 
 import br.com.unhasdequecor.domain.model.ColorRecommendation
-import br.com.unhasdequecor.domain.model.HistoryEntry
 import br.com.unhasdequecor.domain.model.RecommendationContext
 import br.com.unhasdequecor.domain.model.RecommendationSource
 import br.com.unhasdequecor.domain.repository.HistoryRepository
 import br.com.unhasdequecor.domain.repository.PreferencesRepository
-import br.com.unhasdequecor.domain.time.Clock
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -21,9 +19,9 @@ data class GeneratedRecommendation(
 class GenerateAndSaveRecommendationUseCase @Inject constructor(
     private val recommendByContext: RecommendByContextUseCase,
     private val recommendForMe: RecommendForMeUseCase,
+    private val saveRecommendation: SaveRecommendationUseCase,
     private val historyRepository: HistoryRepository,
     private val preferencesRepository: PreferencesRepository,
-    private val clock: Clock,
 ) {
     suspend operator fun invoke(
         source: RecommendationSource,
@@ -37,21 +35,10 @@ class GenerateAndSaveRecommendationUseCase @Inject constructor(
                 recommendByContext(context.copy(preferredStyles = styles))
             }
         }
-        val color = recommendation.color
-        val isFavorite = historyRepository.isFavorite(color.id)
-        historyRepository.save(
-            HistoryEntry(
-                colorId = color.id,
-                colorName = color.name,
-                colorHex = color.hex,
-                tags = color.tags,
-                source = recommendation.source,
-                occasion = recommendation.context.occasion,
-                mood = recommendation.context.mood,
-                createdAtEpochMs = clock.now(),
-                isFavorite = isFavorite,
-                idempotencyKey = idempotencyKey,
-            ),
+        val isFavorite = historyRepository.isFavorite(recommendation.color.id)
+        saveRecommendation(
+            recommendation = recommendation,
+            idempotencyKey = idempotencyKey,
         )
         return GeneratedRecommendation(
             recommendation = recommendation,

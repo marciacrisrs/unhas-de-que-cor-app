@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Política explícita: histórico, favoritos e preferências locais podem ir no backup.
-  Foto da mão (files/hand_reference/) fica de fora — só entram paths listados.
+  Política explícita (include-only): histórico, favoritos e preferências locais
+  podem ir no backup. Foto da mão (files/hand_reference/) fica de fora porque
+  não está listada abaixo.
   Domínios: database (Room) e files/datastore (Preferences DataStore).
+  Nota: o path da mão no DataStore pode apontar para arquivo ausente após restore;
+  HandReferenceRepositoryImpl.observe() trata path inválido como null e o App
+  reinsere a amostra padrão via ensureDefaultHandReference.
 -->
 <full-backup-content>
     <include domain="database" path="unhas_de_que_cor.db" />

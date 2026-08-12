@@ -12,7 +12,6 @@ import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.HandSampleCatalog
 import br.com.unhasdequecor.domain.model.HandSampleOption
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
-import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
@@ -51,7 +50,6 @@ class HandReferenceViewModel @Inject constructor(
     private val saveHandReference: SaveHandReferenceUseCase,
     private val useSampleHandReference: UseSampleHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
-    private val ensureDefaultHandReference: EnsureDefaultHandReferenceUseCase,
     private val fileStore: HandReferenceFileStore,
 ) : ViewModel() {
 
@@ -59,9 +57,6 @@ class HandReferenceViewModel @Inject constructor(
     val uiState: StateFlow<HandReferenceUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            ensureDefaultHandReference()
-        }
         viewModelScope.launch {
             observeHandReference().collect { reference ->
                 _uiState.update { it.copy(reference = reference) }
@@ -185,8 +180,11 @@ class HandReferenceViewModel @Inject constructor(
     }
 
     fun discardPendingUserPhoto() {
-        _uiState.update {
-            it.copy(pendingUserPreviewPath = null, isSaving = false)
+        viewModelScope.launch {
+            fileStore.clearCaptureCache()
+            _uiState.update {
+                it.copy(pendingUserPreviewPath = null, isSaving = false)
+            }
         }
     }
 
@@ -226,6 +224,7 @@ class HandReferenceViewModel @Inject constructor(
                     }
                 }
                 is HandReferenceSaveOutcome.Rejected -> {
+                    fileStore.clearCaptureCache()
                     _uiState.update {
                         it.copy(
                             isSaving = false,
@@ -263,6 +262,7 @@ class HandReferenceViewModel @Inject constructor(
                 }
             }
             is HandReferenceSaveOutcome.Rejected -> {
+                fileStore.clearCaptureCache()
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -282,5 +282,10 @@ class HandReferenceViewModel @Inject constructor(
             "A foto é muito grande. Escolha uma imagem de até 15 MB."
         HandReferenceRejection.IO_ERROR ->
             "Não foi possível salvar a foto. Tente de novo."
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        fileStore.clearCaptureCacheNow()
     }
 }

@@ -15,8 +15,21 @@ data class NailTryOnResult(
 )
 
 /**
+ * Detecção estável (landmarks + máscaras) reutilizável quando só a cor do esmalte muda.
+ */
+data class NailDetectionSnapshot(
+    val workingBitmap: Bitmap,
+    val nails: List<DetectedNail>,
+    val landmarks: HandLandmarks?,
+    /** True se [workingBitmap] é bitmap intermediária (ex.: rotação) distinta da fonte. */
+    val ownsWorkingBitmap: Boolean,
+)
+
+/**
  * Pipeline: landmarks → ROI → segmentação → tracking → cor.
  * Pronto para câmera ao vivo; hoje usado na foto estática do Resultado.
+ *
+ * Separe [detect] de [recolor] para não reprocessar MediaPipe a cada troca de cor.
  */
 @Singleton
 class NailTryOnPipeline @Inject constructor(
@@ -38,6 +51,22 @@ class NailTryOnPipeline @Inject constructor(
         polishColor: Color,
         stabilize: Boolean = false,
     ): NailTryOnResult? {
+        val snapshot = detect(image, stabilize) ?: return null
+        val result = recolor(snapshot, polishColor)
+        // process() é one-shot: se a pintura gerou bitmap nova e working era intermediária, libera.
+        if (result.bitmap !== snapshot.workingBitmap &&
+            snapshot.ownsWorkingBitmap &&
+            !snapshot.workingBitmap.isRecycled
+        ) {
+            snapshot.workingBitmap.recycle()
+        }
+        return result
+    }
+
+    fun detect(
+        image: Bitmap,
+        stabilize: Boolean = false,
+    ): NailDetectionSnapshot? {
         val oriented = landmarkProcessor.detectLandmarksWithOrientationFallback(image)
             ?: return null
         val landmarks = oriented.landmarks
@@ -62,27 +91,37 @@ class NailTryOnPipeline @Inject constructor(
             tracker.reset()
             detected
         }
-        // Almond suave (ROI alargada) primeiro; elipse+Recolorer se a geo falhar.
-        val painted = colorApplier.apply(working, nails, polishColor)
-            ?: ellipseFallback(working, landmarks, polishColor)
-            ?: working
-        // Se a pintura gerou bitmap nova e `working` era rotação intermediária, libera.
-        if (painted !== working && working !== image && !working.isRecycled) {
-            working.recycle()
-        }
-        return NailTryOnResult(
-            bitmap = painted,
+        return NailDetectionSnapshot(
+            workingBitmap = working,
             nails = nails,
             landmarks = landmarks,
+            ownsWorkingBitmap = working !== image,
+        )
+    }
+
+    fun recolor(
+        snapshot: NailDetectionSnapshot,
+        polishColor: Color,
+    ): NailTryOnResult {
+        val working = snapshot.workingBitmap
+        // Almond suave (ROI alargada) primeiro; elipse+Recolorer se a geo falhar.
+        val painted = colorApplier.apply(working, snapshot.nails, polishColor)
+            ?: ellipseFallback(working, snapshot.landmarks, polishColor)
+            ?: working
+        return NailTryOnResult(
+            bitmap = painted,
+            nails = snapshot.nails,
+            landmarks = snapshot.landmarks,
             debugEnabled = debugEnabled,
         )
     }
 
     private fun ellipseFallback(
         image: Bitmap,
-        landmarks: HandLandmarks,
+        landmarks: HandLandmarks?,
         polishColor: Color,
     ): Bitmap? {
+        if (landmarks == null) return null
         val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
             landmarks = landmarks.points.map {
                 NailLandmarkMapper.NormalizedPoint(it.x, it.y)

@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.RecommendationContext
-import br.com.unhasdequecor.domain.usecase.EnsureDefaultHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.GenerateAndSaveRecommendationUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.RestoreRecommendationUseCase
@@ -43,7 +42,6 @@ class ResultViewModel @Inject constructor(
     private val restoreRecommendation: RestoreRecommendationUseCase,
     private val toggleFavorite: ToggleFavoriteUseCase,
     observeHandReference: ObserveHandReferenceUseCase,
-    ensureDefaultHandReference: EnsureDefaultHandReferenceUseCase,
 ) : ViewModel() {
 
     private val source = ResultSources.toDomain(checkNotNull(savedStateHandle["source"]))
@@ -58,9 +56,6 @@ class ResultViewModel @Inject constructor(
     val uiState: StateFlow<ResultUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            ensureDefaultHandReference()
-        }
         viewModelScope.launch {
             observeHandReference().collect { hand ->
                 _uiState.update {

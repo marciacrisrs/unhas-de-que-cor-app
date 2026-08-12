@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import br.com.unhasdequecor.ui.components.EmptyContent
 import br.com.unhasdequecor.ui.components.FilterTab
 import br.com.unhasdequecor.ui.components.HistoryRow
 import br.com.unhasdequecor.ui.components.HistoryRowModel
@@ -38,9 +40,23 @@ import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 @Composable
 fun HistoryScreen(
     onOpenResult: (HistoryRowUi) -> Unit,
+    mode: HistoryScreenMode = HistoryScreenMode.FULL,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(mode) {
+        if (mode == HistoryScreenMode.FAVORITES_ONLY) {
+            viewModel.onFilterSelected(HistoryFilter.FAVORITES)
+        }
+    }
+
+    val title = if (mode == HistoryScreenMode.FAVORITES_ONLY) "Favoritos" else "Histórico"
+    val subtitle = if (mode == HistoryScreenMode.FAVORITES_ONLY) {
+        "Cores que você quer repetir"
+    } else {
+        "Suas escolhas recentes"
+    }
 
     Column(
         modifier = Modifier
@@ -48,19 +64,30 @@ fun HistoryScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 20.dp),
     ) {
-        HistoryHeader()
+        HistoryHeader(title = title, subtitle = subtitle)
         Spacer(modifier = Modifier.height(16.dp))
-        HistoryFilterTabs(
-            filter = state.filter,
-            onFilterSelected = viewModel::onFilterSelected,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        if (mode == HistoryScreenMode.FULL) {
+            HistoryFilterTabs(
+                filter = state.filter,
+                onFilterSelected = viewModel::onFilterSelected,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         if (state.isEmpty) {
-            HistoryEmptyMessage(filter = state.filter)
+            EmptyContent(
+                message = if (state.filter == HistoryFilter.FAVORITES ||
+                    mode == HistoryScreenMode.FAVORITES_ONLY
+                ) {
+                    "Nenhuma favorita ainda. Salve uma recomendação com o coração."
+                } else {
+                    "Seu histórico aparece aqui depois da primeira recomendação."
+                },
+            )
         } else {
             HistoryList(
                 state = state,
+                showStats = mode == HistoryScreenMode.FULL,
                 onToggleFavorite = viewModel::onToggleFavorite,
                 onOpenResult = onOpenResult,
             )
@@ -69,7 +96,10 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun HistoryHeader() {
+private fun HistoryHeader(
+    title: String,
+    subtitle: String,
+) {
     Spacer(modifier = Modifier.height(12.dp))
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -77,9 +107,9 @@ private fun HistoryHeader() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text("Histórico", style = MaterialTheme.typography.headlineLarge)
+            Text(title, style = MaterialTheme.typography.headlineLarge)
             Text(
-                text = "Suas escolhas recentes",
+                text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -120,21 +150,9 @@ private fun HistoryFilterTabs(
 }
 
 @Composable
-private fun HistoryEmptyMessage(filter: HistoryFilter) {
-    Text(
-        text = if (filter == HistoryFilter.FAVORITES) {
-            "Nenhuma favorita ainda. Salve uma recomendação com o coração."
-        } else {
-            "Seu histórico aparece aqui depois da primeira recomendação."
-        },
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
 private fun HistoryList(
     state: HistoryUiState,
+    showStats: Boolean,
     onToggleFavorite: (HistoryRowUi) -> Unit,
     onOpenResult: (HistoryRowUi) -> Unit,
 ) {
@@ -156,8 +174,12 @@ private fun HistoryList(
                 )
             }
         }
-        item {
-            HistoryStatsBanner(distinctColorCount = state.distinctColorCount)
+        if (showStats) {
+            item {
+                HistoryStatsBanner(distinctColorCount = state.distinctColorCount)
+            }
+        } else {
+            item { Spacer(modifier = Modifier.height(88.dp)) }
         }
     }
 }

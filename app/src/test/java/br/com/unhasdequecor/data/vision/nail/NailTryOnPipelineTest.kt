@@ -93,4 +93,61 @@ class NailTryOnPipelineTest {
         assertThat(result.nails).hasSize(1)
         assertThat(result.nails.first().finger).isEqualTo(Finger.MIDDLE)
     }
+
+    @Test
+    fun `detect then recolor avoids second landmark pass`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val paintedRed = mockk<Bitmap>(relaxed = true)
+        val paintedBlue = mockk<Bitmap>(relaxed = true)
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+
+        val roi = NailRoi(
+            finger = Finger.MIDDLE,
+            bounds = PixelRect(left = 90, top = 40, right = 110, bottom = 80),
+            polygon = listOf(
+                PixelPoint(90f, 40f),
+                PixelPoint(110f, 40f),
+                PixelPoint(110f, 80f),
+                PixelPoint(90f, 80f),
+            ),
+            axisFromDip = PixelPoint(100f, 70f),
+            axisToTip = PixelPoint(100f, 45f),
+            lengthPx = 40f,
+            widthPx = 20f,
+            rotationDegrees = 0f,
+            geometricConfidence = 0.9f,
+        )
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(roi)
+        val mask = NailMask(
+            width = 20,
+            height = 40,
+            alpha = ByteArray(20 * 40) { 255.toByte() },
+            originX = 90,
+            originY = 40,
+        )
+        every { segmenter.segment(image, roi) } returns mask
+        every { colorApplier.apply(image, any(), Color.Red) } returns paintedRed
+        every { colorApplier.apply(image, any(), Color.Blue) } returns paintedBlue
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+        assertThat(snapshot).isNotNull()
+        val red = pipeline.recolor(checkNotNull(snapshot), Color.Red)
+        val blue = pipeline.recolor(snapshot, Color.Blue)
+
+        assertThat(red.bitmap).isSameInstanceAs(paintedRed)
+        assertThat(blue.bitmap).isSameInstanceAs(paintedBlue)
+        verify(exactly = 1) { landmarkProcessor.detectLandmarksWithOrientationFallback(image) }
+        verify(exactly = 1) { segmenter.segment(image, roi) }
+    }
 }

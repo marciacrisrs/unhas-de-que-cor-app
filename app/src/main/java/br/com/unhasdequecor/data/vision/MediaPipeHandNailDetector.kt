@@ -4,8 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates
-import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
-import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -16,38 +14,15 @@ import javax.inject.Singleton
 
 /**
  * Detecção de mão via MediaPipe Hand Landmarker (IMAGE).
- * Expõe landmarks brutos ([HandLandmarkProcessor]) e âncoras legadas ([HandNailDetector]).
+ * Expõe landmarks brutos ([HandLandmarkProcessor]) para o pipeline de try-on.
  */
 @Singleton
 class MediaPipeHandNailDetector @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) : HandLandmarkProcessor, HandNailDetector {
+) : HandLandmarkProcessor {
 
     @Volatile
     private var landmarker: HandLandmarker? = null
-
-    override fun detect(bitmap: Bitmap): List<NailOverlayAnchor>? {
-        val landmarks = detectLandmarks(bitmap) ?: return null
-        return NailLandmarkMapper.fromNormalizedLandmarks(
-            landmarks = landmarks.points.map {
-                NailLandmarkMapper.NormalizedPoint(it.x, it.y)
-            },
-            imageWidth = landmarks.imageWidth,
-            imageHeight = landmarks.imageHeight,
-        )
-    }
-
-    override fun detectWithOrientationFallback(bitmap: Bitmap): DetectedHand? {
-        val oriented = detectLandmarksWithOrientationFallback(bitmap) ?: return null
-        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
-            landmarks = oriented.landmarks.points.map {
-                NailLandmarkMapper.NormalizedPoint(it.x, it.y)
-            },
-            imageWidth = oriented.landmarks.imageWidth,
-            imageHeight = oriented.landmarks.imageHeight,
-        ) ?: return null
-        return DetectedHand(bitmap = oriented.bitmap, anchors = anchors)
-    }
 
     override fun detectLandmarks(bitmap: Bitmap): HandLandmarks? =
         detectLandmarksOnBitmap(bitmap)

@@ -24,10 +24,14 @@ class HandReferenceRepositoryImpl @Inject constructor(
 ) : HandReferenceRepository {
 
     override fun observe(): Flow<HandReference?> = preferences.observe().map { reference ->
-        if (reference != null && fileStore.fileExists(reference.localPath)) {
-            reference
-        } else {
-            null
+        when {
+            reference == null -> null
+            fileStore.fileExists(reference.localPath) -> reference
+            else -> {
+                // Backup/restore sem a foto: path no DataStore fica órfão.
+                // emitimos null; ensureDefaultSample reinsere a amostra.
+                null
+            }
         }
     }
 

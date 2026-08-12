@@ -29,9 +29,9 @@ class GenerateAndSaveRecommendationUseCaseTest {
     private val useCase = GenerateAndSaveRecommendationUseCase(
         recommendByContext = RecommendByContextUseCase(catalog, history, engine),
         recommendForMe = RecommendForMeUseCase(catalog, history, preferences, engine),
+        saveRecommendation = SaveRecommendationUseCase(history, clock),
         historyRepository = history,
         preferencesRepository = preferences,
-        clock = clock,
     )
 
     @Test

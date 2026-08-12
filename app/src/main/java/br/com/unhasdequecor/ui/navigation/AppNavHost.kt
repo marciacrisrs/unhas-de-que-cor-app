@@ -15,9 +15,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import br.com.unhasdequecor.ui.context.ContextChoiceScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceViewModel
-import br.com.unhasdequecor.ui.favorites.FavoritesScreen
 import br.com.unhasdequecor.ui.history.HistoryRowUi
 import br.com.unhasdequecor.ui.history.HistoryScreen
+import br.com.unhasdequecor.ui.history.HistoryScreenMode
 import br.com.unhasdequecor.ui.hand.HandReferenceScreen
 import br.com.unhasdequecor.ui.home.HomeScreen
 import br.com.unhasdequecor.ui.profile.ProfileScreen
@@ -124,7 +124,10 @@ fun AppNavHost() {
                 HistoryScreen(onOpenResult = ::openResultFromHistory)
             }
             composable(Routes.FAVORITES) {
-                FavoritesScreen(onOpenResult = ::openResultFromHistory)
+                HistoryScreen(
+                    onOpenResult = ::openResultFromHistory,
+                    mode = HistoryScreenMode.FAVORITES_ONLY,
+                )
             }
             composable(Routes.PROFILE) {
                 ProfileScreen(
