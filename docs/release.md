@@ -21,6 +21,15 @@ RELEASE_KEY_ALIAS=upload
 RELEASE_KEY_PASSWORD=...
 ```
 
+**Windows** — use barra `/`, path absoluto, **sem aspas**:
+
+```properties
+RELEASE_STORE_FILE=C:/Users/marci/keys/unhas-de-que-cor-upload.jks
+RELEASE_STORE_PASSWORD=sua_senha
+RELEASE_KEY_ALIAS=upload
+RELEASE_KEY_PASSWORD=sua_senha
+```
+
 Sem essas props, `assembleRelease` / `bundleRelease` usam assinatura **debug** (só para validar minify/R8).
 
 ### Secrets no GitHub (workflow Release AAB)
