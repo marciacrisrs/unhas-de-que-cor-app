@@ -39,9 +39,16 @@ private fun NavController.openResultFromHistory(entry: HistoryRowUi) {
 }
 
 private fun NavController.returnHomeAfterHandSelected(flash: String?) {
-    getBackStackEntry(Routes.HOME)
-        .savedStateHandle[HomeViewModel.FLASH_MESSAGE_KEY] = flash
-    popBackStack(Routes.HOME, inclusive = false)
+    runCatching { getBackStackEntry(Routes.HOME) }
+        .getOrNull()
+        ?.savedStateHandle
+        ?.set(HomeViewModel.FLASH_MESSAGE_KEY, flash)
+    val popped = popBackStack(Routes.HOME, inclusive = false)
+    if (!popped) {
+        navigate(Routes.HOME) {
+            launchSingleTop = true
+        }
+    }
 }
 
 private fun NavController.navigateBottomTab(route: String) {

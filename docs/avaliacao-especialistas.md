@@ -269,9 +269,9 @@ de paint path; constantes mágicas sem ground-truth.
 | Pri | Item | Status |
 |-----|------|--------|
 | P0 | Confirmar QG Sonar #35/#36 na CI | Em andamento (Verify) |
-| P1 | Testes `paintUserPreview` / empty anchors | Aberto |
-| P1 | Guarda `getBackStackEntry(HOME)` | Aberto |
-| P1 | A11y: banner try-on + convite `maxLines` | Aberto |
+| P1 | Testes `paintUserPreview` / empty anchors | Feito (contrato `planRender` + labels) |
+| P1 | Guarda `getBackStackEntry(HOME)` | Feito |
+| P1 | A11y: banner try-on + convite `maxLines` | Feito |
 | P2 | Result→mão destino; chrome Favoritos; smells History | Aberto |
 | P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Aberto |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
@@ -286,8 +286,18 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 | Regra | Comportamento |
 |-------|----------------|
 | `presenceScore` &lt; 0.28 | `REJECTED` → `detect` retorna `null` (sem claim) |
-| 0.28–0.55 (sem ≥3 máscaras) | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” |
+| 0.28–0.55 | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” (mesmo com ≥3 máscaras) |
 | ≥0.55 **e** ≥3 máscaras | `STRONG` + `FULL` → “Prévia na sua mão” |
 | Elipse / poucas máscaras | Nunca `FULL` — modo ≈ qualidade |
 
-Backlog residual: smoke em device (luz frontal vs contraluz); a11y banner; CHANGELOG no próximo release.
+### Reavaliação especialistas (pós-PR #44) — melhorias aplicadas
+
+| Especialista | Achado | Status |
+|--------------|--------|--------|
+| Vision / UI | TalkBack CD dizia “na sua mão” em qualquer modo | Feito — `TryOnPreviewLabels` |
+| Vision | Mid presence + ≥3 máscaras virava FULL | Feito — classify só por presence; FULL = STRONG ∧ ≥3 máscaras |
+| A11y | Banner alpha 0.88 + CD duplicado; convite `maxLines=1` | Feito — primary sólido, `clearAndSetSemantics`, convite `maxLines=2` + CD completo |
+| Android | `getBackStackEntry(HOME)` sem guarda | Feito — `runCatching` + fallback `navigate(HOME)` |
+| Test | Gaps reliability / labels / applier early-return | Feito — testes + JaCoCo `TryOnPreviewLabels*` |
+
+Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).

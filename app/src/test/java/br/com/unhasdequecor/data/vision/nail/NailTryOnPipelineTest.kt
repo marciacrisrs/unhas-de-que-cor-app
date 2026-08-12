@@ -171,6 +171,7 @@ class NailTryOnPipelineTest {
                 nails = emptyList(),
                 landmarks = landmarks,
                 ownsWorkingBitmap = false,
+                reliability = TryOnReliability.STRONG,
             ),
             Color.Red,
         )

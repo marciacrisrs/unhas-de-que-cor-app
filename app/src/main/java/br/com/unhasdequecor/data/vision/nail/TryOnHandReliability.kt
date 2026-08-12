@@ -13,7 +13,7 @@ enum class TryOnReliability {
     REJECTED,
     /** Landmarks usable só como prévia aproximada. */
     WEAK,
-    /** Detecção boa o bastante para claim pleno quando há máscaras. */
+    /** Presence forte — claim FULL só se também houver máscaras suficientes. */
     STRONG,
 }
 
@@ -37,29 +37,28 @@ object TryOnHandReliability {
     /** Abaixo disso: falso positivo típico pós-enhance — descartar. */
     const val MIN_PRESENCE_ACCEPT = 0.28f
 
-    /** Acima disso: claim FULL permitido (com máscaras). */
+    /** Acima disso: claim FULL permitido (com ≥ [MIN_MASKS_FOR_FULL] máscaras). */
     const val MIN_PRESENCE_STRONG = 0.55f
 
     const val MIN_MASKS_FOR_FULL = 3
 
-    fun classify(
-        presenceScore: Float,
-        reliableNailCount: Int = 0,
-    ): TryOnReliability {
+    /**
+     * Classifica só por presence. Máscaras **não** elevam para STRONG —
+     * mid presence + muitas máscaras continua WEAK → APPROXIMATE (nunca FULL).
+     */
+    fun classify(presenceScore: Float): TryOnReliability {
         val score = presenceScore.coerceIn(0f, 1f)
         if (score < MIN_PRESENCE_ACCEPT) return TryOnReliability.REJECTED
-        if (score >= MIN_PRESENCE_STRONG || reliableNailCount >= MIN_MASKS_FOR_FULL) {
-            return TryOnReliability.STRONG
-        }
+        if (score >= MIN_PRESENCE_STRONG) return TryOnReliability.STRONG
         return TryOnReliability.WEAK
     }
 
-    fun classify(landmarks: HandLandmarks, reliableNailCount: Int): TryOnReliability =
-        classify(landmarks.presenceScore, reliableNailCount)
+    fun classify(landmarks: HandLandmarks): TryOnReliability =
+        classify(landmarks.presenceScore)
 
     /**
      * Plano de renderização honesto (modo ≡ qualidade).
-     * Elipse sozinha **nunca** é FULL.
+     * FULL exige STRONG **e** ≥ [MIN_MASKS_FOR_FULL] máscaras. Elipse sozinha nunca é FULL.
      */
     fun planRender(
         reliability: TryOnReliability?,
@@ -67,12 +66,7 @@ object TryOnHandReliability {
         hasMappableAnchors: Boolean,
     ): UserTryOnRenderPlan {
         if (reliability == null || reliability == TryOnReliability.REJECTED) {
-            return UserTryOnRenderPlan(
-                mode = UserTryOnRenderMode.NONE,
-                useNailMasks = false,
-                useEllipsePaint = false,
-                useCanvasAnchors = false,
-            )
+            return nonePlan()
         }
         val masksOk = nailCount >= MIN_MASKS_FOR_FULL
         val anyMask = nailCount > 0
@@ -96,12 +90,7 @@ object TryOnHandReliability {
                     useEllipsePaint = true,
                     useCanvasAnchors = true,
                 )
-                else -> UserTryOnRenderPlan(
-                    mode = UserTryOnRenderMode.NONE,
-                    useNailMasks = false,
-                    useEllipsePaint = false,
-                    useCanvasAnchors = false,
-                )
+                else -> nonePlan()
             }
             TryOnReliability.WEAK -> when {
                 hasMappableAnchors || anyMask -> UserTryOnRenderPlan(
@@ -110,14 +99,16 @@ object TryOnHandReliability {
                     useEllipsePaint = true,
                     useCanvasAnchors = hasMappableAnchors && !anyMask,
                 )
-                else -> UserTryOnRenderPlan(
-                    mode = UserTryOnRenderMode.NONE,
-                    useNailMasks = false,
-                    useEllipsePaint = false,
-                    useCanvasAnchors = false,
-                )
+                else -> nonePlan()
             }
             TryOnReliability.REJECTED -> error("handled above")
         }
     }
+
+    private fun nonePlan() = UserTryOnRenderPlan(
+        mode = UserTryOnRenderMode.NONE,
+        useNailMasks = false,
+        useEllipsePaint = false,
+        useCanvasAnchors = false,
+    )
 }
