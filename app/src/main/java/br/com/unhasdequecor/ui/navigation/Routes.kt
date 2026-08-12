@@ -13,6 +13,7 @@ object Routes {
     const val FAVORITES = "favorites"
     const val PROFILE = "profile"
     const val HAND_REFERENCE = "hand_reference"
+    const val ABOUT = "about"
 
     const val NONE = "none"
 
