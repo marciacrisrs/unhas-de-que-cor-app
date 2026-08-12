@@ -23,16 +23,36 @@ RELEASE_KEY_PASSWORD=...
 
 Sem essas props, `assembleRelease` / `bundleRelease` usam assinatura **debug** (só para validar minify/R8).
 
-### Secrets no GitHub (workflow Release AAB)
+### Secrets no GitHub (release automática)
+
+Em **Settings → Secrets and variables → Actions**, crie:
 
 | Secret | Conteúdo |
 |--------|----------|
-| `RELEASE_KEYSTORE_BASE64` | `base64 -w0 seu.jks` |
+| `RELEASE_KEYSTORE_BASE64` | No PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\marci\keys\unhas-de-que-cor-upload.jks"))` — no bash: `base64 -w0 seu.jks` |
 | `RELEASE_STORE_PASSWORD` | senha do store |
 | `RELEASE_KEY_ALIAS` | ex. `upload` |
 | `RELEASE_KEY_PASSWORD` | senha da key |
+| `PLAY_SERVICE_ACCOUNT_JSON` | (opcional) JSON da service account da Play API, para upload na faixa internal |
 
-Dispare **Actions → Release AAB → Run workflow**.
+### Como dispara
+
+**Automático (recomendado)** — tag semântica a partir do `master`:
+
+```bash
+git checkout master
+git pull
+# ajuste versionName/versionCode se necessário, commit, depois:
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+O workflow **Release AAB** roda, gera o AAB assinado e publica como artifact do Actions.
+
+**Manual** — Actions → **Release AAB** → Run workflow.  
+Marque *upload_play_internal* só se `PLAY_SERVICE_ACCOUNT_JSON` estiver configurado (sobe draft na faixa internal).
+
+Sem os secrets `RELEASE_*`, o workflow **falha de propósito** (não publica AAB assinado com debug).
 
 ## 2. Build local
 

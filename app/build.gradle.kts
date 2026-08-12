@@ -29,10 +29,21 @@ android {
 
     signingConfigs {
         create("release") {
-            val storeFilePath = (project.findProperty("RELEASE_STORE_FILE") as String?)
+            val rawStorePath = (project.findProperty("RELEASE_STORE_FILE") as String?)
                 ?: System.getenv("RELEASE_STORE_FILE")
-            if (!storeFilePath.isNullOrBlank()) {
-                storeFile = file(storeFilePath)
+            // Trim + tira aspas “inteligentes”/normais (comum no Windows ao colar path).
+            val storeFilePath = rawStorePath
+                ?.trim()
+                ?.trim('"', '\'', '\u201C', '\u201D', '\u2018', '\u2019')
+                ?.takeIf { it.isNotBlank() }
+            if (storeFilePath != null) {
+                val resolved = java.io.File(storeFilePath)
+                storeFile = if (resolved.isAbsolute) {
+                    resolved
+                } else {
+                    // Relativo à raiz do repo (não ao módulo :app).
+                    rootProject.file(storeFilePath)
+                }
                 storePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
                     ?: System.getenv("RELEASE_STORE_PASSWORD")
                 keyAlias = (project.findProperty("RELEASE_KEY_ALIAS") as String?)
