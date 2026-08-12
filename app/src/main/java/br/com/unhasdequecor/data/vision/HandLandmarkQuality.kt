@@ -10,14 +10,14 @@ import kotlin.math.hypot
  */
 object HandLandmarkQuality {
     /**
-     * Span mínimo para early-stop com presence alta.
-     * Abaixo disso tips estão colapsadas (punho / enhance frágil) — continua buscando.
+     * Span mínimo para considerar tips “não colapsadas” (ranking / STRONG).
+     * Punho / oclusão tipicamente fica abaixo.
      */
     const val MIN_TIP_SPAN_FOR_EARLY_STOP = 0.18f
 
     /**
-     * Span de mão aberta: permite early-stop já em presence STRONG
-     * (evita varrer ~21 variantes quando a geometria já é boa).
+     * Span de mão aberta: early-stop e claim STRONG exigem pelo menos isto
+     * (evita parar em semi-punho com presence alta).
      */
     const val GOOD_OPEN_TIP_SPAN = 0.28f
 
@@ -58,17 +58,12 @@ object HandLandmarkQuality {
         rankingScore(landmarks.presenceScore, tipSpanNorm(landmarks.points))
 
     /**
-     * Para de buscar variantes quando presence é alta **e** as tips estão espalhadas,
-     * ou quando já há mão aberta com presence STRONG (economia de variantes).
+     * Para de buscar variantes só com presence forte **e** tip-span de mão aberta.
+     * Presence alta com span médio (0.18) ainda continua — flash recovery pode melhorar.
      */
     fun shouldStopSearching(presenceScore: Float, tipSpan: Float): Boolean {
         val p = presenceScore.coerceIn(0f, 1f)
         val s = tipSpan.coerceIn(0f, 1f)
-        if (p >= DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP &&
-            s >= MIN_TIP_SPAN_FOR_EARLY_STOP
-        ) {
-            return true
-        }
         return p >= DetectionConfidenceFloor.HAND_PRESENCE_STRONG &&
             s >= GOOD_OPEN_TIP_SPAN
     }

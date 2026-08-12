@@ -7,11 +7,10 @@ import org.junit.Test
 class HandPresenceScoringTest {
 
     @Test
-    fun tipGlare_doesNotDropClearHandednessBelowAccept() {
-        // Flash estoura tips → tip presence baixa, mas handedness clara.
+    fun tipGlare_keepsAcceptButNotStrong() {
         val score = HandPresenceScoring.score(handednessScore = 0.72f, tipPresence = 0.05f)
         assertThat(score).isAtLeast(DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT)
-        assertThat(score).isAtLeast(0.72f)
+        assertThat(score).isLessThan(DetectionConfidenceFloor.HAND_PRESENCE_STRONG)
     }
 
     @Test
@@ -21,8 +20,9 @@ class HandPresenceScoringTest {
     }
 
     @Test
-    fun strongTips_raiseWeakHandedness() {
+    fun strongTips_raiseWeakHandednessViaBlend() {
         val score = HandPresenceScoring.score(handednessScore = 0.20f, tipPresence = 0.90f)
-        assertThat(score).isAtLeast(0.90f)
+        // 0.20*0.35 + 0.90*0.65 = 0.655; max com tip → 0.90
+        assertThat(score).isWithin(0.001f).of(0.90f)
     }
 }

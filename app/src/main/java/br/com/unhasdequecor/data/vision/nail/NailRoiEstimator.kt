@@ -97,6 +97,7 @@ class NailRoiEstimator @Inject constructor() {
             tipPip = tipPip,
             tipMcp = tipMcp,
             nailLen = nailLen,
+            rawLengthPx = plate.rawLengthPx,
             nailWidth = nailWidth,
             thumbMode = plate.thumbMode,
             facing = plate.facing,
@@ -121,6 +122,7 @@ class NailRoiEstimator @Inject constructor() {
         tipPip: Float,
         tipMcp: Float,
         nailLen: Float,
+        rawLengthPx: Float,
         nailWidth: Float,
         thumbMode: Boolean,
         facing: Boolean,
@@ -138,9 +140,10 @@ class NailRoiEstimator @Inject constructor() {
             aspect in 0.9f..2.8f -> 0.75f
             else -> 0.4f
         }
+        // sizeScore usa comprimento pré-coerce (coerceIn inflava placa colapsada).
         val sizeScore = when {
-            nailLen in 16f..140f -> 1f
-            nailLen in 10f..180f -> 0.65f
+            rawLengthPx in 16f..140f -> 1f
+            rawLengthPx in 10f..180f -> 0.65f
             else -> 0.3f
         }
         return (
