@@ -33,7 +33,7 @@ class MediaPipeHandNailDetector @Inject constructor(
         detectLandmarksOnBitmap(bitmap, remap = { it })
 
     override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
-        val created = ArrayList<Bitmap>(16)
+        val created = ArrayList<Bitmap>(OWNED_VARIANT_CAPACITY)
         var best: OrientedHandLandmarks? = null
         var bestLandmarks: HandLandmarks? = null
         try {
@@ -217,5 +217,7 @@ class MediaPipeHandNailDetector @Inject constructor(
         /** Mais permissivo: fotos com contraluz / mão retinta falhavam em 0.20. */
         private const val MIN_CONFIDENCE = DetectionConfidenceFloor.MEDIAPIPE_MIN
         private const val MAX_INFERENCE_EDGE = 1280
+        /** Bitmaps intermediários (flash/espelho/rotação) — evita realocar a lista quente. */
+        private const val OWNED_VARIANT_CAPACITY = 40
     }
 }

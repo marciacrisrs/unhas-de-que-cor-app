@@ -22,10 +22,24 @@ import org.junit.Test
 class TryOnDifficultConditionsTest {
 
     @Test
-    fun flashTipGlare_presenceComHandednessClara_naoRejeita() {
+    fun flashTipGlare_presenceComHandednessClara_aceitaMasNaoStrong() {
         val score = HandPresenceScoring.score(handednessScore = 0.68f, tipPresence = 0.04f)
         assertThat(score).isAtLeast(DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT)
-        assertThat(TryOnHandReliability.classify(score)).isNotEqualTo(TryOnReliability.REJECTED)
+        assertThat(score).isLessThan(DetectionConfidenceFloor.HAND_PRESENCE_STRONG)
+        assertThat(TryOnHandReliability.classify(score)).isEqualTo(TryOnReliability.WEAK)
+    }
+
+    @Test
+    fun presenceAltaComTipsColapsadas_classifyLandmarksFicaWeak() {
+        val fist =
+            HandLandmarks(
+                points = List(21) { NormPoint(0.50f, 0.55f) },
+                imageWidth = 800,
+                imageHeight = 1200,
+                presenceScore = 0.90f,
+            )
+        assertThat(TryOnHandReliability.classify(0.90f)).isEqualTo(TryOnReliability.STRONG)
+        assertThat(TryOnHandReliability.classify(fist)).isEqualTo(TryOnReliability.WEAK)
     }
 
 
@@ -255,6 +269,12 @@ class TryOnDifficultConditionsTest {
             HandLandmarkQuality.shouldStopSearching(
                 presenceScore = DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP,
                 tipSpan = HandLandmarkQuality.MIN_TIP_SPAN_FOR_EARLY_STOP,
+            ),
+        ).isFalse()
+        assertThat(
+            HandLandmarkQuality.shouldStopSearching(
+                presenceScore = DetectionConfidenceFloor.HAND_PRESENCE_STRONG,
+                tipSpan = HandLandmarkQuality.GOOD_OPEN_TIP_SPAN,
             ),
         ).isTrue()
     }

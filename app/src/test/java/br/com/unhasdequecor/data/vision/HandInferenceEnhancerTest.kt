@@ -94,4 +94,38 @@ class HandInferenceEnhancerTest {
         assertThat(HandInferenceEnhancer.luminance(pixels[1])).isLessThan(0xF0)
         assertThat(HandInferenceEnhancer.luminance(pixels[1])).isGreaterThan(0x80)
     }
+
+    @Test
+    fun `scaleExposure factor one is no-op`() {
+        val pixels = intArrayOf(0xFFE0E0E0.toInt())
+        val before = pixels[0]
+        HandInferenceEnhancer.scaleExposureArgb(pixels, factor = 1f)
+        assertThat(pixels[0]).isEqualTo(before)
+    }
+
+    @Test
+    fun `compressHighlights zero amount is no-op`() {
+        val pixels = intArrayOf(0xFFF0F0F0.toInt())
+        val before = pixels[0]
+        HandInferenceEnhancer.compressHighlightsArgb(pixels, amount = 0f)
+        assertThat(pixels[0]).isEqualTo(before)
+    }
+
+    @Test
+    fun `highlightShare detects flashy frames`() {
+        val bright = IntArray(100) { 0xFFF0F0F0.toInt() }
+        val dark = IntArray(100) { 0xFF202020.toInt() }
+        assertThat(
+            HandInferenceEnhancer.highlightShareArgb(
+                bright,
+                threshold = HandInferenceEnhancer.HIGHLIGHT_GATE_LUM,
+            ),
+        ).isGreaterThan(HandInferenceVariants.FLASH_HIGHLIGHT_SHARE_MIN)
+        assertThat(
+            HandInferenceEnhancer.highlightShareArgb(
+                dark,
+                threshold = HandInferenceEnhancer.HIGHLIGHT_GATE_LUM,
+            ),
+        ).isLessThan(HandInferenceVariants.FLASH_HIGHLIGHT_SHARE_MIN)
+    }
 }

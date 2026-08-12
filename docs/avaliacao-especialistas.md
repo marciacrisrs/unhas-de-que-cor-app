@@ -340,6 +340,13 @@ FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas →
 | Ranking linear preferia collapsed 0.85 | Feito — soft-gate `p*(0.45+0.55·s)` |
 | `isUsablePlate` length morto (pós-coerce) | Feito — `rawLengthPx` pré-coerce |
 | Selector só no loop MediaPipe | Feito — `HandLandmarkQuality.consider` testável |
+| Tip-glare elevava STRONG/FULL | Feito — `HandPresenceScoring` cap &lt; STRONG |
+| STRONG sem tip-span (punho) | Feito — `classify(landmarks)` exige span |
+| Flash depois do stretch (early-stop) | Feito — flash-first + gate highlights |
+| Early-stop com span 0.18 (semi-punho) | Feito — exige `GOOD_OPEN_TIP_SPAN` |
+| sizeScore ROI com length coercido | Feito — usa `rawLengthPx` |
+| Labels APPROXIMATE ≠ NOT_DETECTED (flash) | Feito — `LIGHTING_HINT` compartilhado |
+| &lt;2 unhas paintable com STRONG | Feito — demote WEAK no pipeline |
 
 Backlog residual: smoke em device; A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
 

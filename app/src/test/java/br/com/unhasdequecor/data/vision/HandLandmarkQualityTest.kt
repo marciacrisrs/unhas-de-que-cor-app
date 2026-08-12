@@ -56,13 +56,13 @@ class HandLandmarkQualityTest {
     }
 
     @Test
-    fun shouldStopSearching_highPresenceWithMinSpan_stops() {
+    fun shouldStopSearching_highPresenceWithOnlyMinSpan_keepsSearching() {
         assertThat(
             HandLandmarkQuality.shouldStopSearching(
                 presenceScore = DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP,
                 tipSpan = HandLandmarkQuality.MIN_TIP_SPAN_FOR_EARLY_STOP,
             ),
-        ).isTrue()
+        ).isFalse()
     }
 
     @Test

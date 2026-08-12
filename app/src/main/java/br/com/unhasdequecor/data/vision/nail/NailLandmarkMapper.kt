@@ -58,8 +58,9 @@ object NailLandmarkMapper {
     private val PLAUSIBLE_RANGE = 0.02f..0.98f
 
     const val PREVIEW_ASPECT = 3f / 4f
+    /** Mínimo de unhas usáveis para aceitar âncoras / alinhar path de máscara. */
+    const val MIN_PLAUSIBLE_NAILS = 2
     private const val MIN_LANDMARKS = 21
-    private const val MIN_PLAUSIBLE_NAILS = 2
     private const val MIN_NAIL_WIDTH_NORM = 0.018f
     private const val MAX_NAIL_WIDTH_NORM = 0.14f
     private const val MIN_NAIL_HEIGHT_NORM = 0.018f

@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.data.vision.nail
 
+import br.com.unhasdequecor.data.vision.HandLandmarkQuality
 import br.com.unhasdequecor.data.vision.HandLandmarks
 
 /**
@@ -51,8 +52,19 @@ object TryOnHandReliability {
         return TryOnReliability.WEAK
     }
 
-    fun classify(landmarks: HandLandmarks): TryOnReliability =
-        classify(landmarks.presenceScore)
+    /**
+     * Presence forte só vira STRONG com tip-span mínimo (punho / tips coladas → WEAK).
+     */
+    fun classify(landmarks: HandLandmarks): TryOnReliability {
+        val base = classify(landmarks.presenceScore)
+        if (base != TryOnReliability.STRONG) return base
+        val span = HandLandmarkQuality.tipSpanNorm(landmarks.points)
+        return if (span >= HandLandmarkQuality.MIN_TIP_SPAN_FOR_EARLY_STOP) {
+            TryOnReliability.STRONG
+        } else {
+            TryOnReliability.WEAK
+        }
+    }
 
     /**
      * Plano de renderização a partir das unhas detectadas (caminho de produção).
