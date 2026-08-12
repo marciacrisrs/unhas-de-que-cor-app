@@ -54,9 +54,8 @@ Primeira versão na Play Store:
 
 ## Política de privacidade
 
-1. Publique `docs/privacy-policy.md` em URL HTTPS pública.
-2. Preencha o e-mail de contato no doc.
-3. Cole a URL em Play Console → Política do app → Privacidade.
+1. Publique `docs/privacy-policy.md` em URL HTTPS pública (contato: marciacrisrs@gmail.com).
+2. Cole a URL em Play Console → Política do app → Privacidade.
 
 ## Assets (checklist)
 
