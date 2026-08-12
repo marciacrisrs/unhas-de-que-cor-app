@@ -43,35 +43,34 @@ class NailRoiEstimator @Inject constructor() {
         val tipPip = ImageCoordinates.distancePx(tip, pip)
         val tipMcp = ImageCoordinates.distancePx(tip, mcp)
 
-        val ux = plate.ux
-        val uy = plate.uy
-        val px = -uy
-        val py = ux
-        val cx = plate.centerX
-        val cy = plate.centerY
-        val nailLen = plate.lengthPx
-        val nailWidth = plate.widthPx
+        val almond = NailPlateCalibration.almondExtents(plate)
+        val tipHalfW = almond.tipHalfW
+        val midHalfW = almond.midHalfW
+        val cuticleHalfW = almond.cuticleHalfW
+        val px = almond.px
+        val py = almond.py
 
-        val halfLen = nailLen * 0.50f
-        val halfWBase = nailWidth * 0.50f
-        // Almond suave (não pontiagudo): cobre a placa sem invadir tanto a pele.
-        val tipHalfW = halfWBase * TIP_WIDTH_FACTOR
-        val midHalfW = halfWBase * MID_WIDTH_FACTOR
-        val cuticleHalfW = halfWBase * CUTICLE_WIDTH_FACTOR
-
-        val tipPt = PixelPoint(cx + ux * halfLen, cy + uy * halfLen)
-        val cuticlePt = PixelPoint(cx - ux * halfLen * CUTICLE_BACK, cy - uy * halfLen * CUTICLE_BACK)
-        val mid = PixelPoint(cx + ux * halfLen * MID_FORWARD, cy + uy * halfLen * MID_FORWARD)
+        val tipPt = PixelPoint(almond.tipX, almond.tipY)
+        val cuticlePt = PixelPoint(almond.cuticleX, almond.cuticleY)
+        val mid = PixelPoint(almond.midX, almond.midY)
 
         val polygon = listOf(
-            PixelPoint(tipPt.x + px * tipHalfW * TIP_POINT_FACTOR, tipPt.y + py * tipHalfW * TIP_POINT_FACTOR),
+            PixelPoint(
+                tipPt.x + px * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
+                tipPt.y + py * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
+            ),
             PixelPoint(mid.x + px * midHalfW, mid.y + py * midHalfW),
             PixelPoint(cuticlePt.x + px * cuticleHalfW, cuticlePt.y + py * cuticleHalfW),
             PixelPoint(cuticlePt.x - px * cuticleHalfW, cuticlePt.y - py * cuticleHalfW),
             PixelPoint(mid.x - px * midHalfW, mid.y - py * midHalfW),
-            PixelPoint(tipPt.x - px * tipHalfW * TIP_POINT_FACTOR, tipPt.y - py * tipHalfW * TIP_POINT_FACTOR),
+            PixelPoint(
+                tipPt.x - px * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
+                tipPt.y - py * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
+            ),
         )
 
+        val nailLen = plate.lengthPx
+        val nailWidth = plate.widthPx
         val pad = max(nailWidth, nailLen) * PAD_SCALE + PAD_EXTRA
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
@@ -126,9 +125,9 @@ class NailRoiEstimator @Inject constructor() {
         presence: Float,
     ): Float {
         val axisOk = when {
-            thumbMode -> tipMcp > 16f
-            facing -> tipPip > 12f
-            else -> tipDip > 10f
+            thumbMode -> tipMcp > NailPlateCalibration.MIN_AXIS_THUMB_PX
+            facing -> tipPip > NailPlateCalibration.MIN_AXIS_FACING_PX
+            else -> tipDip > NailPlateCalibration.MIN_AXIS_OPEN_PX
         }
         if (!axisOk) return 0.15f
         val aspect = nailLen / nailWidth.coerceAtLeast(1f)
@@ -150,12 +149,6 @@ class NailRoiEstimator @Inject constructor() {
     }
 
     private companion object {
-        const val TIP_WIDTH_FACTOR = 0.82f
-        const val MID_WIDTH_FACTOR = 1.12f
-        const val CUTICLE_WIDTH_FACTOR = 0.86f
-        const val TIP_POINT_FACTOR = 0.70f
-        const val CUTICLE_BACK = 0.90f
-        const val MID_FORWARD = 0.20f
         const val PAD_SCALE = 0.22f
         const val PAD_EXTRA = 2f
         const val PRESENCE_WEIGHT = 0.30f

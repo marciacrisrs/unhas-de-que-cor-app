@@ -45,9 +45,9 @@ object DetectedNailPolishApplier {
         for (anchor in anchors) {
             val cx = anchor.centerX * width
             val cy = anchor.centerY * height
-            val rx = (anchor.width * width * NailPlateCalibration.ELLIPSE_RX_FACTOR)
+            val rx = NailPlateCalibration.ellipseRadiusX(anchor.width, width)
                 .coerceAtLeast(MIN_RX)
-            val ry = (anchor.height * height * NailPlateCalibration.ELLIPSE_RY_FACTOR)
+            val ry = NailPlateCalibration.ellipseRadiusY(anchor.height, height)
                 .coerceAtLeast(MIN_RY)
             paint.shader = RadialGradient(
                 0f,

@@ -34,7 +34,6 @@ class NailPlateCalibrationTest {
 
         assertThat(plate.facing).isFalse()
         assertThat(plate.thumbMode).isFalse()
-        // Centro entre dip e tip (não além da ponta).
         assertThat(plate.centerY).isLessThan(dipY)
         assertThat(plate.centerY).isGreaterThan(tipY)
         val tipDist = hypot(
@@ -49,34 +48,70 @@ class NailPlateCalibrationTest {
     }
 
     @Test
-    fun plateFromPixels_facing_usesTipPipOvershootBase() {
-        // tip≈dip → facing; overshoot deve usar tip–pip (não tip–dip ~0).
-        val tipX = 400f
-        val tipY = 354f
-        val dipX = 400f
-        val dipY = 360f // 6px → facing
-        val pipX = 400f
-        val pipY = 480f
-        val mcpX = 400f
-        val mcpY = 600f
-
+    fun plateFromPixels_facing_widthFromTipPipNotShortLength() {
+        val tipPip = 120f
         val plate = NailPlateCalibration.plateFromPixels(
             finger = Finger.MIDDLE,
-            tipX = tipX,
-            tipY = tipY,
-            dipX = dipX,
-            dipY = dipY,
-            pipX = pipX,
-            pipY = pipY,
-            mcpX = mcpX,
-            mcpY = mcpY,
+            tipX = 400f,
+            tipY = 354f,
+            dipX = 400f,
+            dipY = 360f,
+            pipX = 400f,
+            pipY = 354f + tipPip,
+            mcpX = 400f,
+            mcpY = 600f,
         )
         assertThat(plate.facing).isTrue()
+        assertThat(plate.widthPx).isWithin(0.5f)
+            .of(tipPip * NailPlateCalibration.FACING_WIDTH_SCALE)
+        // Largura maior que length * widthScale típico do comprimento encurtado.
+        val foreshortenedWidth = plate.lengthPx * NailPlateCalibration.scalesFor(Finger.MIDDLE).widthScale
+        assertThat(plate.widthPx).isGreaterThan(foreshortenedWidth)
+    }
 
-        val withoutOvershootY = pipY + (tipY - pipY) * NailPlateCalibration.FACING_CENTER
-        // Overshoot tipPip * 0.02 em direção à tip (Y menor).
-        assertThat(plate.centerY).isLessThan(withoutOvershootY)
-        assertThat(plate.centerY).isGreaterThan(tipY)
+    @Test
+    fun almondExtents_facing_tipPastLandmarkByOvershootOnly() {
+        val tipY = 354f
+        val plate = NailPlateCalibration.plateFromPixels(
+            finger = Finger.MIDDLE,
+            tipX = 400f,
+            tipY = tipY,
+            dipX = 400f,
+            dipY = 360f,
+            pipX = 400f,
+            pipY = 480f,
+            mcpX = 400f,
+            mcpY = 600f,
+        )
+        val almond = NailPlateCalibration.almondExtents(plate)
+        val pastTip = tipY - almond.tipY // tip aponta para Y menor
+        assertThat(pastTip).isGreaterThan(0f)
+        assertThat(pastTip).isAtMost(plate.lengthPx * 0.06f)
+        assertThat(pastTip).isWithin(0.5f).of(plate.overshootPx)
+    }
+
+    @Test
+    fun almondExtents_thumb_tipAtOrBeyondLandmarkTip() {
+        val hand = openHand(800, 1200)
+        val tip = ImageCoordinates.toPixel(hand.point(Finger.THUMB.tipIndex), 800, 1200)
+        val dip = ImageCoordinates.toPixel(hand.point(Finger.THUMB.dipIndex), 800, 1200)
+        val pip = ImageCoordinates.toPixel(hand.point(Finger.THUMB.pipIndex), 800, 1200)
+        val mcp = ImageCoordinates.toPixel(hand.point(Finger.THUMB.mcpIndex), 800, 1200)
+        val plate = NailPlateCalibration.plateFromPixels(
+            finger = Finger.THUMB,
+            tipX = tip.x,
+            tipY = tip.y,
+            dipX = dip.x,
+            dipY = dip.y,
+            pipX = pip.x,
+            pipY = pip.y,
+            mcpX = mcp.x,
+            mcpY = mcp.y,
+        )
+        val almond = NailPlateCalibration.almondExtents(plate)
+        val along = (almond.tipX - tip.x) * plate.ux + (almond.tipY - tip.y) * plate.uy
+        assertThat(along).isAtLeast(0f)
+        assertThat(along).isWithin(0.5f).of(plate.overshootPx)
     }
 
     @Test
@@ -125,15 +160,59 @@ class NailPlateCalibrationTest {
     }
 
     @Test
+    fun facingMapperCenter_matchesPipPlusFacingCenter() {
+        val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }
+        fun finger(tip: Int, dip: Int, pip: Int, x: Float) {
+            landmarks[pip] = NailLandmarkMapper.NormalizedPoint(x, 0.40f)
+            landmarks[dip] = NailLandmarkMapper.NormalizedPoint(x, 0.30f)
+            landmarks[tip] = NailLandmarkMapper.NormalizedPoint(x, 0.295f)
+        }
+        finger(4, 3, 2, 0.30f)
+        finger(8, 7, 6, 0.40f)
+        finger(12, 11, 10, 0.50f)
+        finger(16, 15, 14, 0.60f)
+        finger(20, 19, 18, 0.70f)
+        // MCP indices for non-thumb
+        landmarks[5] = NailLandmarkMapper.NormalizedPoint(0.40f, 0.50f)
+        landmarks[9] = NailLandmarkMapper.NormalizedPoint(0.50f, 0.50f)
+        landmarks[13] = NailLandmarkMapper.NormalizedPoint(0.60f, 0.50f)
+        landmarks[17] = NailLandmarkMapper.NormalizedPoint(0.70f, 0.52f)
+
+        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
+            landmarks = landmarks,
+            imageWidth = 800,
+            imageHeight = 1200,
+        )
+        requireNotNull(anchors)
+        val index = anchors[1]
+        val tipY = 0.295f
+        val pipY = 0.40f
+        val tipPipNorm = pipY - tipY
+        val expectedY = pipY + (tipY - pipY) * NailPlateCalibration.FACING_CENTER -
+            tipPipNorm * NailPlateCalibration.TIP_OVERSHOOT
+        assertThat(index.centerY).isWithin(0.01f).of(expectedY)
+    }
+
+    @Test
+    fun ellipseRadii_matchCalibrationFactors() {
+        val rx = NailPlateCalibration.ellipseRadiusX(0.10f, 1000)
+        val ry = NailPlateCalibration.ellipseRadiusY(0.12f, 1000)
+        assertThat(rx).isWithin(0.01f).of(1000f * 0.10f * NailPlateCalibration.ELLIPSE_RX_FACTOR)
+        assertThat(ry).isWithin(0.01f).of(1000f * 0.12f * NailPlateCalibration.ELLIPSE_RY_FACTOR)
+        assertThat(NailPlateCalibration.canvasNailWidthNorm(0.10f))
+            .isWithin(0.001f).of(0.10f * 2f * NailPlateCalibration.ELLIPSE_RX_FACTOR)
+    }
+
+    @Test
     fun plateTipOfAlmond_isSlightlyPastLandmarkTip() {
         val hand = openHand(800, 1200)
         val roi = NailRoiEstimator().estimate(hand, Finger.INDEX)!!
         val tipLandmark = ImageCoordinates.toPixel(hand.point(Finger.INDEX.tipIndex), 800, 1200)
         val almondTip = mid(roi.polygon[0], roi.polygon[5])
-        // Ponta do almond além da tip landmark ao longo do eixo (borda livre).
         val toAlmond = (almondTip.x - tipLandmark.x) * roi.uxApprox() +
             (almondTip.y - tipLandmark.y) * roi.uyApprox()
         assertThat(toAlmond).isGreaterThan(0f)
+        assertThat(toAlmond).isAtMost(roi.lengthPx * 0.06f)
     }
 
     private fun mid(

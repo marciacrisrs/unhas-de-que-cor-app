@@ -288,10 +288,20 @@ de paint path; constantes mágicas sem ground-truth.
 |------|----------------|
 | Centros / escalas / overshoot | Um só objeto; mapper e ROI via `plateFromPixels` |
 | Facing overshoot | Base = tip–pip (antes tip–dip colapsado ≈ 0) |
-| Segmenter `along01` | Eixo cutícula→ponta do **almond**, não landmark PIP→tip |
+| Almond tip | `tip landmark + overshoot` (não `center + halfLen`) |
+| Facing width | `tipPip * FACING_WIDTH_SCALE` (não length encurtado) |
+| Segmenter `along01` | Eixo cutícula→ponta do **almond** |
+| Canvas usuária | Mesmo tamanho da elipse (`matchEllipsePlate`) |
 | Elipse fallback | Fatores em calibração (rx/ry/bias/opaque) |
 
-Testes: `NailPlateCalibrationTest` (paridade mapper/ROI, facing overshoot, ponta do almond).
+### Follow-ups especialistas (pós-calibração) — feitos
+
+| Achado | Status |
+|--------|--------|
+| Ponta almond ultrapassava tip em facing | Feito — `almondExtents` |
+| Canvas 2× maior que elipse | Feito — `matchEllipsePlate` |
+| Largura facing encolhida | Feito — `FACING_WIDTH_SCALE` |
+| Testes facing/thumb/eixo almond/elipse | Feito |
 
 Backlog residual: smoke em device; A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
 

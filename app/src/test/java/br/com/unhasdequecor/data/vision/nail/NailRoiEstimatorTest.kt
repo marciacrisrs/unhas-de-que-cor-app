@@ -57,6 +57,51 @@ class NailRoiEstimatorTest {
         assertThat(thumb!!.geometricConfidence).isGreaterThan(0.3f)
         assertThat(thumb.lengthPx).isGreaterThan(20f)
         assertThat(thumb.widthPx).isGreaterThan(14f)
+        val mcp = ImageCoordinates.toPixel(hand.point(Finger.THUMB.mcpIndex), 800, 1200)
+        assertThat(thumb.axisFromDip.x).isWithin(0.5f).of(mcp.x)
+        assertThat(thumb.axisFromDip.y).isWithin(0.5f).of(mcp.y)
+    }
+
+    @Test
+    fun `facing camera uses tip pip width and capped almond tip`() {
+        val hand = facingHand(800, 1200)
+        val index = estimator.estimate(hand, Finger.INDEX)
+        assertThat(index).isNotNull()
+        val tip = ImageCoordinates.toPixel(hand.point(Finger.INDEX.tipIndex), 800, 1200)
+        val pip = ImageCoordinates.toPixel(hand.point(Finger.INDEX.pipIndex), 800, 1200)
+        val tipPip = ImageCoordinates.distancePx(tip, pip)
+        assertThat(index!!.widthPx).isWithin(1f)
+            .of(tipPip * NailPlateCalibration.FACING_WIDTH_SCALE)
+        val almondTipX = (index.polygon[0].x + index.polygon[5].x) * 0.5f
+        val almondTipY = (index.polygon[0].y + index.polygon[5].y) * 0.5f
+        val past = kotlin.math.hypot(
+            (almondTipX - tip.x).toDouble(),
+            (almondTipY - tip.y).toDouble(),
+        ).toFloat()
+        assertThat(past).isLessThan(index.lengthPx * 0.06f)
+        assertThat(index.geometricConfidence).isGreaterThan(0.3f)
+    }
+
+    private fun facingHand(width: Int, height: Int): HandLandmarks {
+        val pts = MutableList(21) { ImageCoordinates.NormPoint(0.5f, 0.5f) }
+        pts[0] = ImageCoordinates.NormPoint(0.50f, 0.78f)
+        fun finger(mcp: Int, pip: Int, dip: Int, tip: Int, x: Float) {
+            pts[mcp] = ImageCoordinates.NormPoint(x, 0.50f)
+            pts[pip] = ImageCoordinates.NormPoint(x, 0.40f)
+            pts[dip] = ImageCoordinates.NormPoint(x, 0.301f)
+            pts[tip] = ImageCoordinates.NormPoint(x, 0.295f)
+        }
+        finger(2, 3, 3, 4, 0.30f)
+        finger(5, 6, 7, 8, 0.40f)
+        finger(9, 10, 11, 12, 0.50f)
+        finger(13, 14, 15, 16, 0.60f)
+        finger(17, 18, 19, 20, 0.70f)
+        return HandLandmarks(
+            points = pts,
+            imageWidth = width,
+            imageHeight = height,
+            presenceScore = 0.95f,
+        )
     }
 
     private fun openHand(

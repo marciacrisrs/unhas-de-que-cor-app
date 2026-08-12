@@ -10,6 +10,18 @@ import org.junit.Test
 class DetectedNailPolishApplierTest {
 
     @Test
+    fun ellipseRadii_followNailPlateCalibration() {
+        val rx = NailPlateCalibration.ellipseRadiusX(0.08f, 500)
+        val ry = NailPlateCalibration.ellipseRadiusY(0.10f, 800)
+        assertThat(rx).isWithin(0.01f)
+            .of(0.08f * 500f * NailPlateCalibration.ELLIPSE_RX_FACTOR)
+        assertThat(ry).isWithin(0.01f)
+            .of(0.10f * 800f * NailPlateCalibration.ELLIPSE_RY_FACTOR)
+        assertThat(NailPlateCalibration.ELLIPSE_CENTER_Y_BIAS).isGreaterThan(0f)
+        assertThat(NailPlateCalibration.ELLIPSE_OPAQUE_STOP).isLessThan(1f)
+    }
+
+    @Test
     fun apply_whenAnchorsEmpty_returnsNull() {
         val source = mockk<Bitmap>(relaxed = true) {
             every { width } returns 100
