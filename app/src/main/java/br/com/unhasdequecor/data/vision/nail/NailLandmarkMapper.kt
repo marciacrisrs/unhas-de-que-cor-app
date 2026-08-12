@@ -13,8 +13,8 @@ import kotlin.math.hypot
  */
 object NailLandmarkMapper {
     private val FINGERS = listOf(
-        // Escalas alinhadas ao NailRoiEstimator (placa real costuma ser um pouco maior).
-        Finger(tip = 4, dip = 3, pip = 2, widthScale = 0.82f, lengthScale = 0.90f),
+        // Polegar: tip/dip/pip; eixo usa MCP (índice 2 = IP no MediaPipe; tratamos pip como eixo proximal).
+        Finger(tip = 4, dip = 3, pip = 2, widthScale = 0.82f, lengthScale = 0.90f, thumb = true),
         Finger(tip = 8, dip = 7, pip = 6, widthScale = 0.74f, lengthScale = 0.96f),
         Finger(tip = 12, dip = 11, pip = 10, widthScale = 0.76f, lengthScale = 0.98f),
         Finger(tip = 16, dip = 15, pip = 14, widthScale = 0.72f, lengthScale = 0.96f),
@@ -43,28 +43,34 @@ object NailLandmarkMapper {
             val pipX = pip.x * w
             val pipY = pip.y * h
 
-            val dx = tipX - dipX
-            val dy = tipY - dipY
-            val tipDipPx = hypot(dx.toDouble(), dy.toDouble()).toFloat()
+            val tipDipPx = hypot((tipX - dipX).toDouble(), (tipY - dipY).toDouble()).toFloat()
             val tipPipPx = hypot((tipX - pipX).toDouble(), (tipY - pipY).toDouble()).toFloat()
 
-            // Unha de frente (punho): tip≈dip em 2D — estima pela falange tip–pip.
+            // Polegar / unha de frente: tip≈dip em 2D — estima pela falange tip–pip (MCP no polegar).
             val facingCamera = tipDipPx < SHORT_TIP_DIP_PX
-            val nailLenPx = if (facingCamera) {
-                (tipPipPx * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
+            val useProximalAxis = finger.thumb || facingCamera
+            val axisX = if (useProximalAxis) pipX else dipX
+            val axisY = if (useProximalAxis) pipY else dipY
+            val dx = tipX - axisX
+            val dy = tipY - axisY
+            val axisLenPx = hypot(dx.toDouble(), dy.toDouble()).toFloat()
+
+            val nailLenPx = if (useProximalAxis) {
+                val scale = if (finger.thumb) THUMB_LENGTH_SCALE else FACING_LENGTH_SCALE
+                (axisLenPx * scale).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
             } else {
                 (tipDipPx * finger.lengthScale).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
             }
             val nailWidPx = (nailLenPx * finger.widthScale)
                 .coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
 
-            val (centerXpx, centerYpx) = if (facingCamera) {
-                tipX to tipY
-            } else {
-                // Centro da placa: entre DIP e TIP, sem passar da ponta.
-                val t = NAIL_CENTER_ALONG
-                (dipX + dx * t) to (dipY + dy * t)
+            val centerT = when {
+                finger.thumb -> THUMB_CENTER_ALONG
+                facingCamera -> FACING_CENTER_ALONG
+                else -> NAIL_CENTER_ALONG
             }
+            val centerXpx = axisX + dx * centerT
+            val centerYpx = axisY + dy * centerT
 
             val rotation = Math.toDegrees(atan2(dx.toDouble(), -dy.toDouble())).toFloat()
             NailOverlayAnchor(
@@ -89,6 +95,7 @@ object NailLandmarkMapper {
         val pip: Int,
         val widthScale: Float,
         val lengthScale: Float,
+        val thumb: Boolean = false,
     )
 
     private val PLAUSIBLE_RANGE = 0.02f..0.98f
@@ -98,7 +105,11 @@ object NailLandmarkMapper {
     private const val MIN_PLAUSIBLE_NAILS = 3
     private const val SHORT_TIP_DIP_PX = 16f
     private const val FACING_LENGTH_SCALE = 0.48f
-    private const val NAIL_CENTER_ALONG = 0.74f
+    private const val THUMB_LENGTH_SCALE = 0.38f
+    /** Centro da placa mais próximo do meio do eixo (evita esmalte além da ponta). */
+    private const val NAIL_CENTER_ALONG = 0.58f
+    private const val FACING_CENTER_ALONG = 0.82f
+    private const val THUMB_CENTER_ALONG = 0.78f
     private const val MIN_NAIL_LEN_PX = 14f
     private const val MAX_NAIL_LEN_PX = 160f
     private const val MIN_NAIL_WID_PX = 10f

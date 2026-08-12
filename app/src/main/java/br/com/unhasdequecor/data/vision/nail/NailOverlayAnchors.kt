@@ -16,8 +16,9 @@ data class NailOverlayAnchor(
 
 object NailOverlayAnchors {
     /**
-     * Fallback para foto própria (mão aberta / unhas no topo).
-     * MediaPipe tem prioridade quando detectar a mão do usuário.
+     * Fallback só para **amostras** sem layout próprio / máscara.
+     * Em foto do usuário, se MediaPipe falhar, a UI **não** pinta estas âncoras
+     * (ficam longe das unhas reais) — mostra só a foto + orientação.
      */
     val DEFAULT: List<NailOverlayAnchor> = listOf(
         NailOverlayAnchor(0.28f, 0.34f, 0.075f, 0.055f, -28f),

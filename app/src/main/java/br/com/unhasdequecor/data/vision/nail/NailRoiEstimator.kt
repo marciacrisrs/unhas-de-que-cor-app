@@ -182,11 +182,11 @@ class NailRoiEstimator @Inject constructor() {
         const val SHORT_TIP_DIP_PX = 16f
         const val FACING_LENGTH_SCALE = 0.48f
         const val THUMB_LENGTH_SCALE = 0.38f
-        const val FACING_CENTER = 0.90f
-        const val THUMB_CENTER = 0.82f
-        /** Alinhado ao [NailLandmarkMapper.NAIL_CENTER_ALONG]. */
-        const val CENTER_ALONG = 0.74f
-        const val TIP_OVERSHOOT = 0.10f
+        const val FACING_CENTER = 0.88f
+        const val THUMB_CENTER = 0.78f
+        /** Alinhado ao [NailLandmarkMapper] — centro da placa, não além da ponta. */
+        const val CENTER_ALONG = 0.58f
+        const val TIP_OVERSHOOT = 0.02f
         const val TIP_WIDTH_FACTOR = 0.82f
         const val MID_WIDTH_FACTOR = 1.12f
         const val CUTICLE_WIDTH_FACTOR = 0.86f
