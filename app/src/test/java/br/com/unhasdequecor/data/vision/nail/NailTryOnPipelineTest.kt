@@ -178,4 +178,83 @@ class NailTryOnPipelineTest {
         assertThat(result.bitmap).isSameInstanceAs(image)
         verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
     }
+
+    @Test
+    fun `detect returns null when presence is below reliability floor`() {
+        val source = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val rotated = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.10f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(source)
+        } returns OrientedHandLandmarks(bitmap = rotated, landmarks = landmarks)
+        every { roiEstimator.estimateAll(landmarks) } returns emptyList()
+
+        val snapshot = pipeline.detect(source, stabilize = false)
+
+        assertThat(snapshot).isNull()
+        verify(exactly = 1) { rotated.recycle() }
+        verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
+
+    @Test
+    fun `detect marks weak reliability when presence is mid-range`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.40f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        every { roiEstimator.estimateAll(landmarks) } returns emptyList()
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.WEAK)
+        assertThat(snapshot.nails).isEmpty()
+    }
+
+    @Test
+    fun `detect marks strong reliability when presence is high`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        every { roiEstimator.estimateAll(landmarks) } returns emptyList()
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.STRONG)
+    }
 }

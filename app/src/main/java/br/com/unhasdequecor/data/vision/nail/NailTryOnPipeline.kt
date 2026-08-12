@@ -23,6 +23,7 @@ data class NailDetectionSnapshot(
     val landmarks: HandLandmarks?,
     /** True se [workingBitmap] é bitmap intermediária (ex.: rotação) distinta da fonte. */
     val ownsWorkingBitmap: Boolean,
+    val reliability: TryOnReliability = TryOnReliability.STRONG,
 )
 
 /**
@@ -91,11 +92,19 @@ class NailTryOnPipeline @Inject constructor(
             tracker.reset()
             detected
         }
+        val reliability = TryOnHandReliability.classify(landmarks, nails.size)
+        if (reliability == TryOnReliability.REJECTED) {
+            if (working !== image && !working.isRecycled) {
+                working.recycle()
+            }
+            return null
+        }
         return NailDetectionSnapshot(
             workingBitmap = working,
             nails = nails,
             landmarks = landmarks,
             ownsWorkingBitmap = working !== image,
+            reliability = reliability,
         )
     }
 

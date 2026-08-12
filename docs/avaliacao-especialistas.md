@@ -276,3 +276,18 @@ de paint path; constantes mágicas sem ground-truth.
 | P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Aberto |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
 | — | A11y Scanner + smoke try-on em device | **OUT_OF_REPO** |
+
+---
+
+## Implementação — Try-on confiável na mão real
+
+Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTryOnPreview`:
+
+| Regra | Comportamento |
+|-------|----------------|
+| `presenceScore` &lt; 0.28 | `REJECTED` → `detect` retorna `null` (sem claim) |
+| 0.28–0.55 (sem ≥3 máscaras) | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” |
+| ≥0.55 **e** ≥3 máscaras | `STRONG` + `FULL` → “Prévia na sua mão” |
+| Elipse / poucas máscaras | Nunca `FULL` — modo ≈ qualidade |
+
+Backlog residual: smoke em device (luz frontal vs contraluz); a11y banner; CHANGELOG no próximo release.
