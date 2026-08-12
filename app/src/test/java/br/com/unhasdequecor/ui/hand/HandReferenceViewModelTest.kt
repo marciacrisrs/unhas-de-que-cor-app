@@ -60,6 +60,7 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.USER)
         assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
         assertThat(viewModel.uiState.value.navigateHome).isTrue()
+        assertThat(viewModel.uiState.value.homeFlashMessage).contains("sucesso")
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
     }
 
@@ -94,6 +95,7 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.isSample).isTrue()
         assertThat(viewModel.uiState.value.sampleTitle).isEqualTo("Pele retinta")
         assertThat(viewModel.uiState.value.navigateHome).isTrue()
+        assertThat(viewModel.uiState.value.homeFlashMessage).contains("Pele retinta")
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
     }
 

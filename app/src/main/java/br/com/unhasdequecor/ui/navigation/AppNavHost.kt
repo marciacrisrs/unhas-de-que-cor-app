@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -21,9 +22,37 @@ import br.com.unhasdequecor.ui.history.HistoryScreen
 import br.com.unhasdequecor.ui.history.HistoryScreenMode
 import br.com.unhasdequecor.ui.hand.HandReferenceScreen
 import br.com.unhasdequecor.ui.home.HomeScreen
+import br.com.unhasdequecor.ui.home.HomeViewModel
 import br.com.unhasdequecor.ui.profile.ProfileScreen
 import br.com.unhasdequecor.ui.result.ResultScreen
 import br.com.unhasdequecor.ui.style.StyleScreen
+
+private fun NavController.openResultFromHistory(entry: HistoryRowUi) {
+    navigate(
+        Routes.resultFromHistory(
+            source = entry.source,
+            occasion = entry.occasion,
+            mood = entry.mood,
+            colorId = entry.colorId,
+        ),
+    )
+}
+
+private fun NavController.returnHomeAfterHandSelected(flash: String?) {
+    getBackStackEntry(Routes.HOME)
+        .savedStateHandle[HomeViewModel.FLASH_MESSAGE_KEY] = flash
+    popBackStack(Routes.HOME, inclusive = false)
+}
+
+private fun NavController.navigateBottomTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 @Composable
 fun AppNavHost() {
@@ -38,31 +67,12 @@ fun AppNavHost() {
         Routes.CONTEXT,
     )
 
-    fun openResultFromHistory(entry: HistoryRowUi) {
-        navController.navigate(
-            Routes.resultFromHistory(
-                source = entry.source,
-                occasion = entry.occasion,
-                mood = entry.mood,
-                colorId = entry.colorId,
-            ),
-        )
-    }
-
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
                 AppBottomBar(
                     currentRoute = currentRoute,
-                    onNavigate = { route ->
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    onNavigate = navController::navigateBottomTab,
                 )
             }
         },
@@ -100,9 +110,7 @@ fun AppNavHost() {
             composable(Routes.HAND_REFERENCE) {
                 HandReferenceScreen(
                     onBack = { navController.popBackStack() },
-                    onHandSelected = {
-                        navController.popBackStack(Routes.HOME, inclusive = false)
-                    },
+                    onHandSelected = navController::returnHomeAfterHandSelected,
                 )
             }
             composable(
@@ -127,21 +135,13 @@ fun AppNavHost() {
                 )
             }
             composable(Routes.HISTORY) {
-                HistoryScreen(onOpenResult = ::openResultFromHistory)
+                HistoryScreen(onOpenResult = navController::openResultFromHistory)
             }
             composable(Routes.FAVORITES) {
                 HistoryScreen(
-                    onOpenResult = ::openResultFromHistory,
+                    onOpenResult = navController::openResultFromHistory,
                     mode = HistoryScreenMode.FAVORITES_ONLY,
-                    onBack = {
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    onBack = { navController.navigateBottomTab(Routes.HOME) },
                 )
             }
             composable(Routes.PROFILE) {

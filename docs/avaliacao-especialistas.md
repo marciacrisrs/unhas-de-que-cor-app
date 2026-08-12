@@ -4,23 +4,26 @@
 **Base inicial:** `master` @ `5a8663b`  
 **Fonte de verdade:** `.github/agents/*` + `.github/copilot-instructions.md`
 
-## Painel (pós follow-ups)
+## Painel (pós follow-ups + UX #35)
 
 | Especialista | Veredito atualizado |
 |--------------|---------------------|
-| Android Engineer | Ressalvas P0 tratadas |
-| Architecture Reviewer | Ciclo data↔ui, higiene de telas e DIP (EntryPoint/Context em ViewModel) tratados |
-| Test Engineer | Gate domain + app ≥80%; pipeline try-on coberto |
+| Android Engineer | Ressalvas P0 tratadas; UX #35 aprovada com ajustes P1 aplicados |
+| Architecture Reviewer | Ciclo data↔ui, higiene de telas e DIP tratados; `navigateHome` ok |
+| Test Engineer | Gate domain + app ≥80%; pipeline try-on + VM mão cobertos |
 | Quality Reviewer | QG Sonar bloqueante; recolor unificado |
 | Performance Reviewer | Recycle + detect/recolor separados |
-| Security Reviewer | Allowlist path; limpeza `hand_capture`; backup explícito; `verify-metadata=true` |
-| Accessibility Reviewer | Contraste/FilterTab/CD try-on tratados |
-| UI Reviewer | AsyncContent + Favoritos dedupe + telas fatiadas |
-| Documentation Reviewer | README/release/AGENTS/CHANGELOG atualizados |
+| Security Reviewer | Allowlist path; limpeza `hand_capture`; backup explícito; Sobre via HTTPS GitHub |
+| Accessibility Reviewer | Contraste/FilterTab/CD try-on tratados; Favoritos com Voltar |
+| UI Reviewer | AsyncContent + Favoritos + Home compacta + mark alinhado ao logo |
+| Documentation Reviewer | README/release/AGENTS/CHANGELOG + este painel |
 | Release Manager | Docs + workflow AAB + bump; keystore/Console = Márcia |
-| CI/CD Reviewer | QG, artefatos JaCoCo, Release AAB |
+| CI/CD Reviewer | QG, artefatos JaCoCo, Release AAB → internal |
 
-**Síntese:** recomendações de código dos especialistas foram aplicadas. Resta operação de loja (keystore de upload nos secrets + listing no Play Console), fora do repositório.
+**Síntese:** recomendações de código dos especialistas foram aplicadas. UX do PR #35
+avaliada por todos os agentes (sem Bloqueio); P1 de feedback e overflow da Home
+tratados no follow-up da mesma branch. Resta operação de loja (keystore + listing),
+fora do repositório.
 
 ---
 
@@ -130,3 +133,47 @@ Inversion apontadas pelo Architecture Reviewer (ViewModels resolvendo dependênc
 
 - Keystore de upload assinado nos secrets do CI (`RELEASE_*`/`ANDROID_*`), para gerar AAB de release assinado fora do debug-signing fallback.
 - Publicação/atualização do listing na Google Play Console (screenshots, descrição, política de privacidade hospedada) — conteúdo já preparado em `docs/play-listing.md`/`docs/privacy-policy.md`.
+
+---
+
+## Follow-up UX (2026-08-12c) — avaliação conjunta PR #35
+
+Branch `cursor/ux-home-favoritos-sobre-535f`. Pedidos da Márcia avaliados por **todos** os
+especialistas em `.github/agents/*`.
+
+### Painel do PR
+
+| Especialista | Veredito | Notas |
+|--------------|----------|-------|
+| Android Engineer | Ressalvas → tratadas | Home compacta; flash pós-mão na Home |
+| Architecture Reviewer | OK | `navigateHome` + `SavedStateHandle` flash; sem Nav no VM |
+| Test Engineer | Ressalvas | VM mão coberto; wiring Compose/nav sem teste (aceitável) |
+| Quality Reviewer | OK | detekt + unit; mark vetorial mais denso mas legível |
+| Performance Reviewer | OK | sem regressão |
+| Security Reviewer | OK | Sobre → GitHub HTTPS; e-mail fora do APK |
+| Accessibility Reviewer | Ressalvas → mitigadas | Voltar em Favoritos; scroll de segurança na Home |
+| UI Reviewer | Ressalvas → mitigadas | layout compacto; snackbar na Home após confirmar mão |
+| Documentation Reviewer | OK | `design/guia` + este painel; privacidade Play mantém e-mail |
+| Release Manager | OK | sem bump; `OUT_OF_REPO` intacto |
+| CI/CD Reviewer | OK | pipeline inalterada |
+
+**Veredito global:** aprovável, **sem Bloqueio**.
+
+### Itens do pedido
+
+| Pedido | Status |
+|--------|--------|
+| Sem rolagem na primeira página | Compactação (logo 64 / heroes 136); scroll só se altura insuficiente |
+| Favoritos com voltar | TopAppBar → Home |
+| Sobre: GitHub no lugar do e-mail | Feito + nota apontando contato da política Play |
+| Ajustar logo / esmalte vetorizado | `NailPolishMark` alinhado ao `logo-icone` |
+| Minha mão → Home após “OK, usar esta” | `navigateHome` + snackbar flash na Home |
+
+### Backlog residual deste follow-up
+
+| Pri | Item | Status |
+|-----|------|--------|
+| P2 | Chrome Favoritos (AppBar) vs Histórico (só header) | Aceito por pedido explícito de Voltar em Favoritos |
+| P3 | Teste de wiring nav Home flash / Favoritos back | Opcional |
+| — | Keystore + listing Play | **OUT_OF_REPO** |
+| — | A11y Scanner em device | **OUT_OF_REPO** / device |

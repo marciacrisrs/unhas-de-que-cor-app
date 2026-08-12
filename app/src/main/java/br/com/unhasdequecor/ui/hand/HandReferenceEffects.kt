@@ -8,15 +8,16 @@ import androidx.compose.runtime.LaunchedEffect
 internal fun HandReferenceMessageEffects(
     message: String?,
     navigateHome: Boolean,
+    homeFlashMessage: String?,
     cameraPermissionDenied: Boolean,
     snackbarHostState: SnackbarHostState,
     onMessageConsumed: () -> Unit,
-    onNavigateHomeConsumed: () -> Unit,
+    onNavigateHomeConsumed: (flashMessage: String?) -> Unit,
     onPermissionDeniedConsumed: () -> Unit,
 ) {
     LaunchedEffect(navigateHome) {
         if (navigateHome) {
-            onNavigateHomeConsumed()
+            onNavigateHomeConsumed(homeFlashMessage)
         }
     }
     LaunchedEffect(message) {

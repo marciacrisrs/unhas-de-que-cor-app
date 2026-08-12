@@ -35,6 +35,8 @@ data class HandReferenceUiState(
     val message: String? = null,
     /** Após confirmar foto ou amostra — a UI deve voltar para a Home. */
     val navigateHome: Boolean = false,
+    /** Mensagem curta exibida na Home após o retorno. */
+    val homeFlashMessage: String? = null,
 ) {
     val hasReference: Boolean get() = reference != null
     val isSample: Boolean get() = reference?.source == HandReferenceSource.SAMPLE
@@ -213,6 +215,7 @@ class HandReferenceViewModel @Inject constructor(
                             isSaving = false,
                             message = null,
                             navigateHome = true,
+                            homeFlashMessage = "Exemplo salvo: ${option.title}.",
                         )
                     }
                 }
@@ -233,7 +236,7 @@ class HandReferenceViewModel @Inject constructor(
     }
 
     fun consumeNavigateHome() {
-        _uiState.update { it.copy(navigateHome = false) }
+        _uiState.update { it.copy(navigateHome = false, homeFlashMessage = null) }
     }
 
     private fun stageUserPhoto(path: String) {
@@ -254,6 +257,7 @@ class HandReferenceViewModel @Inject constructor(
                         pendingUserPreviewPath = null,
                         message = null,
                         navigateHome = true,
+                        homeFlashMessage = "Mão cadastrada com sucesso.",
                     )
                 }
             }

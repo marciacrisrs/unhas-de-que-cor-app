@@ -27,7 +27,7 @@ import java.io.File
 @Composable
 fun HandReferenceScreen(
     onBack: () -> Unit,
-    onHandSelected: () -> Unit = onBack,
+    onHandSelected: (flashMessage: String?) -> Unit = { onBack() },
     viewModel: HandReferenceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -39,12 +39,13 @@ fun HandReferenceScreen(
     HandReferenceMessageEffects(
         message = state.message,
         navigateHome = state.navigateHome,
+        homeFlashMessage = state.homeFlashMessage,
         cameraPermissionDenied = cameraPermissionDenied,
         snackbarHostState = snackbarHostState,
         onMessageConsumed = viewModel::consumeMessage,
-        onNavigateHomeConsumed = {
+        onNavigateHomeConsumed = { flash ->
             viewModel.consumeNavigateHome()
-            onHandSelected()
+            onHandSelected(flash)
         },
         onPermissionDeniedConsumed = { cameraPermissionDenied = false },
     )

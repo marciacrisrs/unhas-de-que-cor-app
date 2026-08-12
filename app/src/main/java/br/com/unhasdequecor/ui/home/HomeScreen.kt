@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -26,6 +28,9 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,95 +73,109 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(state.flashMessage) {
+        val text = state.flashMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(text)
+        viewModel.consumeFlashMessage()
+    }
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(550),
         label = "homeFade",
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .alpha(alpha),
-    ) {
-        BrandHeader(lockupHeight = 64.dp)
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // Compacto no primeiro viewport; scroll só se a altura for insuficiente
+                // (fonte grande / convite de mão + recentes).
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .alpha(alpha),
         ) {
-            HeroActionCard(
-                title = "Escolher minha cor",
-                subtitle = "Receba a cor ideal para o seu momento",
-                icon = Icons.Outlined.Palette,
-                emphasized = true,
-                onClick = onChooseByContext,
-                modifier = Modifier.weight(1f),
-            )
-            HeroActionCard(
-                title = "Escolha por mim",
-                subtitle = "Surpreenda-se com uma cor incrível",
-                icon = Icons.Outlined.AutoAwesome,
-                emphasized = false,
-                onClick = onChooseForMe,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        state.inspiration?.let { inspiration ->
+            BrandHeader(lockupHeight = 64.dp)
             Spacer(modifier = Modifier.height(12.dp))
-            InspirationCard(
-                title = inspiration.name,
-                subtitle = inspiration.description,
-                polishColor = Color(inspiration.hex),
-                onClick = onChooseByContext,
-            )
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "CONTINUE EXPLORANDO",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ExploreTile("Por contexto", Icons.Outlined.Event, onChooseByContext, Modifier.weight(1f))
-            ExploreTile("Estilo", Icons.Outlined.Checkroom, onOpenStyle, Modifier.weight(1f))
-            ExploreTile("Favoritos", Icons.Outlined.FavoriteBorder, onOpenFavorites, Modifier.weight(1f))
-            ExploreTile("Histórico", Icons.Outlined.History, onOpenHistory, Modifier.weight(1f))
-        }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                HeroActionCard(
+                    title = "Escolher minha cor",
+                    subtitle = "Receba a cor ideal para o seu momento",
+                    icon = Icons.Outlined.Palette,
+                    emphasized = true,
+                    onClick = onChooseByContext,
+                    modifier = Modifier.weight(1f),
+                )
+                HeroActionCard(
+                    title = "Escolha por mim",
+                    subtitle = "Surpreenda-se com uma cor incrível",
+                    icon = Icons.Outlined.AutoAwesome,
+                    emphasized = false,
+                    onClick = onChooseForMe,
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
-        if (state.showHandInvite) {
-            Spacer(modifier = Modifier.height(10.dp))
-            HandReferenceInviteCard(
-                isSampleHand = state.isSampleHand,
-                onClick = onOpenHandReference,
-            )
-        }
+            state.inspiration?.let { inspiration ->
+                Spacer(modifier = Modifier.height(12.dp))
+                InspirationCard(
+                    title = inspiration.name,
+                    subtitle = inspiration.description,
+                    polishColor = Color(inspiration.hex),
+                    onClick = onChooseByContext,
+                )
+            }
 
-        if (state.recentColors.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            RecentChoicesCard(
-                recentColors = state.recentColors,
-                onOpenHistory = onOpenHistory,
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "CONTINUE EXPLORANDO",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ExploreTile("Por contexto", Icons.Outlined.Event, onChooseByContext, Modifier.weight(1f))
+                ExploreTile("Estilo", Icons.Outlined.Checkroom, onOpenStyle, Modifier.weight(1f))
+                ExploreTile("Favoritos", Icons.Outlined.FavoriteBorder, onOpenFavorites, Modifier.weight(1f))
+                ExploreTile("Histórico", Icons.Outlined.History, onOpenHistory, Modifier.weight(1f))
+            }
+
+            if (state.showHandInvite) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HandReferenceInviteCard(
+                    isSampleHand = state.isSampleHand,
+                    onClick = onOpenHandReference,
+                )
+            }
+
+            if (state.recentColors.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                RecentChoicesCard(
+                    recentColors = state.recentColors,
+                    onOpenHistory = onOpenHistory,
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun RecentChoicesCard(
-    recentColors: List<br.com.unhasdequecor.domain.model.HistoryEntry>,
+    recentColors: List<HistoryEntry>,
     onOpenHistory: () -> Unit,
 ) {
     Surface(

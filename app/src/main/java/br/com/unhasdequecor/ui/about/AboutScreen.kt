@@ -133,6 +133,12 @@ fun AboutScreen(
                     ) {
                         Text(GITHUB_LABEL)
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Dúvidas de privacidade: use o contato da política publicada na Play Store.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
