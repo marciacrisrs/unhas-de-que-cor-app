@@ -2,7 +2,6 @@ package br.com.unhasdequecor.data.vision
 
 import android.content.Context
 import android.graphics.Bitmap
-import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
@@ -15,6 +14,9 @@ import javax.inject.Singleton
 /**
  * Detecção de mão via MediaPipe Hand Landmarker (IMAGE).
  * Expõe landmarks brutos ([HandLandmarkProcessor]) para o pipeline de try-on.
+ *
+ * Em fotos difíceis (contraluz, mão escura), tenta contraste/gamma/espelho/rotação
+ * antes de desistir — ver [HandInferenceVariants].
  */
 @Singleton
 class MediaPipeHandNailDetector @Inject constructor(
@@ -25,26 +27,51 @@ class MediaPipeHandNailDetector @Inject constructor(
     private var landmarker: HandLandmarker? = null
 
     override fun detectLandmarks(bitmap: Bitmap): HandLandmarks? =
-        detectLandmarksOnBitmap(bitmap)
+        detectLandmarksOnBitmap(bitmap, remap = { it })
 
     override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
-        detectLandmarksOnBitmap(bitmap)?.let {
-            return OrientedHandLandmarks(bitmap = bitmap, landmarks = it)
-        }
-        for (degrees in ROTATION_FALLBACKS) {
-            val rotated = OrientedBitmapDecoder.rotate(bitmap, degrees)
-            val landmarks = detectLandmarksOnBitmap(rotated)
-            if (landmarks != null) {
-                return OrientedHandLandmarks(bitmap = rotated, landmarks = landmarks)
+        val created = ArrayList<Bitmap>(8)
+        try {
+            for (variant in HandInferenceVariants.forSource(bitmap)) {
+                if (variant.inferenceBitmap !== bitmap &&
+                    variant.inferenceBitmap !== variant.displayBitmap
+                ) {
+                    created += variant.inferenceBitmap
+                }
+                if (variant.displayBitmap !== bitmap) {
+                    created += variant.displayBitmap
+                }
+                val landmarks = detectLandmarksOnBitmap(
+                    bitmap = variant.inferenceBitmap,
+                    displayWidth = variant.displayBitmap.width,
+                    displayHeight = variant.displayBitmap.height,
+                    remap = variant.remapPoint,
+                )
+                if (landmarks != null) {
+                    // Mantém o display escolhido; libera o restante.
+                    created.removeAll { it === variant.displayBitmap }
+                    return OrientedHandLandmarks(
+                        bitmap = variant.displayBitmap,
+                        landmarks = landmarks,
+                    )
+                }
             }
-            if (rotated !== bitmap && !rotated.isRecycled) {
-                rotated.recycle()
+            return null
+        } finally {
+            for (bmp in created.distinct()) {
+                if (bmp !== bitmap && !bmp.isRecycled) {
+                    bmp.recycle()
+                }
             }
         }
-        return null
     }
 
-    private fun detectLandmarksOnBitmap(bitmap: Bitmap): HandLandmarks? {
+    private fun detectLandmarksOnBitmap(
+        bitmap: Bitmap,
+        displayWidth: Int = bitmap.width,
+        displayHeight: Int = bitmap.height,
+        remap: (ImageCoordinates.NormPoint) -> ImageCoordinates.NormPoint,
+    ): HandLandmarks? {
         // HandLandmarker IMAGE não é thread-safe: serializa init + detect.
         synchronized(this) {
             return runCatching {
@@ -88,10 +115,10 @@ class MediaPipeHandNailDetector @Inject constructor(
                     .coerceIn(0f, 1f)
                 HandLandmarks(
                     points = landmarks.map {
-                        ImageCoordinates.NormPoint(it.x(), it.y())
+                        remap(ImageCoordinates.NormPoint(it.x(), it.y()))
                     },
-                    imageWidth = bitmap.width,
-                    imageHeight = bitmap.height,
+                    imageWidth = displayWidth,
+                    imageHeight = displayHeight,
                     handedness = handedness,
                     presenceScore = presenceScore,
                 )
@@ -169,9 +196,9 @@ class MediaPipeHandNailDetector @Inject constructor(
 
     companion object {
         const val MODEL_ASSET = "hand_landmarker.task"
-        private const val MIN_CONFIDENCE = 0.20f
+        /** Mais permissivo: fotos com contraluz / mão retinta falhavam em 0.20. */
+        private const val MIN_CONFIDENCE = 0.10f
         private const val MAX_INFERENCE_EDGE = 1280
-        private val ROTATION_FALLBACKS = floatArrayOf(90f, 270f, 180f)
         /** Tips MediaPipe: polegar, indicador, médio, anelar, mindinho. */
         private val TIP_LANDMARK_INDICES = intArrayOf(4, 8, 12, 16, 20)
     }
