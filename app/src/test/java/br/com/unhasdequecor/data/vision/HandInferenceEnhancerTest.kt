@@ -30,6 +30,20 @@ class HandInferenceEnhancerTest {
     }
 
     @Test
+    fun `contrast stretch is no-op when luminance almost flat`() {
+        val pixels = IntArray(32) { 0xFF646464.toInt() }
+        val before = pixels.copyOf()
+        HandInferenceEnhancer.contrastStretchArgb(pixels)
+        assertThat(pixels.toList()).isEqualTo(before.toList())
+    }
+
+    @Test
+    fun `luminance is within channel bounds`() {
+        assertThat(HandInferenceEnhancer.luminance(0xFF000000.toInt())).isEqualTo(0)
+        assertThat(HandInferenceEnhancer.luminance(0xFFFFFFFF.toInt())).isEqualTo(255)
+    }
+
+    @Test
     fun `mirrorXNormalized flips horizontal coordinate`() {
         assertThat(HandInferenceEnhancer.mirrorXNormalized(0.25f)).isWithin(0.001f).of(0.75f)
         assertThat(HandInferenceEnhancer.mirrorXNormalized(0f)).isWithin(0.001f).of(1f)
