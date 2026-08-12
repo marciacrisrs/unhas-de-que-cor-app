@@ -17,8 +17,9 @@ import javax.inject.Singleton
  * Expõe landmarks brutos ([HandLandmarkProcessor]) para o pipeline de try-on.
  *
  * Em fotos difíceis (contraluz, mão escura, horizontal), avalia variantes
- * (contraste/gamma/brilho/espelho/rotação) e escolhe a de maior [HandLandmarks.presenceScore]
- * — não fica na primeira detecção fraca.
+ * (contraste/gamma/brilho/espelho/rotação) e escolhe a de maior
+ * [HandLandmarkQuality.rankingScore] (presence + span das tips) — não fica na
+ * primeira detecção fraca nem na primeira presence só “forte”.
  */
 @Singleton
 class MediaPipeHandNailDetector @Inject constructor(
@@ -34,7 +35,8 @@ class MediaPipeHandNailDetector @Inject constructor(
     override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
         val created = ArrayList<Bitmap>(16)
         var best: OrientedHandLandmarks? = null
-        var bestScore = -1f
+        var bestRank = -1f
+        var bestPresence = -1f
         try {
             for (variant in HandInferenceVariants.forSource(bitmap)) {
                 if (variant.inferenceBitmap !== bitmap &&
@@ -52,16 +54,19 @@ class MediaPipeHandNailDetector @Inject constructor(
                     remap = variant.remapPoint,
                 )
                 if (landmarks != null &&
-                    DetectionConfidenceFloor.acceptsHandPresence(landmarks.presenceScore) &&
-                    landmarks.presenceScore > bestScore
+                    DetectionConfidenceFloor.acceptsHandPresence(landmarks.presenceScore)
                 ) {
-                    bestScore = landmarks.presenceScore
-                    best = OrientedHandLandmarks(
-                        bitmap = variant.displayBitmap,
-                        landmarks = landmarks,
-                    )
+                    val rank = HandLandmarkQuality.rankingScore(landmarks)
+                    if (rank > bestRank) {
+                        bestRank = rank
+                        bestPresence = landmarks.presenceScore
+                        best = OrientedHandLandmarks(
+                            bitmap = variant.displayBitmap,
+                            landmarks = landmarks,
+                        )
+                    }
                 }
-                if (DetectionConfidenceFloor.isStrongHandPresence(bestScore)) {
+                if (HandLandmarkQuality.shouldStopSearching(bestPresence)) {
                     break
                 }
             }

@@ -317,6 +317,8 @@ FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas →
 | Facing overshoot | Base = tip–pip (antes tip–dip colapsado ≈ 0) |
 | Almond tip | `tip landmark + overshoot` (não `center + halfLen`) |
 | Facing width | `tipPip * FACING_WIDTH_SCALE` (não length encurtado) |
+| Facing tip–dip | Relativo a tip–pip (`FACING_TIP_DIP_RATIO`) — escala-invariante |
+| Placas usáveis | `isUsablePlate` filtra eixo colapsado (mapper **e** ROI) |
 | Segmenter `along01` | Eixo cutícula→ponta do **almond** |
 | Canvas usuária | Mesmo tamanho da elipse (`matchEllipsePlate`) |
 | Elipse fallback | Fatores em calibração (rx/ry/bias/opaque) |
@@ -329,6 +331,11 @@ FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas →
 | Canvas 2× maior que elipse | Feito — `matchEllipsePlate` |
 | Largura facing encolhida | Feito — `FACING_WIDTH_SCALE` |
 | Testes facing/thumb/eixo almond/elipse | Feito |
+| Foto pequena → facing falso (limiar absoluto) | Feito — tip–dip relativo |
+| Punho / oclusão → elipses fantasmas | Feito — `isUsablePlate` + ROI null |
+| Early-stop MediaPipe em presence 0.55 | Feito — `HAND_PRESENCE_EARLY_STOP` + ranking tip-span |
+| Reject presence sem gastar ROI/seg | Feito — classify precoce no `detect` |
+| Bateria condições difíceis (JVM) | Feito — `TryOnDifficultConditionsTest` |
 
 Backlog residual: smoke em device; A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
 
@@ -346,8 +353,10 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 | Máscaras só paintable (0.32–0.45) / elipse | Nunca `FULL` — `APPROXIMATE` |
 
 Detecção (falsos negativos em fotos reais): escolhe a **melhor** variante MediaPipe
-(presence), não a primeira; variantes extras (stretch+gamma, brilho, rotação+espelho);
-mapper aceita ≥2 unhas plausíveis; limiar MediaPipe 0.08.
+(`HandLandmarkQuality` = presence + span das tips), não a primeira nem a primeira
+só “forte”; early-stop só com presence ≥ 0.82; variantes extras (stretch+gamma,
+brilho, rotação+espelho); mapper/ROI aceitam só placas usáveis (≥2 unhas);
+limiar MediaPipe 0.08.
 
 ### Reavaliação especialistas (pós-PR #44) — melhorias aplicadas
 

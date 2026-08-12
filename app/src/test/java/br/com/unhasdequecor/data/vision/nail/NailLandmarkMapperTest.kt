@@ -56,7 +56,7 @@ class NailLandmarkMapperTest {
 
     @Test
     fun `facing camera uses tip as center when tip and dip collapse`() {
-        // tip≈dip em pixels (< SHORT_TIP_DIP_PX) → ramo facingCamera.
+        // tip–dip curto relativo a tip–pip → ramo facing.
         val landmarks = MutableList(21) { NailLandmarkMapper.NormalizedPoint(0.5f, 0.5f) }
         fun finger(tip: Int, dip: Int, pip: Int, x: Float) {
             landmarks[pip] = NailLandmarkMapper.NormalizedPoint(x, 0.40f)

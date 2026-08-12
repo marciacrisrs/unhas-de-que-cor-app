@@ -11,6 +11,11 @@ import kotlin.math.hypot
  */
 object NailPlateCalibration {
     const val SHORT_TIP_DIP_PX = 16f
+    /**
+     * Facing quando tip–dip é pequeno **relativo** a tip–pip (escala-invariante).
+     * Evita open-hand virar facing só porque a foto é pequena.
+     */
+    const val FACING_TIP_DIP_RATIO = 0.35f
     const val FACING_LENGTH_SCALE = 0.48f
     /** Largura em unha de frente: fração tip–pip (independente do comprimento encurtado). */
     const val FACING_WIDTH_SCALE = 0.45f
@@ -99,6 +104,27 @@ object NailPlateCalibration {
         else -> CENTER_ALONG
     }
 
+    /** Limiar tip–dip (px) para considerar unha de frente — relativo a tip–pip. */
+    fun facingTipDipThresholdPx(tipPipPx: Float): Float =
+        maxOf(SHORT_TIP_DIP_PX * 0.5f, tipPipPx * FACING_TIP_DIP_RATIO)
+
+    fun isFacing(thumbMode: Boolean, tipDipPx: Float, tipPipPx: Float): Boolean =
+        !thumbMode && tipDipPx < facingTipDipThresholdPx(tipPipPx)
+
+    /** Placa com eixo utilizável (não collapsada / fora da anatomia). */
+    fun isUsablePlate(plate: PlateGeometry): Boolean {
+        val axisLen = hypot(
+            (plate.tipX - plate.axisStartX).toDouble(),
+            (plate.tipY - plate.axisStartY).toDouble(),
+        ).toFloat()
+        val minAxis = when {
+            plate.thumbMode -> MIN_AXIS_THUMB_PX
+            plate.facing -> MIN_AXIS_FACING_PX
+            else -> MIN_AXIS_OPEN_PX
+        }
+        return axisLen >= minAxis && plate.lengthPx >= MIN_NAIL_LEN_PX * 0.85f
+    }
+
     fun ellipseRadiusX(anchorWidthNorm: Float, imageWidth: Int): Float =
         (anchorWidthNorm * imageWidth * ELLIPSE_RX_FACTOR).coerceAtLeast(4f)
 
@@ -132,7 +158,7 @@ object NailPlateCalibration {
         val tipMcp = hypot((tipX - mcpX).toDouble(), (tipY - mcpY).toDouble()).toFloat()
         val scales = scalesFor(finger)
         val thumbMode = finger == Finger.THUMB
-        val facing = !thumbMode && tipDip < SHORT_TIP_DIP_PX
+        val facing = isFacing(thumbMode, tipDipPx = tipDip, tipPipPx = tipPip)
 
         val lengthPx = when {
             thumbMode -> (tipMcp * THUMB_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
