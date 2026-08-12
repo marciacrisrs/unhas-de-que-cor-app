@@ -6,15 +6,20 @@ import org.junit.Test
 class HandSampleCatalogTest {
 
     @Test
-    fun `catalog exposes five curated samples`() {
-        assertThat(HandSampleCatalog.options).hasSize(5)
+    fun `catalog exposes curated samples including diverse retinta pose`() {
+        assertThat(HandSampleCatalog.options).hasSize(6)
         assertThat(HandSampleCatalog.options.map { it.id }).containsExactly(
             "retinta_vinho",
+            "retinta_polegar",
             "morena_nude",
             "clara_vermelho",
             "morena_clara_coral",
             "media_rosa",
         ).inOrder()
+        val diverse = HandSampleCatalog.findById("retinta_polegar")
+        assertThat(diverse?.title).isEqualTo("Pele retinta")
+        assertThat(diverse?.detailLabel).isEqualTo("Pose diversa")
+        assertThat(diverse?.assetPath).endsWith("hand_sample_retinta_polegar.webp")
     }
 
     @Test

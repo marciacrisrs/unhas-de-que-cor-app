@@ -2,7 +2,8 @@ package br.com.unhasdequecor.data.vision.nail
 
 /**
  * Âncoras normalizadas (0–1) no espaço da imagem (ContentScale.FillBounds + aspect da bitmap).
- * Pose das amostras: punho semi-fechado com unhas de frente para a câmera.
+ * Pose das amostras: punho semi-fechado com unhas de frente para a câmera
+ * (exceto `retinta_polegar`: polegar erguido + unhas de frente — diversidade de pose/tom).
  *
  * Preferência: máscara em `hand_nail_masks/` (recoloração). As âncoras são fallback.
  */
@@ -56,6 +57,14 @@ object NailOverlayAnchors {
             NailOverlayAnchor(0.590f, 0.555f, 0.085f, 0.100f, 13f),
             NailOverlayAnchor(0.665f, 0.620f, 0.075f, 0.090f, 23f),
         ),
+        // Pose diversa (polegar erguido + unhas de frente) — pele retinta.
+        "retinta_polegar" to listOf(
+            NailOverlayAnchor(0.458f, 0.118f, 0.090f, 0.105f, -4f),
+            NailOverlayAnchor(0.555f, 0.492f, 0.122f, 0.068f, 8f),
+            NailOverlayAnchor(0.556f, 0.588f, 0.128f, 0.070f, 5f),
+            NailOverlayAnchor(0.562f, 0.680f, 0.122f, 0.066f, 9f),
+            NailOverlayAnchor(0.588f, 0.790f, 0.115f, 0.065f, 14f),
+        ),
         "morena_clara_coral" to listOf(
             NailOverlayAnchor(0.400f, 0.175f, 0.070f, 0.075f, -16f),
             NailOverlayAnchor(0.480f, 0.345f, 0.075f, 0.080f, -2f),
@@ -76,6 +85,7 @@ object NailOverlayAnchors {
         "media_rosa",
         "morena_nude",
         "retinta_vinho",
+        "retinta_polegar",
         "morena_clara_coral",
     )
 }

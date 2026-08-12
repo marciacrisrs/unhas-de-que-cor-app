@@ -33,7 +33,11 @@ class NailOverlayAnchorsTest {
         assertThat(NailOverlayAnchors.hasMaskAsset("media_rosa")).isTrue()
         assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isTrue()
         assertThat(NailOverlayAnchors.hasMaskAsset("retinta_vinho")).isTrue()
+        assertThat(NailOverlayAnchors.hasMaskAsset("retinta_polegar")).isTrue()
         assertThat(NailOverlayAnchors.hasMaskAsset("morena_clara_coral")).isTrue()
+        assertThat(NailOverlayAnchors.forSample("retinta_polegar")).hasSize(5)
+        assertThat(NailOverlayAnchors.forSample("retinta_polegar"))
+            .isNotEqualTo(NailOverlayAnchors.DEFAULT)
         assertThat(NailOverlayAnchors.hasMaskAsset(null)).isFalse()
         assertThat(NailOverlayAnchors.hasMaskAsset("unknown")).isFalse()
     }
