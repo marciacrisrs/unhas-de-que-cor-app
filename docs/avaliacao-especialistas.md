@@ -163,5 +163,5 @@ Branch `cursor/especialistas-followups-535f` (inclui smells #17):
 | 4 | Testes + gate app | Feito (`NailTryOnPipelineTest`, `jacocoAppCoverageVerification` ≥80%) |
 | 5 | README / release / AGENTS | Feito + `CHANGELOG.md` |
 | 6 | Manifest rede | Feito (`INTERNET`/`ACCESS_NETWORK_STATE` removidos no merge) |
-| 7 | CI artefatos / ordem / permissions | Feito (QG wait ainda opt-in via var) |
-| 8 | Keystore + AAB + listing Play | Pendente (operacional / console) |
+| 7 | CI artefatos / ordem / permissions | Feito (`SONAR_QUALITY_GATE_WAIT=true` por padrão) |
+| 8 | Keystore + AAB + listing Play | Em andamento — docs/listing/privacidade + workflow AAB; falta keystore da Márcia + Console |
