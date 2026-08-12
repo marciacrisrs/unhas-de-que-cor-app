@@ -1,8 +1,7 @@
 name: Release AAB
 
-# Automático: git push de tag v* (ex.: git tag v1.0.1 && git push origin v1.0.1)
-# Manual: Actions → Release AAB → Run workflow
-# Cada execução incrementa versionCode (+1) e versionName (patch +1, ou o nome da tag).
+# Tag v* ou Actions → Release AAB: bump de versão, AAB assinado e publicação na faixa
+# internal da Play (status completed) quando PLAY_SERVICE_ACCOUNT_JSON estiver configurado.
 on:
   push:
     tags:
@@ -13,8 +12,8 @@ on:
         description: Rodar verifyCi antes do bundle
         type: boolean
         default: true
-      upload_play_internal:
-        description: Enviar AAB para faixa internal da Play (requer PLAY_SERVICE_ACCOUNT_JSON)
+      skip_play_upload:
+        description: Pular envio para teste interno da Play
         type: boolean
         default: false
 
@@ -35,12 +34,15 @@ jobs:
       RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
       RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      # completed = publica direto na faixa internal; use draft só se o app ainda estiver
+      # "Draft" no Play Console (primeiro upload / listing incompleto).
+      PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          # Dispatch: branch escolhida na UI. Tag: faz checkout da tag e depois espelha o bump no master.
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -125,15 +127,19 @@ jobs:
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
-      - name: Upload to Play internal (draft)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_play_internal }}
+      - name: Publish to Play internal testing
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' && (github.event_name != 'workflow_dispatch' || !inputs.skip_play_upload) }}
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: br.com.unhasdequecor
           releaseFiles: app/build/outputs/bundle/release/*.aab
-          track: internal
-          status: draft
+          tracks: internal
+          status: ${{ env.PLAY_RELEASE_STATUS }}
+          releaseName: ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})
+          mappingFile: app/build/outputs/mapping/release/mapping.txt
+          whatsNewDirectory: distribution/whatsnew
+          changesNotSentForReview: true
 
       - name: Commit and push version bump
         run: |
@@ -149,7 +155,6 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             git push origin "HEAD:${GITHUB_REF_NAME}"
           else
-            # Tag release: espelha o bump no master.
             git push origin "HEAD:master"
           fi
 

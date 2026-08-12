@@ -42,27 +42,41 @@ Em **Settings → Secrets and variables → Actions**, crie:
 | `RELEASE_STORE_PASSWORD` | senha do store |
 | `RELEASE_KEY_ALIAS` | ex. `upload` |
 | `RELEASE_KEY_PASSWORD` | senha da key |
-| `PLAY_SERVICE_ACCOUNT_JSON` | (opcional) JSON da service account da Play API, para upload na faixa internal |
+| `PLAY_SERVICE_ACCOUNT_JSON` | JSON da service account com permissão de release no app (obrigatório para publicar na faixa internal) |
+
+Variable opcional:
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `PLAY_RELEASE_STATUS` | `completed` | `completed` publica direto na faixa internal; use `draft` só se o app ainda estiver em rascunho no Play Console (primeiro upload / listing incompleto) |
+
+### Service account na Play Console
+
+1. [Google Cloud](https://console.cloud.google.com/) → IAM → Service accounts → criar conta → chave JSON.
+2. [Play Console](https://play.google.com/console) → **Users and permissions** → convidar o e-mail da service account.
+3. Conceder permissão **Release to testing tracks** (e **View app information**) no app `br.com.unhasdequecor`.
+4. Colar o JSON inteiro no secret `PLAY_SERVICE_ACCOUNT_JSON`.
 
 ### Como dispara
 
-**Manual (botão Release)** — Actions → **Release AAB** → Run workflow (branch `master`).  
-Cada clique **sobe sozinho** o `versionCode` (+1) e o patch do `versionName` (ex.: `1.0.0` → `1.0.1`), faz commit no repo, gera o AAB e (se marcado) sobe draft na faixa internal.
+**Manual (recomendado para o primeiro deploy)** — Actions → **Release AAB** → Run workflow (branch `master`).  
+Cada execução incrementa `versionCode` (+1) e o patch do `versionName`, gera o AAB assinado, **publica na faixa Teste interno** da Play (`status: completed`) e faz commit da versão no repo.
 
 **Por tag** — a partir do `master`:
 
 ```bash
 git checkout master
 git pull
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
-Na tag, o `versionName` vira o nome da tag (sem `v`) e o `versionCode` também incrementa; o bump é espelhado no `master`.
+Na tag, o `versionName` vira o nome da tag (sem `v`); o upload para teste interno também roda automaticamente se `PLAY_SERVICE_ACCOUNT_JSON` existir.
 
-Marque *upload_play_internal* só se `PLAY_SERVICE_ACCOUNT_JSON` estiver configurado.
+Marque *skip_play_upload* no dispatch manual só se quiser gerar o AAB sem enviar à Play.
 
-Sem os secrets `RELEASE_*`, o workflow **falha de propósito** (não publica AAB assinado com debug).
+Sem os secrets `RELEASE_*`, o workflow **falha de propósito** (não publica AAB assinado com debug).  
+Sem `PLAY_SERVICE_ACCOUNT_JSON`, o AAB é gerado e fica como artifact, mas **não** sobe à Play.
 
 ## 2. Build local
 
@@ -89,9 +103,12 @@ gradlew :app:bundleRelease --no-configuration-cache
 1. Criar app + preencher [`play-listing.md`](play-listing.md)
 2. Publicar política de privacidade (URL HTTPS) e colar no Console
 3. Ativar **Play App Signing** e registrar o upload key
-4. Criar release em **Teste interno** com o AAB
-5. Smoke no device (abaixo) na faixa interna
-6. Promover para fechado/produção quando estável
+4. Preencher listing, privacidade, classificação de conteúdo e demais formulários obrigatórios (app fora do status *Draft*)
+5. **Release AAB** no GitHub Actions publica direto na faixa **Teste interno** (`PLAY_SERVICE_ACCOUNT_JSON` + keystore)
+6. Smoke no device (abaixo) na faixa interna
+7. Promover para fechado/produção quando estável
+
+> **Primeiro upload:** se o app ainda estiver *Draft* no Console, defina a variable `PLAY_RELEASE_STATUS=draft`, rode o workflow e finalize o release manualmente no Console uma vez. Depois volte para `completed` (default).
 
 ## 4. Validar upgrade de Room
 
