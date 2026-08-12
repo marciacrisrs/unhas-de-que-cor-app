@@ -42,6 +42,7 @@ Assets otimizados derivados dos logos oficiais:
 | `drawable/ic_launcher_{background,foreground}.webp` + mipmaps | `logo-icone.png` | ícone do app |
 
 Nas toolbars (Contexto, Resultado, Histórico, Favoritos) o mark é o chip circular
-vetorial (frasco + anel + sparkles) — o tile do ícone de app não é usado lá.
+vetorial alinhado ao `logo-icone` (tampa alta, corpo bulboso, anel com aberturas e
+sparkles) — tintável quando há cor de esmalte.
 
 Telas em `telas/` são referência visual — não entram no APK.

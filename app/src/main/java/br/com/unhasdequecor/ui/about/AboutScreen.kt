@@ -32,7 +32,8 @@ import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.ui.components.BrandLogoLockup
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
-private const val CONTACT_EMAIL = "marciacrisrs@gmail.com"
+private const val GITHUB_URL = "https://github.com/marciacrisrs/unhas-de-que-cor-app"
+private const val GITHUB_LABEL = "github.com/marciacrisrs/unhas-de-que-cor-app"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +65,7 @@ fun AboutScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            BrandLogoLockup()
+            BrandLogoLockup(height = 96.dp)
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "Menos dúvida. Mais unha bonita.",
@@ -112,29 +113,32 @@ fun AboutScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Privacidade e contato",
+                        text = "Código e projeto",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Dúvidas sobre privacidade ou o app? Fale conosco.",
+                        text = "O app é open source. Veja o código, issues e novidades no GitHub.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     TextButton(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:$CONTACT_EMAIL")
-                                putExtra(Intent.EXTRA_SUBJECT, "Unhas de Que Cor?")
-                            }
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL))
                             runCatching { context.startActivity(intent) }
                         },
                         modifier = Modifier.semantics {
-                            contentDescription = "Enviar e-mail para $CONTACT_EMAIL"
+                            contentDescription = "Abrir repositório no GitHub"
                         },
                     ) {
-                        Text(CONTACT_EMAIL)
+                        Text(GITHUB_LABEL)
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Dúvidas de privacidade: use o contato da política publicada na Play Store.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 

@@ -12,12 +12,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,10 +42,12 @@ import br.com.unhasdequecor.ui.components.HistoryRowModel
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     onOpenResult: (HistoryRowUi) -> Unit,
     mode: HistoryScreenMode = HistoryScreenMode.FULL,
+    onBack: (() -> Unit)? = null,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,36 +68,74 @@ fun HistoryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        HistoryHeader(title = title, subtitle = subtitle)
-        Spacer(modifier = Modifier.height(16.dp))
-        if (mode == HistoryScreenMode.FULL) {
-            HistoryFilterTabs(
-                filter = state.filter,
-                onFilterSelected = viewModel::onFilterSelected,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (state.isEmpty) {
-            EmptyContent(
-                message = if (state.filter == HistoryFilter.FAVORITES ||
-                    mode == HistoryScreenMode.FAVORITES_ONLY
-                ) {
-                    "Nenhuma favorita ainda. Salve uma recomendação com o coração."
-                } else {
-                    "Seu histórico aparece aqui depois da primeira recomendação."
+        if (onBack != null) {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(title, style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                    }
+                },
+                actions = {
+                    NailPolishMark(
+                        modifier = Modifier.padding(end = 12.dp),
+                        markSize = 40.dp,
+                        decorative = true,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
             )
-        } else {
-            HistoryList(
-                state = state,
-                showStats = mode == HistoryScreenMode.FULL,
-                onToggleFavorite = viewModel::onToggleFavorite,
-                onOpenResult = onOpenResult,
-            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+        ) {
+            if (onBack == null) {
+                HistoryHeader(title = title, subtitle = subtitle)
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            if (mode == HistoryScreenMode.FULL) {
+                HistoryFilterTabs(
+                    filter = state.filter,
+                    onFilterSelected = viewModel::onFilterSelected,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (state.isEmpty) {
+                EmptyContent(
+                    message = if (state.filter == HistoryFilter.FAVORITES ||
+                        mode == HistoryScreenMode.FAVORITES_ONLY
+                    ) {
+                        "Nenhuma favorita ainda. Salve uma recomendação com o coração."
+                    } else {
+                        "Seu histórico aparece aqui depois da primeira recomendação."
+                    },
+                )
+            } else {
+                HistoryList(
+                    state = state,
+                    showStats = mode == HistoryScreenMode.FULL,
+                    onToggleFavorite = viewModel::onToggleFavorite,
+                    onOpenResult = onOpenResult,
+                )
+            }
         }
     }
 }
