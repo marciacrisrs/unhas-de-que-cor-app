@@ -75,12 +75,14 @@ class NailTryOnPipeline @Inject constructor(
 
         val rois = roiEstimator.estimateAll(landmarks)
         val detected = rois.mapNotNull { roi ->
-            if (roi.geometricConfidence < MIN_ROI_CONFIDENCE) return@mapNotNull null
+            if (!DetectionConfidenceFloor.acceptsRoi(roi.geometricConfidence)) {
+                return@mapNotNull null
+            }
             val mask = segmenter.segment(working, roi) ?: return@mapNotNull null
             val segScore = segmentationConfidence(mask, roi)
             val confidence = (GEO_WEIGHT * roi.geometricConfidence + SEG_WEIGHT * segScore)
                 .coerceIn(0f, 1f)
-            if (confidence < NailColorApplier.MIN_CONFIDENCE) return@mapNotNull null
+            if (!DetectionConfidenceFloor.acceptsNail(confidence)) return@mapNotNull null
             DetectedNail(
                 finger = roi.finger,
                 roi = roi,
@@ -88,10 +90,12 @@ class NailTryOnPipeline @Inject constructor(
                 confidence = confidence,
             )
         }
-        val nails = if (stabilize) tracker.stabilize(detected) else {
+        val rawNails = if (stabilize) tracker.stabilize(detected) else {
             tracker.reset()
             detected
         }
+        // Garante que snapshot não retenha unhas abaixo do piso de pintura.
+        val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
         val reliability = TryOnHandReliability.classify(landmarks)
         if (reliability == TryOnReliability.REJECTED) {
             if (working !== image && !working.isRecycled) {
@@ -113,9 +117,10 @@ class NailTryOnPipeline @Inject constructor(
         polishColor: Color,
     ): NailTryOnResult {
         val working = snapshot.workingBitmap
-        // ≥3 máscaras: almond; 0 máscaras: elipse pelos landmarks; 1–2: tenta máscara e completa com elipse.
+        // Caminho almond vs elipse: usa piso de pintura, não o de claim FULL.
+        val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
         val painted = when {
-            snapshot.nails.size >= MIN_NAILS_FOR_MASK_PATH -> {
+            paintableCount >= DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH -> {
                 colorApplier.apply(working, snapshot.nails, polishColor)
                     ?: ellipseFallback(working, snapshot.landmarks, polishColor)
                     ?: working
@@ -170,8 +175,6 @@ class NailTryOnPipeline @Inject constructor(
     }
 
     private companion object {
-        const val MIN_ROI_CONFIDENCE = 0.24f
-        const val MIN_NAILS_FOR_MASK_PATH = 3
         // Prioriza geometria: unhas naturais falham em heurística de pele.
         const val GEO_WEIGHT = 0.65f
         const val SEG_WEIGHT = 0.35f

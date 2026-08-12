@@ -19,12 +19,12 @@
 | Documentation Reviewer | Aprovado c/ ressalvas (CHANGELOG 1.0.5 aberto) |
 | Release Manager | Aprovado c/ ressalvas — smoke device antes de ampliar loja |
 | CI/CD Reviewer | Aprovado — Verify master verde pós-#42 |
-| Vision Try-On Reviewer | Aprovado c/ ressalvas (falha honesta; falta floor confiança) |
+| Vision Try-On Reviewer | Aprovado c/ ressalvas (falha honesta; floor confiança → `DetectionConfidenceFloor`) |
 
 **Síntese:** master @ `f23cec0` (1.0.5 / 6) com try-on mais resiliente (#41),
 QG Sonar recuperado (#42) e símbolos nativos instrumentados (#40). Aprovado com
-ressalvas para teste interno — **smoke em device** e piso de confiança ainda
-pendentes. Reavaliação **2026-08-12f**.
+ressalvas para teste interno — **smoke em device** ainda pendente; piso de
+confiança unificado em `DetectionConfidenceFloor`. Reavaliação **2026-08-12f**.
 
 ---
 
@@ -280,6 +280,33 @@ de paint path; constantes mágicas sem ground-truth.
 
 ---
 
+## Implementação — Floor de confiança da detecção
+
+`DetectionConfidenceFloor` centraliza limiares (mão + unha):
+
+| Piso | Valor | Uso |
+|------|-------|-----|
+| `MEDIAPIPE_MIN` | 0.08 | Hand Landmarker |
+| `HAND_PRESENCE_ACCEPT` | 0.12 | Aceitar mão / variantes |
+| `HAND_PRESENCE_STRONG` | 0.55 | Eligibility FULL |
+| `ROI_GEOMETRIC_MIN` | 0.24 | ROI → segmentar |
+| `NAIL_COMBINED_MIN` | 0.32 | Pintar / contar máscara |
+| `NAIL_FULL_MIN` | 0.45 | Contar para “Prévia na sua mão” |
+
+FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas → APPROXIMATE).
+
+### Follow-ups especialistas (pós-floor) — feitos
+
+| Achado | Status |
+|--------|--------|
+| Default `fullQuality = paintable` (footgun FULL) | Feito — parâmetro obrigatório |
+| `meetsFullNailFloor` morto | Feito — usado no `planRender(nails)` |
+| Testes path `planRender(nails)` + pipeline floors | Feito |
+| Alias vs `DetectionConfidenceFloor` direto | Feito (MediaPipe / Variants / Tracker) |
+| `MIN_MASKS_FOR_FULL` no caminho almond | Feito — `MIN_PAINTABLE_FOR_MASK_PATH` |
+
+---
+
 ## Implementação — Detecção correta da área da unha
 
 `NailPlateCalibration` é a fonte única de geometria da placa (mapper ↔ ROI ↔ elipse):
@@ -314,9 +341,9 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 | Regra | Comportamento |
 |-------|----------------|
 | `presenceScore` &lt; 0.12 | `REJECTED` → `detect` retorna `null` (sem claim) |
-| 0.12–0.55 | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” (mesmo com ≥3 máscaras) |
-| ≥0.55 **e** ≥3 máscaras | `STRONG` + `FULL` → “Prévia na sua mão” |
-| Elipse / poucas máscaras | Nunca `FULL` — modo ≈ qualidade |
+| 0.12–0.55 | `WEAK` → só `APPROXIMATE` (mesmo com ≥3 máscaras) |
+| ≥0.55 **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (0.45) | `STRONG` + `FULL` → “Prévia na sua mão” |
+| Máscaras só paintable (0.32–0.45) / elipse | Nunca `FULL` — `APPROXIMATE` |
 
 Detecção (falsos negativos em fotos reais): escolhe a **melhor** variante MediaPipe
 (presence), não a primeira; variantes extras (stretch+gamma, brilho, rotação+espelho);
@@ -327,7 +354,7 @@ mapper aceita ≥2 unhas plausíveis; limiar MediaPipe 0.08.
 | Especialista | Achado | Status |
 |--------------|--------|--------|
 | Vision / UI | TalkBack CD dizia “na sua mão” em qualquer modo | Feito — `TryOnPreviewLabels` |
-| Vision | Mid presence + ≥3 máscaras virava FULL | Feito — classify só por presence; FULL = STRONG ∧ ≥3 máscaras |
+| Vision | Mid presence + ≥3 máscaras virava FULL | Feito — classify só por presence; FULL = STRONG ∧ ≥3 unhas ≥ 0.45 |
 | A11y | Banner alpha 0.88 + CD duplicado; convite `maxLines=1` | Feito — primary sólido, `clearAndSetSemantics`, convite `maxLines=2` + CD completo |
 | Android | `getBackStackEntry(HOME)` sem guarda | Feito — `runCatching` + fallback `navigate(HOME)` |
 | Test | Gaps reliability / labels / applier early-return | Feito — testes + JaCoCo `TryOnPreviewLabels*` |

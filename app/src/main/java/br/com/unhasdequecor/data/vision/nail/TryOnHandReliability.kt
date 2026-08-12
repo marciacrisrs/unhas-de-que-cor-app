@@ -7,13 +7,15 @@ import br.com.unhasdequecor.data.vision.HandLandmarks
  *
  * MediaPipe pode devolver landmarks fracos (limiar baixo / contraluz).
  * Esta camada evita rotular elipse frágil como “Prévia na sua mão”.
+ *
+ * Pisos numéricos: [DetectionConfidenceFloor].
  */
 enum class TryOnReliability {
     /** Descartar — tratar como mão não detectada. */
     REJECTED,
     /** Landmarks usable só como prévia aproximada. */
     WEAK,
-    /** Presence forte — claim FULL só se também houver máscaras suficientes. */
+    /** Presence forte — claim FULL só se também houver máscaras de qualidade. */
     STRONG,
 }
 
@@ -34,22 +36,18 @@ data class UserTryOnRenderPlan(
 )
 
 object TryOnHandReliability {
-    /** Abaixo disso: ruído típico — descartar. Alinhado ao limiar MediaPipe (~0.08). */
-    const val MIN_PRESENCE_ACCEPT = 0.12f
-
-    /** Acima disso: claim FULL permitido (com ≥ [MIN_MASKS_FOR_FULL] máscaras). */
-    const val MIN_PRESENCE_STRONG = 0.55f
-
-    const val MIN_MASKS_FOR_FULL = 3
-
     /**
      * Classifica só por presence. Máscaras **não** elevam para STRONG —
      * mid presence + muitas máscaras continua WEAK → APPROXIMATE (nunca FULL).
      */
     fun classify(presenceScore: Float): TryOnReliability {
         val score = presenceScore.coerceIn(0f, 1f)
-        if (score < MIN_PRESENCE_ACCEPT) return TryOnReliability.REJECTED
-        if (score >= MIN_PRESENCE_STRONG) return TryOnReliability.STRONG
+        if (!DetectionConfidenceFloor.acceptsHandPresence(score)) {
+            return TryOnReliability.REJECTED
+        }
+        if (DetectionConfidenceFloor.isStrongHandPresence(score)) {
+            return TryOnReliability.STRONG
+        }
         return TryOnReliability.WEAK
     }
 
@@ -57,22 +55,58 @@ object TryOnHandReliability {
         classify(landmarks.presenceScore)
 
     /**
-     * Plano de renderização honesto (modo ≡ qualidade).
-     * FULL exige STRONG **e** ≥ [MIN_MASKS_FOR_FULL] máscaras. Elipse sozinha nunca é FULL.
+     * Plano de renderização a partir das unhas detectadas (caminho de produção).
+     * FULL = STRONG ∧ [DetectionConfidenceFloor.meetsFullNailFloor].
      */
     fun planRender(
         reliability: TryOnReliability?,
-        nailCount: Int,
+        nails: List<DetectedNail>,
         hasMappableAnchors: Boolean,
     ): UserTryOnRenderPlan {
         if (reliability == null || reliability == TryOnReliability.REJECTED) {
             return nonePlan()
         }
-        val masksOk = nailCount >= MIN_MASKS_FOR_FULL
-        val anyMask = nailCount > 0
+        val paintable = DetectionConfidenceFloor.countPaintable(nails)
+        val fullOk = DetectionConfidenceFloor.meetsFullNailFloor(nails)
+        return planFromCounts(
+            reliability = reliability,
+            paintableNailCount = paintable,
+            fullQualityOk = fullOk,
+            hasMappableAnchors = hasMappableAnchors,
+        )
+    }
+
+    /**
+     * Variante por contagens (testes). [fullQualityNailCount] é **obrigatório** —
+     * não defaulta para paintable (evita FULL indevido).
+     */
+    fun planRender(
+        reliability: TryOnReliability?,
+        paintableNailCount: Int,
+        fullQualityNailCount: Int,
+        hasMappableAnchors: Boolean,
+    ): UserTryOnRenderPlan {
+        if (reliability == null || reliability == TryOnReliability.REJECTED) {
+            return nonePlan()
+        }
+        return planFromCounts(
+            reliability = reliability,
+            paintableNailCount = paintableNailCount,
+            fullQualityOk = fullQualityNailCount >= DetectionConfidenceFloor.MIN_MASKS_FOR_FULL,
+            hasMappableAnchors = hasMappableAnchors,
+        )
+    }
+
+    private fun planFromCounts(
+        reliability: TryOnReliability,
+        paintableNailCount: Int,
+        fullQualityOk: Boolean,
+        hasMappableAnchors: Boolean,
+    ): UserTryOnRenderPlan {
+        val anyMask = paintableNailCount > 0
         return when (reliability) {
             TryOnReliability.STRONG -> when {
-                masksOk -> UserTryOnRenderPlan(
+                fullQualityOk -> UserTryOnRenderPlan(
                     mode = UserTryOnRenderMode.FULL,
                     useNailMasks = true,
                     useEllipsePaint = true,

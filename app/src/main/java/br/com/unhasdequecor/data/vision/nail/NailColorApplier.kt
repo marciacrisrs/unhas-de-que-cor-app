@@ -85,7 +85,7 @@ class NailColorApplier @Inject constructor() {
     }
 
     companion object {
-        const val MIN_CONFIDENCE = 0.32f
+        const val MIN_CONFIDENCE = DetectionConfidenceFloor.NAIL_COMBINED_MIN
         private const val MIN_MASK_ALPHA = 16
         private const val MIN_WEIGHT = 8f
         private const val FULL_ALPHA = 255f

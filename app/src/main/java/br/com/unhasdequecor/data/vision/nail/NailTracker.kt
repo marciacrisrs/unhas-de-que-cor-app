@@ -26,15 +26,15 @@ class NailTracker @Inject constructor() {
             val prev = previous[nail.finger]
             val stabilized = if (prev == null || nail.confidence >= prev.confidence) {
                 nail
-            } else if (nail.confidence < NailColorApplier.MIN_CONFIDENCE &&
-                prev.confidence >= NailColorApplier.MIN_CONFIDENCE
+            } else if (!DetectionConfidenceFloor.acceptsNail(nail.confidence) &&
+                DetectionConfidenceFloor.acceptsNail(prev.confidence)
             ) {
                 // Detecção ruim: reutiliza máscara anterior levemente.
                 prev.copy(confidence = prev.confidence * 0.92f)
             } else {
                 blend(prev, nail, alpha = 0.55f)
             }
-            if (stabilized.confidence >= NailColorApplier.MIN_CONFIDENCE * KEEP_FACTOR) {
+            if (DetectionConfidenceFloor.acceptsNail(stabilized.confidence)) {
                 out += stabilized
                 previous[nail.finger] = stabilized
             }
@@ -83,7 +83,6 @@ class NailTracker @Inject constructor() {
     }
 
     private companion object {
-        const val KEEP_FACTOR = 0.9f
         const val HALF_TURN_DEG = 180f
         const val FULL_TURN_DEG = 360f
     }

@@ -2,8 +2,8 @@ package br.com.unhasdequecor.data.vision
 
 import android.content.Context
 import android.graphics.Bitmap
+import br.com.unhasdequecor.data.vision.nail.DetectionConfidenceFloor
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates
-import br.com.unhasdequecor.data.vision.nail.TryOnHandReliability
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -52,7 +52,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                     remap = variant.remapPoint,
                 )
                 if (landmarks != null &&
-                    HandInferenceVariants.isAcceptablePresence(landmarks.presenceScore) &&
+                    DetectionConfidenceFloor.acceptsHandPresence(landmarks.presenceScore) &&
                     landmarks.presenceScore > bestScore
                 ) {
                     bestScore = landmarks.presenceScore
@@ -61,7 +61,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                         landmarks = landmarks,
                     )
                 }
-                if (bestScore >= TryOnHandReliability.MIN_PRESENCE_STRONG) {
+                if (DetectionConfidenceFloor.isStrongHandPresence(bestScore)) {
                     break
                 }
             }
@@ -208,7 +208,7 @@ class MediaPipeHandNailDetector @Inject constructor(
     companion object {
         const val MODEL_ASSET = "hand_landmarker.task"
         /** Mais permissivo: fotos com contraluz / mão retinta falhavam em 0.20. */
-        private const val MIN_CONFIDENCE = 0.08f
+        private const val MIN_CONFIDENCE = DetectionConfidenceFloor.MEDIAPIPE_MIN
         private const val MAX_INFERENCE_EDGE = 1280
         /** Tips MediaPipe: polegar, indicador, médio, anelar, mindinho. */
         private val TIP_LANDMARK_INDICES = intArrayOf(4, 8, 12, 16, 20)

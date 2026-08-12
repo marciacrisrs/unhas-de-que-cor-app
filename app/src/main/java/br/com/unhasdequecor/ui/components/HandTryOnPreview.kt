@@ -368,7 +368,7 @@ private fun paintUserPreview(
     }
     val plan = TryOnHandReliability.planRender(
         reliability = snapshot?.reliability,
-        nailCount = snapshot?.nails?.size ?: 0,
+        nails = snapshot?.nails.orEmpty(),
         hasMappableAnchors = mappedAnchors != null,
     )
     return when (plan.mode) {
