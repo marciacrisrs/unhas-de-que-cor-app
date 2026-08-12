@@ -2,6 +2,7 @@ name: Release AAB
 
 # Automático: git push de tag v* (ex.: git tag v1.0.1 && git push origin v1.0.1)
 # Manual: Actions → Release AAB → Run workflow
+# Cada execução incrementa versionCode (+1) e versionName (patch +1, ou o nome da tag).
 on:
   push:
     tags:
@@ -18,11 +19,11 @@ on:
         default: false
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
+  group: release-aab
+  cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   bundle:
@@ -38,6 +39,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # Dispatch: branch escolhida na UI. Tag: faz checkout da tag e depois espelha o bump no master.
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Require upload keystore secrets
         run: |
@@ -49,6 +54,35 @@ jobs:
             fi
           done
           exit "$missing"
+
+      - name: Bump versionCode / versionName
+        id: version
+        run: |
+          set -euo pipefail
+          file="app/build.gradle.kts"
+          current_code=$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' "$file" | head -1)
+          current_name=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' "$file" | head -1)
+          if [ -z "$current_code" ] || [ -z "$current_name" ]; then
+            echo "::error::Não achei versionCode/versionName em $file"
+            exit 1
+          fi
+          next_code=$((current_code + 1))
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            next_name="${GITHUB_REF_NAME#v}"
+          else
+            maj=$(echo "$current_name" | cut -d. -f1)
+            min=$(echo "$current_name" | cut -d. -f2)
+            pat=$(echo "$current_name" | cut -d. -f3)
+            maj=${maj:-0}
+            min=${min:-0}
+            pat=${pat:-0}
+            next_name="${maj}.${min}.$((pat + 1))"
+          fi
+          sed -i -E "s/versionCode = [0-9]+/versionCode = ${next_code}/" "$file"
+          sed -i -E "s/versionName = \"[^\"]+\"/versionName = \"${next_name}\"/" "$file"
+          echo "code=${next_code}" >> "$GITHUB_OUTPUT"
+          echo "name=${next_name}" >> "$GITHUB_OUTPUT"
+          echo "Version → ${next_name} (${next_code})"
 
       - name: Set up JDK 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -87,11 +121,10 @@ jobs:
       - name: Upload AAB artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: app-release-aab-${{ github.ref_name }}
+          name: app-release-aab-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
-      # Opcional: só no dispatch com checkbox, e só se o secret existir.
       - name: Upload to Play internal (draft)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_play_internal }}
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
@@ -101,6 +134,24 @@ jobs:
           releaseFiles: app/build/outputs/bundle/release/*.aab
           track: internal
           status: draft
+
+      - name: Commit and push version bump
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          if git diff --cached --quiet; then
+            echo "Nada para commitar"
+            exit 0
+          fi
+          git commit -m "chore(release): ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            # Tag release: espelha o bump no master.
+            git push origin "HEAD:master"
+          fi
 
       - name: Scrub keystore
         if: always()

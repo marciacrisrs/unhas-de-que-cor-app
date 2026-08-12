@@ -46,20 +46,21 @@ Em **Settings → Secrets and variables → Actions**, crie:
 
 ### Como dispara
 
-**Automático (recomendado)** — tag semântica a partir do `master`:
+**Manual (botão Release)** — Actions → **Release AAB** → Run workflow (branch `master`).  
+Cada clique **sobe sozinho** o `versionCode` (+1) e o patch do `versionName` (ex.: `1.0.0` → `1.0.1`), faz commit no repo, gera o AAB e (se marcado) sobe draft na faixa internal.
+
+**Por tag** — a partir do `master`:
 
 ```bash
 git checkout master
 git pull
-# ajuste versionName/versionCode se necessário, commit, depois:
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
-O workflow **Release AAB** roda, gera o AAB assinado e publica como artifact do Actions.
+Na tag, o `versionName` vira o nome da tag (sem `v`) e o `versionCode` também incrementa; o bump é espelhado no `master`.
 
-**Manual** — Actions → **Release AAB** → Run workflow.  
-Marque *upload_play_internal* só se `PLAY_SERVICE_ACCOUNT_JSON` estiver configurado (sobe draft na faixa internal).
+Marque *upload_play_internal* só se `PLAY_SERVICE_ACCOUNT_JSON` estiver configurado.
 
 Sem os secrets `RELEASE_*`, o workflow **falha de propósito** (não publica AAB assinado com debug).
 
