@@ -102,6 +102,45 @@ class HandLandmarkQualityTest {
         assertThat(stopOpen).isTrue()
     }
 
+    @Test
+    fun consider_rejectedCandidate_keepsBestAndCanStop() {
+        val open =
+            HandLandmarks(
+                points = openHandPoints(),
+                imageWidth = 800,
+                imageHeight = 1200,
+                presenceScore = 0.85f,
+            )
+        val (kept, stop) =
+            HandLandmarkQuality.consider(
+                currentBest = open,
+                candidate = null,
+            )
+        assertThat(kept).isSameInstanceAs(open)
+        assertThat(stop).isTrue()
+    }
+
+    @Test
+    fun consider_weakerCandidate_keepsCurrentBest() {
+        val open =
+            HandLandmarks(
+                points = openHandPoints(),
+                imageWidth = 800,
+                imageHeight = 1200,
+                presenceScore = 0.75f,
+            )
+        val collapsed =
+            HandLandmarks(
+                points = List(21) { NormPoint(0.5f, 0.55f) },
+                imageWidth = 800,
+                imageHeight = 1200,
+                presenceScore = 0.90f,
+            )
+        val (kept, _) =
+            HandLandmarkQuality.consider(currentBest = open, candidate = collapsed)
+        assertThat(kept).isSameInstanceAs(open)
+    }
+
     private fun openHandPoints(): List<NormPoint> {
         val pts = MutableList(21) { NormPoint(0.5f, 0.5f) }
         pts[4] = NormPoint(0.22f, 0.40f)

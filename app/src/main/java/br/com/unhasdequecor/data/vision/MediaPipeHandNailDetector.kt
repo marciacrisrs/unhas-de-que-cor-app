@@ -38,40 +38,49 @@ class MediaPipeHandNailDetector @Inject constructor(
         var bestLandmarks: HandLandmarks? = null
         try {
             for (variant in HandInferenceVariants.forSource(bitmap)) {
-                if (variant.inferenceBitmap !== bitmap &&
-                    variant.inferenceBitmap !== variant.displayBitmap
-                ) {
-                    created += variant.inferenceBitmap
-                }
-                if (variant.displayBitmap !== bitmap) {
-                    created += variant.displayBitmap
-                }
+                trackOwnedBitmaps(variant, source = bitmap, into = created)
                 val landmarks = detectLandmarksOnBitmap(
                     bitmap = variant.inferenceBitmap,
                     displayWidth = variant.displayBitmap.width,
                     displayHeight = variant.displayBitmap.height,
                     remap = variant.remapPoint,
                 )
-                val (nextBest, stop) = HandLandmarkQuality.consider(bestLandmarks, landmarks)
-                if (landmarks != null && nextBest === landmarks) {
-                    bestLandmarks = landmarks
+                val considered = HandLandmarkQuality.consider(bestLandmarks, landmarks)
+                bestLandmarks = considered.first
+                if (landmarks != null && considered.first === landmarks) {
                     best = OrientedHandLandmarks(
                         bitmap = variant.displayBitmap,
                         landmarks = landmarks,
                     )
                 }
-                if (stop) {
-                    break
-                }
+                if (considered.second) break
             }
             // Mantém o display vencedor; o finally recicla o restante.
             best?.bitmap?.let { winner -> created.removeAll { it === winner } }
             return best
         } finally {
-            for (bmp in created.distinct()) {
-                if (bmp !== bitmap && bmp !== best?.bitmap && !bmp.isRecycled) {
-                    bmp.recycle()
-                }
+            recycleOwnedBitmaps(created, keep = listOfNotNull(bitmap, best?.bitmap))
+        }
+    }
+
+    private fun trackOwnedBitmaps(
+        variant: HandInferenceVariant,
+        source: Bitmap,
+        into: MutableList<Bitmap>,
+    ) {
+        val inference = variant.inferenceBitmap
+        if (inference !== source && inference !== variant.displayBitmap) {
+            into += inference
+        }
+        if (variant.displayBitmap !== source) {
+            into += variant.displayBitmap
+        }
+    }
+
+    private fun recycleOwnedBitmaps(created: List<Bitmap>, keep: List<Bitmap>) {
+        for (bmp in created.distinct()) {
+            if (bmp !in keep && !bmp.isRecycled) {
+                bmp.recycle()
             }
         }
     }
