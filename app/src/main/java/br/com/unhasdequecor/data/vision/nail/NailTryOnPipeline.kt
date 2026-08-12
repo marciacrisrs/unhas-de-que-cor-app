@@ -73,6 +73,15 @@ class NailTryOnPipeline @Inject constructor(
         val landmarks = oriented.landmarks
         val working = oriented.bitmap
 
+        // Reject precoce: não gasta ROI/segmentação em presence abaixo do piso.
+        val reliability = TryOnHandReliability.classify(landmarks)
+        if (reliability == TryOnReliability.REJECTED) {
+            if (working !== image && !working.isRecycled) {
+                working.recycle()
+            }
+            return null
+        }
+
         val rois = roiEstimator.estimateAll(landmarks)
         val detected = rois.mapNotNull { roi ->
             if (!DetectionConfidenceFloor.acceptsRoi(roi.geometricConfidence)) {
@@ -96,13 +105,6 @@ class NailTryOnPipeline @Inject constructor(
         }
         // Garante que snapshot não retenha unhas abaixo do piso de pintura.
         val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
-        val reliability = TryOnHandReliability.classify(landmarks)
-        if (reliability == TryOnReliability.REJECTED) {
-            if (working !== image && !working.isRecycled) {
-                working.recycle()
-            }
-            return null
-        }
         return NailDetectionSnapshot(
             workingBitmap = working,
             nails = nails,

@@ -47,6 +47,8 @@ class DetectionConfidenceFloorTest {
     fun mediapipeMin_isBelowHandAccept() {
         assertThat(DetectionConfidenceFloor.MEDIAPIPE_MIN)
             .isLessThan(DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT)
+        assertThat(DetectionConfidenceFloor.HAND_PRESENCE_STRONG)
+            .isLessThan(DetectionConfidenceFloor.HAND_PRESENCE_EARLY_STOP)
         assertThat(DetectionConfidenceFloor.NAIL_COMBINED_MIN)
             .isLessThan(DetectionConfidenceFloor.NAIL_FULL_MIN)
         assertThat(DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH)

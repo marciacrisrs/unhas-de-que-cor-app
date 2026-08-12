@@ -16,6 +16,12 @@ object DetectionConfidenceFloor {
     /** Acima: presence forte o bastante para FULL (com máscaras de qualidade). */
     const val HAND_PRESENCE_STRONG = 0.55f
 
+    /**
+     * Para de avaliar variantes MediaPipe só com presence bem acima de STRONG.
+     * Parar em 0.55 escolhia enhance frágil e perdia tip geometry melhor.
+     */
+    const val HAND_PRESENCE_EARLY_STOP = 0.82f
+
     /** ROI geométrico mínimo para tentar segmentar. */
     const val ROI_GEOMETRIC_MIN = 0.24f
 

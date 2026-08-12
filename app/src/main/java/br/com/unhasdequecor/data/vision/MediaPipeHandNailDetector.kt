@@ -17,8 +17,9 @@ import javax.inject.Singleton
  * Expõe landmarks brutos ([HandLandmarkProcessor]) para o pipeline de try-on.
  *
  * Em fotos difíceis (contraluz, mão escura, horizontal), avalia variantes
- * (contraste/gamma/brilho/espelho/rotação) e escolhe a de maior [HandLandmarks.presenceScore]
- * — não fica na primeira detecção fraca.
+ * (contraste/gamma/brilho/espelho/rotação) e escolhe a de maior
+ * [HandLandmarkQuality.rankingScore] (presence + span das tips) — não fica na
+ * primeira detecção fraca nem na primeira presence só “forte”.
  */
 @Singleton
 class MediaPipeHandNailDetector @Inject constructor(
@@ -34,45 +35,52 @@ class MediaPipeHandNailDetector @Inject constructor(
     override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
         val created = ArrayList<Bitmap>(16)
         var best: OrientedHandLandmarks? = null
-        var bestScore = -1f
+        var bestLandmarks: HandLandmarks? = null
         try {
             for (variant in HandInferenceVariants.forSource(bitmap)) {
-                if (variant.inferenceBitmap !== bitmap &&
-                    variant.inferenceBitmap !== variant.displayBitmap
-                ) {
-                    created += variant.inferenceBitmap
-                }
-                if (variant.displayBitmap !== bitmap) {
-                    created += variant.displayBitmap
-                }
+                trackOwnedBitmaps(variant, source = bitmap, into = created)
                 val landmarks = detectLandmarksOnBitmap(
                     bitmap = variant.inferenceBitmap,
                     displayWidth = variant.displayBitmap.width,
                     displayHeight = variant.displayBitmap.height,
                     remap = variant.remapPoint,
                 )
-                if (landmarks != null &&
-                    DetectionConfidenceFloor.acceptsHandPresence(landmarks.presenceScore) &&
-                    landmarks.presenceScore > bestScore
-                ) {
-                    bestScore = landmarks.presenceScore
+                val considered = HandLandmarkQuality.consider(bestLandmarks, landmarks)
+                bestLandmarks = considered.first
+                if (landmarks != null && considered.first === landmarks) {
                     best = OrientedHandLandmarks(
                         bitmap = variant.displayBitmap,
                         landmarks = landmarks,
                     )
                 }
-                if (DetectionConfidenceFloor.isStrongHandPresence(bestScore)) {
-                    break
-                }
+                if (considered.second) break
             }
             // Mantém o display vencedor; o finally recicla o restante.
             best?.bitmap?.let { winner -> created.removeAll { it === winner } }
             return best
         } finally {
-            for (bmp in created.distinct()) {
-                if (bmp !== bitmap && bmp !== best?.bitmap && !bmp.isRecycled) {
-                    bmp.recycle()
-                }
+            recycleOwnedBitmaps(created, keep = listOfNotNull(bitmap, best?.bitmap))
+        }
+    }
+
+    private fun trackOwnedBitmaps(
+        variant: HandInferenceVariant,
+        source: Bitmap,
+        into: MutableList<Bitmap>,
+    ) {
+        val inference = variant.inferenceBitmap
+        if (inference !== source && inference !== variant.displayBitmap) {
+            into += inference
+        }
+        if (variant.displayBitmap !== source) {
+            into += variant.displayBitmap
+        }
+    }
+
+    private fun recycleOwnedBitmaps(created: List<Bitmap>, keep: List<Bitmap>) {
+        for (bmp in created.distinct()) {
+            if (bmp !in keep && !bmp.isRecycled) {
+                bmp.recycle()
             }
         }
     }
@@ -106,7 +114,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                         ?.score()
                         ?: 0f
                     val tipScore = averageTipPresence(handLandmarks)
-                    val combined = handScore * 0.35f + tipScore * 0.65f
+                    val combined = HandPresenceScoring.score(handScore, tipScore)
                     if (combined > bestScore) {
                         bestScore = combined
                         bestIndex = i
@@ -121,9 +129,8 @@ class MediaPipeHandNailDetector @Inject constructor(
                     else -> Handedness.UNKNOWN
                 }
                 val handednessScore = handednessCat?.score() ?: 0f
-                val tipPresence = averageTipPresence(landmarks).takeIf { it > 0f } ?: handednessScore
-                val presenceScore = maxOf(handednessScore * 0.35f + tipPresence * 0.65f, tipPresence)
-                    .coerceIn(0f, 1f)
+                val tipPresence = averageTipPresence(landmarks)
+                val presenceScore = HandPresenceScoring.score(handednessScore, tipPresence)
                 HandLandmarks(
                     points = landmarks.map {
                         remap(ImageCoordinates.NormPoint(it.x(), it.y()))
@@ -194,7 +201,7 @@ class MediaPipeHandNailDetector @Inject constructor(
     ): Float {
         var sum = 0f
         var count = 0
-        for (idx in TIP_LANDMARK_INDICES) {
+        for (idx in HandLandmarks.TIP_INDICES) {
             if (idx >= landmarks.size) continue
             val optional = landmarks[idx].presence()
             if (optional.isPresent) {
@@ -210,7 +217,5 @@ class MediaPipeHandNailDetector @Inject constructor(
         /** Mais permissivo: fotos com contraluz / mão retinta falhavam em 0.20. */
         private const val MIN_CONFIDENCE = DetectionConfidenceFloor.MEDIAPIPE_MIN
         private const val MAX_INFERENCE_EDGE = 1280
-        /** Tips MediaPipe: polegar, indicador, médio, anelar, mindinho. */
-        private val TIP_LANDMARK_INDICES = intArrayOf(4, 8, 12, 16, 20)
     }
 }

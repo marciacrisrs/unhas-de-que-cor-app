@@ -18,9 +18,9 @@ object TryOnPreviewLabels {
         TryOnPreviewClaim.SAMPLE_MASK -> "Prévia na mão de exemplo"
         TryOnPreviewClaim.FULL_USER -> "Prévia na sua mão"
         TryOnPreviewClaim.APPROXIMATE ->
-            "Prévia aproximada — unhas à mostra, luz na mão, dedos abertos"
+            "Prévia aproximada — unhas à mostra, luz frontal, dedos abertos"
         TryOnPreviewClaim.NOT_DETECTED ->
-            "Mão não detectada — unhas à mostra, boa luz, dedos abertos (evite contraluz)"
+            "Mão não detectada — unhas à mostra, luz frontal sem flash, dedos abertos (evite contraluz)"
     }
 
     /**

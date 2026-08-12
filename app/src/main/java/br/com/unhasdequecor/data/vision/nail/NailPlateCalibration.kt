@@ -11,6 +11,11 @@ import kotlin.math.hypot
  */
 object NailPlateCalibration {
     const val SHORT_TIP_DIP_PX = 16f
+    /**
+     * Facing quando tip–dip é pequeno **relativo** a tip–pip (escala-invariante).
+     * Evita open-hand virar facing só porque a foto é pequena.
+     */
+    const val FACING_TIP_DIP_RATIO = 0.35f
     const val FACING_LENGTH_SCALE = 0.48f
     /** Largura em unha de frente: fração tip–pip (independente do comprimento encurtado). */
     const val FACING_WIDTH_SCALE = 0.45f
@@ -68,6 +73,8 @@ object NailPlateCalibration {
         val overshootPx: Float,
         val thumbMode: Boolean,
         val facing: Boolean,
+        /** Comprimento anatômico antes do coerceIn (para [isUsablePlate]). */
+        val rawLengthPx: Float,
     )
 
     /** Extremos tip/cutícula do almond alinhados à tip landmark (não halfLen a partir do centro). */
@@ -97,6 +104,34 @@ object NailPlateCalibration {
         thumbMode -> THUMB_CENTER
         facing -> FACING_CENTER
         else -> CENTER_ALONG
+    }
+
+    /** Piso absoluto do limiar tip–dip (fração de [SHORT_TIP_DIP_PX]). */
+    private const val FACING_TIP_DIP_ABS_FLOOR = 0.5f
+    /** Comprimento mínimo aceito vs [MIN_NAIL_LEN_PX] para placa usável. */
+    private const val USABLE_LENGTH_MIN_FACTOR = 0.85f
+
+    /** Limiar tip–dip (px) para considerar unha de frente — relativo a tip–pip. */
+    fun facingTipDipThresholdPx(tipPipPx: Float): Float =
+        maxOf(SHORT_TIP_DIP_PX * FACING_TIP_DIP_ABS_FLOOR, tipPipPx * FACING_TIP_DIP_RATIO)
+
+    fun isFacing(thumbMode: Boolean, tipDipPx: Float, tipPipPx: Float): Boolean =
+        !thumbMode && tipDipPx < facingTipDipThresholdPx(tipPipPx)
+
+    /** Placa com eixo utilizável (não collapsada / fora da anatomia). */
+    fun isUsablePlate(plate: PlateGeometry): Boolean {
+        val axisLen = hypot(
+            (plate.tipX - plate.axisStartX).toDouble(),
+            (plate.tipY - plate.axisStartY).toDouble(),
+        ).toFloat()
+        val minAxis = when {
+            plate.thumbMode -> MIN_AXIS_THUMB_PX
+            plate.facing -> MIN_AXIS_FACING_PX
+            else -> MIN_AXIS_OPEN_PX
+        }
+        // Usa rawLength: lengthPx já passou por coerceIn(MIN_NAIL_LEN_PX) e sempre passaria.
+        return axisLen >= minAxis &&
+            plate.rawLengthPx >= MIN_NAIL_LEN_PX * USABLE_LENGTH_MIN_FACTOR
     }
 
     fun ellipseRadiusX(anchorWidthNorm: Float, imageWidth: Int): Float =
@@ -132,13 +167,14 @@ object NailPlateCalibration {
         val tipMcp = hypot((tipX - mcpX).toDouble(), (tipY - mcpY).toDouble()).toFloat()
         val scales = scalesFor(finger)
         val thumbMode = finger == Finger.THUMB
-        val facing = !thumbMode && tipDip < SHORT_TIP_DIP_PX
+        val facing = isFacing(thumbMode, tipDipPx = tipDip, tipPipPx = tipPip)
 
-        val lengthPx = when {
-            thumbMode -> (tipMcp * THUMB_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
-            facing -> (tipPip * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
-            else -> (tipDip * scales.lengthScale).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
+        val rawLengthPx = when {
+            thumbMode -> tipMcp * THUMB_LENGTH_SCALE
+            facing -> tipPip * FACING_LENGTH_SCALE
+            else -> tipDip * scales.lengthScale
         }
+        val lengthPx = rawLengthPx.coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
         val widthPx = when {
             facing -> (tipPip * FACING_WIDTH_SCALE).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
             else -> (lengthPx * scales.widthScale).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
@@ -186,6 +222,7 @@ object NailPlateCalibration {
             overshootPx = overshootPx,
             thumbMode = thumbMode,
             facing = facing,
+            rawLengthPx = rawLengthPx,
         )
     }
 
