@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates
-import br.com.unhasdequecor.data.vision.nail.TryOnHandReliability
+import br.com.unhasdequecor.data.vision.nail.DetectionConfidenceFloor
 
 /**
  * Variante de inferência: [inferenceBitmap] vai ao MediaPipe;
@@ -105,5 +105,5 @@ internal object HandInferenceVariants {
 
     /** Presence mínima para aceitar uma variante (alinhada ao piso de confiabilidade). */
     fun isAcceptablePresence(score: Float): Boolean =
-        score >= TryOnHandReliability.MIN_PRESENCE_ACCEPT
+        DetectionConfidenceFloor.acceptsHandPresence(score)
 }

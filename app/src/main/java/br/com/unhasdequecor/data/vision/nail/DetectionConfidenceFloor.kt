@@ -28,7 +28,14 @@ object DetectionConfidenceFloor {
      */
     const val NAIL_FULL_MIN = 0.45f
 
+    /** Unhas ≥ [NAIL_FULL_MIN] necessárias para claim FULL. */
     const val MIN_MASKS_FOR_FULL = 3
+
+    /**
+     * Unhas paintable necessárias para preferir caminho almond no recolor
+     * (independente do claim FULL).
+     */
+    const val MIN_PAINTABLE_FOR_MASK_PATH = 3
 
     fun acceptsHandPresence(presenceScore: Float): Boolean =
         presenceScore.coerceIn(0f, 1f) >= HAND_PRESENCE_ACCEPT
@@ -54,4 +61,7 @@ object DetectionConfidenceFloor {
     /** TRUE se há ≥ [MIN_MASKS_FOR_FULL] unhas acima de [NAIL_FULL_MIN]. */
     fun meetsFullNailFloor(nails: List<DetectedNail>): Boolean =
         countFullQuality(nails) >= MIN_MASKS_FOR_FULL
+
+    fun filterPaintable(nails: List<DetectedNail>): List<DetectedNail> =
+        nails.filter { acceptsNail(it.confidence) }
 }

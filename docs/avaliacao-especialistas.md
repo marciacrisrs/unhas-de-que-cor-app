@@ -295,6 +295,16 @@ de paint path; constantes mágicas sem ground-truth.
 
 FULL = presence forte **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (máscaras fracas → APPROXIMATE).
 
+### Follow-ups especialistas (pós-floor) — feitos
+
+| Achado | Status |
+|--------|--------|
+| Default `fullQuality = paintable` (footgun FULL) | Feito — parâmetro obrigatório |
+| `meetsFullNailFloor` morto | Feito — usado no `planRender(nails)` |
+| Testes path `planRender(nails)` + pipeline floors | Feito |
+| Alias vs `DetectionConfidenceFloor` direto | Feito (MediaPipe / Variants / Tracker) |
+| `MIN_MASKS_FOR_FULL` no caminho almond | Feito — `MIN_PAINTABLE_FOR_MASK_PATH` |
+
 ---
 
 ## Implementação — Detecção correta da área da unha
@@ -331,9 +341,9 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 | Regra | Comportamento |
 |-------|----------------|
 | `presenceScore` &lt; 0.12 | `REJECTED` → `detect` retorna `null` (sem claim) |
-| 0.12–0.55 | `WEAK` → só `APPROXIMATE` / “Prévia aproximada” (mesmo com ≥3 máscaras) |
-| ≥0.55 **e** ≥3 máscaras | `STRONG` + `FULL` → “Prévia na sua mão” |
-| Elipse / poucas máscaras | Nunca `FULL` — modo ≈ qualidade |
+| 0.12–0.55 | `WEAK` → só `APPROXIMATE` (mesmo com ≥3 máscaras) |
+| ≥0.55 **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (0.45) | `STRONG` + `FULL` → “Prévia na sua mão” |
+| Máscaras só paintable (0.32–0.45) / elipse | Nunca `FULL` — `APPROXIMATE` |
 
 Detecção (falsos negativos em fotos reais): escolhe a **melhor** variante MediaPipe
 (presence), não a primeira; variantes extras (stretch+gamma, brilho, rotação+espelho);
@@ -344,7 +354,7 @@ mapper aceita ≥2 unhas plausíveis; limiar MediaPipe 0.08.
 | Especialista | Achado | Status |
 |--------------|--------|--------|
 | Vision / UI | TalkBack CD dizia “na sua mão” em qualquer modo | Feito — `TryOnPreviewLabels` |
-| Vision | Mid presence + ≥3 máscaras virava FULL | Feito — classify só por presence; FULL = STRONG ∧ ≥3 máscaras |
+| Vision | Mid presence + ≥3 máscaras virava FULL | Feito — classify só por presence; FULL = STRONG ∧ ≥3 unhas ≥ 0.45 |
 | A11y | Banner alpha 0.88 + CD duplicado; convite `maxLines=1` | Feito — primary sólido, `clearAndSetSemantics`, convite `maxLines=2` + CD completo |
 | Android | `getBackStackEntry(HOME)` sem guarda | Feito — `runCatching` + fallback `navigate(HOME)` |
 | Test | Gaps reliability / labels / applier early-return | Feito — testes + JaCoCo `TryOnPreviewLabels*` |

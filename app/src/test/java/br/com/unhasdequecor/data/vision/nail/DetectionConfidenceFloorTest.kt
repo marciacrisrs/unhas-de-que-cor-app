@@ -49,6 +49,16 @@ class DetectionConfidenceFloorTest {
             .isLessThan(DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT)
         assertThat(DetectionConfidenceFloor.NAIL_COMBINED_MIN)
             .isLessThan(DetectionConfidenceFloor.NAIL_FULL_MIN)
+        assertThat(DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH)
+            .isEqualTo(DetectionConfidenceFloor.MIN_MASKS_FOR_FULL)
+    }
+
+    @Test
+    fun filterPaintable_removesSubFloorNails() {
+        val nails = listOf(nail(0.20f), nail(0.40f), nail(0.50f))
+        val kept = DetectionConfidenceFloor.filterPaintable(nails)
+        assertThat(kept).hasSize(2)
+        assertThat(kept.all { DetectionConfidenceFloor.acceptsNail(it.confidence) }).isTrue()
     }
 
     private fun nail(confidence: Float): DetectedNail {

@@ -258,4 +258,120 @@ class NailTryOnPipelineTest {
         assertThat(snapshot).isNotNull()
         assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.STRONG)
     }
+
+    @Test
+    fun `detect drops roi below geometric confidence floor`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        val roi = sampleRoi(
+            geometricConfidence = DetectionConfidenceFloor.ROI_GEOMETRIC_MIN - 0.01f,
+        )
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(roi)
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.nails).isEmpty()
+        verify(exactly = 0) { segmenter.segment(any(), any()) }
+    }
+
+    @Test
+    fun `detect drops nail below combined confidence floor`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        val roi = sampleRoi(geometricConfidence = DetectionConfidenceFloor.ROI_GEOMETRIC_MIN)
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(roi)
+        // Máscara vazia → segScore muito baixo → confiança combinada < NAIL_COMBINED_MIN.
+        every { segmenter.segment(image, roi) } returns NailMask(
+            width = 20,
+            height = 40,
+            alpha = ByteArray(20 * 40) { 0 },
+            originX = 90,
+            originY = 40,
+        )
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.nails).isEmpty()
+    }
+
+    @Test
+    fun `detect keeps paintable nail below full quality floor`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        val roi = sampleRoi(geometricConfidence = 0.30f)
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(roi)
+        // filled≈0.10 → SCORE_LOW; geo 0.30 → conf ~0.37 (paintable, não FULL).
+        val alpha = ByteArray(20 * 40) { i -> if (i < 80) 255.toByte() else 0 }
+        every { segmenter.segment(image, roi) } returns NailMask(
+            width = 20,
+            height = 40,
+            alpha = alpha,
+            originX = 90,
+            originY = 40,
+        )
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.nails).hasSize(1)
+        val conf = snapshot.nails.first().confidence
+        assertThat(conf).isAtLeast(DetectionConfidenceFloor.NAIL_COMBINED_MIN)
+        assertThat(conf).isLessThan(DetectionConfidenceFloor.NAIL_FULL_MIN)
+        assertThat(DetectionConfidenceFloor.meetsFullNailFloor(snapshot.nails)).isFalse()
+    }
+
+    private fun sampleRoi(geometricConfidence: Float): NailRoi = NailRoi(
+        finger = Finger.MIDDLE,
+        bounds = PixelRect(left = 90, top = 40, right = 110, bottom = 80),
+        polygon = listOf(
+            PixelPoint(90f, 40f),
+            PixelPoint(110f, 40f),
+            PixelPoint(110f, 80f),
+            PixelPoint(90f, 80f),
+        ),
+        axisFromDip = PixelPoint(100f, 70f),
+        axisToTip = PixelPoint(100f, 45f),
+        lengthPx = 40f,
+        widthPx = 20f,
+        rotationDegrees = 0f,
+        geometricConfidence = geometricConfidence,
+    )
 }

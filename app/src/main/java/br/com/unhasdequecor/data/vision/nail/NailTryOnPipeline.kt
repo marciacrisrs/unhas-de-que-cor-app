@@ -90,10 +90,12 @@ class NailTryOnPipeline @Inject constructor(
                 confidence = confidence,
             )
         }
-        val nails = if (stabilize) tracker.stabilize(detected) else {
+        val rawNails = if (stabilize) tracker.stabilize(detected) else {
             tracker.reset()
             detected
         }
+        // Garante que snapshot não retenha unhas abaixo do piso de pintura.
+        val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
         val reliability = TryOnHandReliability.classify(landmarks)
         if (reliability == TryOnReliability.REJECTED) {
             if (working !== image && !working.isRecycled) {
@@ -115,10 +117,10 @@ class NailTryOnPipeline @Inject constructor(
         polishColor: Color,
     ): NailTryOnResult {
         val working = snapshot.workingBitmap
-        // ≥3 máscaras paintable: almond; 0: elipse; 1–2: máscara + completa com elipse.
+        // Caminho almond vs elipse: usa piso de pintura, não o de claim FULL.
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
         val painted = when {
-            paintableCount >= DetectionConfidenceFloor.MIN_MASKS_FOR_FULL -> {
+            paintableCount >= DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH -> {
                 colorApplier.apply(working, snapshot.nails, polishColor)
                     ?: ellipseFallback(working, snapshot.landmarks, polishColor)
                     ?: working

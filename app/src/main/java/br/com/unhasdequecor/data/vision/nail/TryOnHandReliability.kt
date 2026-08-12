@@ -36,10 +36,6 @@ data class UserTryOnRenderPlan(
 )
 
 object TryOnHandReliability {
-    const val MIN_PRESENCE_ACCEPT = DetectionConfidenceFloor.HAND_PRESENCE_ACCEPT
-    const val MIN_PRESENCE_STRONG = DetectionConfidenceFloor.HAND_PRESENCE_STRONG
-    const val MIN_MASKS_FOR_FULL = DetectionConfidenceFloor.MIN_MASKS_FOR_FULL
-
     /**
      * Classifica só por presence. Máscaras **não** elevam para STRONG —
      * mid presence + muitas máscaras continua WEAK → APPROXIMATE (nunca FULL).
@@ -59,27 +55,58 @@ object TryOnHandReliability {
         classify(landmarks.presenceScore)
 
     /**
-     * Plano de renderização honesto (modo ≡ qualidade).
-     * FULL exige STRONG **e** ≥ [MIN_MASKS_FOR_FULL] unhas com confiança ≥ [DetectionConfidenceFloor.NAIL_FULL_MIN].
-     * Elipse sozinha nunca é FULL.
-     *
-     * @param paintableNailCount unhas ≥ [DetectionConfidenceFloor.NAIL_COMBINED_MIN]
-     * @param fullQualityNailCount unhas ≥ [DetectionConfidenceFloor.NAIL_FULL_MIN]
+     * Plano de renderização a partir das unhas detectadas (caminho de produção).
+     * FULL = STRONG ∧ [DetectionConfidenceFloor.meetsFullNailFloor].
      */
     fun planRender(
         reliability: TryOnReliability?,
-        paintableNailCount: Int,
+        nails: List<DetectedNail>,
         hasMappableAnchors: Boolean,
-        fullQualityNailCount: Int = paintableNailCount,
     ): UserTryOnRenderPlan {
         if (reliability == null || reliability == TryOnReliability.REJECTED) {
             return nonePlan()
         }
-        val masksOk = fullQualityNailCount >= MIN_MASKS_FOR_FULL
+        val paintable = DetectionConfidenceFloor.countPaintable(nails)
+        val fullOk = DetectionConfidenceFloor.meetsFullNailFloor(nails)
+        return planFromCounts(
+            reliability = reliability,
+            paintableNailCount = paintable,
+            fullQualityOk = fullOk,
+            hasMappableAnchors = hasMappableAnchors,
+        )
+    }
+
+    /**
+     * Variante por contagens (testes). [fullQualityNailCount] é **obrigatório** —
+     * não defaulta para paintable (evita FULL indevido).
+     */
+    fun planRender(
+        reliability: TryOnReliability?,
+        paintableNailCount: Int,
+        fullQualityNailCount: Int,
+        hasMappableAnchors: Boolean,
+    ): UserTryOnRenderPlan {
+        if (reliability == null || reliability == TryOnReliability.REJECTED) {
+            return nonePlan()
+        }
+        return planFromCounts(
+            reliability = reliability,
+            paintableNailCount = paintableNailCount,
+            fullQualityOk = fullQualityNailCount >= DetectionConfidenceFloor.MIN_MASKS_FOR_FULL,
+            hasMappableAnchors = hasMappableAnchors,
+        )
+    }
+
+    private fun planFromCounts(
+        reliability: TryOnReliability,
+        paintableNailCount: Int,
+        fullQualityOk: Boolean,
+        hasMappableAnchors: Boolean,
+    ): UserTryOnRenderPlan {
         val anyMask = paintableNailCount > 0
         return when (reliability) {
             TryOnReliability.STRONG -> when {
-                masksOk -> UserTryOnRenderPlan(
+                fullQualityOk -> UserTryOnRenderPlan(
                     mode = UserTryOnRenderMode.FULL,
                     useNailMasks = true,
                     useEllipsePaint = true,
@@ -111,17 +138,6 @@ object TryOnHandReliability {
             TryOnReliability.REJECTED -> error("handled above")
         }
     }
-
-    fun planRender(
-        reliability: TryOnReliability?,
-        nails: List<DetectedNail>,
-        hasMappableAnchors: Boolean,
-    ): UserTryOnRenderPlan = planRender(
-        reliability = reliability,
-        paintableNailCount = DetectionConfidenceFloor.countPaintable(nails),
-        hasMappableAnchors = hasMappableAnchors,
-        fullQualityNailCount = DetectionConfidenceFloor.countFullQuality(nails),
-    )
 
     private fun nonePlan() = UserTryOnRenderPlan(
         mode = UserTryOnRenderMode.NONE,
