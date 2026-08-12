@@ -188,7 +188,7 @@ de produto no bug das ovais flutuantes.
 
 | Pri | Item | Status |
 |-----|------|--------|
-| P0 | Testes `HomeViewModel` flash p/ QG #35 | Em andamento |
+| P0 | Testes `HomeViewModel` flash p/ QG #35 | Feito no #35 (`HomeViewModelTest`) |
 | P1 | Testes ramos `paintUserPreview` (extrair se preciso) | Aberto |
 | P1 | A11y banner try-on (semantics/contraste) | Aberto |
 | P2 | Smells HistoryScreen / HandReferenceEffects | Aberto |
