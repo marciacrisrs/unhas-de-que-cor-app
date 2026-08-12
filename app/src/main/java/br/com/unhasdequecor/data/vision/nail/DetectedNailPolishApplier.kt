@@ -13,6 +13,13 @@ import androidx.compose.ui.graphics.Color
  * (mesma lógica visual das amostras com máscara).
  */
 object DetectedNailPolishApplier {
+    private const val ELLIPSE_RX_FACTOR = 0.52f
+    private const val ELLIPSE_RY_FACTOR = 0.56f
+    private const val MIN_RX = 4f
+    private const val MIN_RY = 5f
+    private const val ELLIPSE_CENTER_Y_BIAS = -0.08f
+    private const val ELLIPSE_OPAQUE_STOP = 0.78f
+
     fun apply(
         source: Bitmap,
         anchors: List<NailOverlayAnchor>,
@@ -40,19 +47,19 @@ object DetectedNailPolishApplier {
         for (anchor in anchors) {
             val cx = anchor.centerX * width
             val cy = anchor.centerY * height
-            // Elipse de unha (um pouco mais longa que larga).
-            val rx = (anchor.width * width * 0.50f).coerceAtLeast(4f)
-            val ry = (anchor.height * height * 0.52f).coerceAtLeast(5f)
+            // Elipse de unha um pouco mais longa e com núcleo opaco maior.
+            val rx = (anchor.width * width * ELLIPSE_RX_FACTOR).coerceAtLeast(MIN_RX)
+            val ry = (anchor.height * height * ELLIPSE_RY_FACTOR).coerceAtLeast(MIN_RY)
             paint.shader = RadialGradient(
                 0f,
-                0f,
+                ELLIPSE_CENTER_Y_BIAS,
                 1f,
                 intArrayOf(
                     android.graphics.Color.WHITE,
                     android.graphics.Color.WHITE,
                     android.graphics.Color.TRANSPARENT,
                 ),
-                floatArrayOf(0f, 0.70f, 1f),
+                floatArrayOf(0f, ELLIPSE_OPAQUE_STOP, 1f),
                 Shader.TileMode.CLAMP,
             )
             canvas.save()

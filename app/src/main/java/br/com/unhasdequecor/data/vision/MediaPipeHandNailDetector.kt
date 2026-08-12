@@ -55,24 +55,37 @@ class MediaPipeHandNailDetector @Inject constructor(
                 if (working !== bitmap && !working.isRecycled) {
                     working.recycle()
                 }
-                val landmarks = result.landmarks().firstOrNull() ?: return null
+                val allHands = result.landmarks()
+                if (allHands.isEmpty()) return null
+                val handednessLists = result.handednesses()
+                var bestIndex = 0
+                var bestScore = -1f
+                for (i in allHands.indices) {
+                    val handLandmarks = allHands[i]
+                    if (handLandmarks.size < HandLandmarks.MIN_POINTS) continue
+                    val handScore = handednessLists.getOrNull(i)
+                        ?.firstOrNull()
+                        ?.score()
+                        ?: 0f
+                    val tipScore = averageTipPresence(handLandmarks)
+                    val combined = handScore * 0.35f + tipScore * 0.65f
+                    if (combined > bestScore) {
+                        bestScore = combined
+                        bestIndex = i
+                    }
+                }
+                val landmarks = allHands.getOrNull(bestIndex) ?: return null
                 if (landmarks.size < HandLandmarks.MIN_POINTS) return null
-                val handedness = result.handednesses()
-                    .firstOrNull()
-                    ?.firstOrNull()
-                    ?.categoryName()
-                    ?.let { name ->
-                        when (name.lowercase()) {
-                            "left" -> Handedness.LEFT
-                            "right" -> Handedness.RIGHT
-                            else -> Handedness.UNKNOWN
-                        }
-                    } ?: Handedness.UNKNOWN
-                val score = result.handednesses()
-                    .firstOrNull()
-                    ?.firstOrNull()
-                    ?.score()
-                    ?: 1f
+                val handednessCat = handednessLists.getOrNull(bestIndex)?.firstOrNull()
+                val handedness = when (handednessCat?.categoryName()?.lowercase()) {
+                    "left" -> Handedness.LEFT
+                    "right" -> Handedness.RIGHT
+                    else -> Handedness.UNKNOWN
+                }
+                val handednessScore = handednessCat?.score() ?: 0f
+                val tipPresence = averageTipPresence(landmarks).takeIf { it > 0f } ?: handednessScore
+                val presenceScore = maxOf(handednessScore * 0.35f + tipPresence * 0.65f, tipPresence)
+                    .coerceIn(0f, 1f)
                 HandLandmarks(
                     points = landmarks.map {
                         ImageCoordinates.NormPoint(it.x(), it.y())
@@ -80,7 +93,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                     imageWidth = bitmap.width,
                     imageHeight = bitmap.height,
                     handedness = handedness,
-                    presenceScore = score,
+                    presenceScore = presenceScore,
                 )
             }.getOrNull()
         }
@@ -124,7 +137,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                         .build(),
                 )
                 .setRunningMode(RunningMode.IMAGE)
-                .setNumHands(1)
+                .setNumHands(2)
                 .setMinHandDetectionConfidence(MIN_CONFIDENCE)
                 .setMinHandPresenceConfidence(MIN_CONFIDENCE)
                 .setMinTrackingConfidence(MIN_CONFIDENCE)
@@ -138,10 +151,28 @@ class MediaPipeHandNailDetector @Inject constructor(
         true
     }.getOrDefault(false)
 
+    private fun averageTipPresence(
+        landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>,
+    ): Float {
+        var sum = 0f
+        var count = 0
+        for (idx in TIP_LANDMARK_INDICES) {
+            if (idx >= landmarks.size) continue
+            val optional = landmarks[idx].presence()
+            if (optional.isPresent) {
+                sum += optional.get()
+                count += 1
+            }
+        }
+        return if (count == 0) 0f else sum / count
+    }
+
     companion object {
         const val MODEL_ASSET = "hand_landmarker.task"
-        private const val MIN_CONFIDENCE = 0.25f
+        private const val MIN_CONFIDENCE = 0.20f
         private const val MAX_INFERENCE_EDGE = 1280
         private val ROTATION_FALLBACKS = floatArrayOf(90f, 270f, 180f)
+        /** Tips MediaPipe: polegar, indicador, médio, anelar, mindinho. */
+        private val TIP_LANDMARK_INDICES = intArrayOf(4, 8, 12, 16, 20)
     }
 }

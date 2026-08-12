@@ -13,11 +13,12 @@ import kotlin.math.hypot
  */
 object NailLandmarkMapper {
     private val FINGERS = listOf(
-        Finger(tip = 4, dip = 3, pip = 2, widthScale = 0.78f, lengthScale = 0.92f),
-        Finger(tip = 8, dip = 7, pip = 6, widthScale = 0.68f, lengthScale = 0.95f),
-        Finger(tip = 12, dip = 11, pip = 10, widthScale = 0.70f, lengthScale = 1.00f),
-        Finger(tip = 16, dip = 15, pip = 14, widthScale = 0.66f, lengthScale = 0.95f),
-        Finger(tip = 20, dip = 19, pip = 18, widthScale = 0.62f, lengthScale = 0.90f),
+        // Escalas alinhadas ao NailRoiEstimator (placa real costuma ser um pouco maior).
+        Finger(tip = 4, dip = 3, pip = 2, widthScale = 0.82f, lengthScale = 0.90f),
+        Finger(tip = 8, dip = 7, pip = 6, widthScale = 0.74f, lengthScale = 0.96f),
+        Finger(tip = 12, dip = 11, pip = 10, widthScale = 0.76f, lengthScale = 0.98f),
+        Finger(tip = 16, dip = 15, pip = 14, widthScale = 0.72f, lengthScale = 0.96f),
+        Finger(tip = 20, dip = 19, pip = 18, widthScale = 0.68f, lengthScale = 0.92f),
     )
 
     fun fromNormalizedLandmarks(
@@ -50,7 +51,7 @@ object NailLandmarkMapper {
             // Unha de frente (punho): tip≈dip em 2D — estima pela falange tip–pip.
             val facingCamera = tipDipPx < SHORT_TIP_DIP_PX
             val nailLenPx = if (facingCamera) {
-                (tipPipPx * 0.42f).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
+                (tipPipPx * FACING_LENGTH_SCALE).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
             } else {
                 (tipDipPx * finger.lengthScale).coerceIn(MIN_NAIL_LEN_PX, MAX_NAIL_LEN_PX)
             }
@@ -95,8 +96,9 @@ object NailLandmarkMapper {
     const val PREVIEW_ASPECT = 3f / 4f
     private const val MIN_LANDMARKS = 21
     private const val MIN_PLAUSIBLE_NAILS = 3
-    private const val SHORT_TIP_DIP_PX = 18f
-    private const val NAIL_CENTER_ALONG = 0.72f
+    private const val SHORT_TIP_DIP_PX = 16f
+    private const val FACING_LENGTH_SCALE = 0.48f
+    private const val NAIL_CENTER_ALONG = 0.74f
     private const val MIN_NAIL_LEN_PX = 14f
     private const val MAX_NAIL_LEN_PX = 160f
     private const val MIN_NAIL_WID_PX = 10f

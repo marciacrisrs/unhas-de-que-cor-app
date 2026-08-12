@@ -150,4 +150,32 @@ class NailTryOnPipelineTest {
         verify(exactly = 1) { landmarkProcessor.detectLandmarksWithOrientationFallback(image) }
         verify(exactly = 1) { segmenter.segment(image, roi) }
     }
+
+    @Test
+    fun `recolor with empty nails returns working when ellipse cannot run`() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        // Landmarks nas bordas → mapper rejeita → ellipse null → devolve working.
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.01f, 0.01f) },
+            imageWidth = 200,
+            imageHeight = 300,
+        )
+
+        val result = pipeline.recolor(
+            NailDetectionSnapshot(
+                workingBitmap = image,
+                nails = emptyList(),
+                landmarks = landmarks,
+                ownsWorkingBitmap = false,
+            ),
+            Color.Red,
+        )
+
+        assertThat(result.bitmap).isSameInstanceAs(image)
+        verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
 }

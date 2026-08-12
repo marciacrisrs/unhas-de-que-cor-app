@@ -1,7 +1,6 @@
 package br.com.unhasdequecor.data.vision.nail
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,8 +14,9 @@ import kotlin.math.sqrt
 /**
  * Segmentação geométrica conservadora (sem OpenCV):
  * 1) rasteriza almond suave (distance field);
- * 2) só remove pele óbvia na **borda** da placa (miolo sempre preservado);
- * 3) se o refinamento apagar demais, volta ao almond suave.
+ * 2) remove pele óbvia na **borda** e na **cutícula** (miolo/tip preservados);
+ * 3) reforça pixels com brilho/contraste típicos de placa;
+ * 4) se o refinamento apagar demais, volta ao almond suave.
  *
  * Unhas naturais ≈ pele: trim agressivo no interior pintava buracos / nada.
  */
@@ -47,7 +47,8 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         }
 
         val skin = estimateSkinColor(pixels, solidGeo, rw, rh)
-        val trimmed = trimBorderSkin(pixels, softGeo, solidGeo, skin, rw, rh)
+        val axis = axisProjection(roi, bounds)
+        val trimmed = refineMask(pixels, softGeo, solidGeo, skin, axis, rw, rh)
 
         val kept = trimmed.count { (it.toInt() and 0xFF) >= MASK_SOLID }
         val geoCount = softGeo.count { (it.toInt() and 0xFF) >= MASK_SOLID }.coerceAtLeast(1)
@@ -67,13 +68,14 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
     }
 
     /**
-     * Mantém o miolo (~70% interno) intacto; só na coroa externa rejeita pele tipicamente igual.
+     * Trim na coroa externa + zona proximal (cutícula); tip/miolo reforçados se brilharem.
      */
-    private fun trimBorderSkin(
+    private fun refineMask(
         pixels: IntArray,
         softGeo: ByteArray,
         solidGeo: ByteArray,
         skin: SkinStats,
+        axis: AxisProjection,
         w: Int,
         h: Int,
     ): ByteArray {
@@ -84,25 +86,55 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val coreRadius = maxDist * CORE_FRACTION
 
         for (i in pixels.indices) {
-            val onBorder = (softGeo[i].toInt() and 0xFF) > 0 && dist[i] < coreRadius
-            if (onBorder && isObviousSkin(pixels[i], skin)) {
-                out[i] = 0
+            val geoAlpha = softGeo[i].toInt() and 0xFF
+            if (geoAlpha == 0) continue
+
+            val x = i % w
+            val y = i / w
+            val along = axis.along01(x + 0.5f, y + 0.5f)
+            val pixel = pixels[i]
+            val looksPlate = looksLikeNailPlate(pixel, skin)
+            val onBorder = dist[i] < coreRadius
+            val nearCuticle = along < CUTICLE_ZONE
+            val nearTip = along > TIP_ZONE
+
+            when {
+                // Pele óbvia na borda ou cutícula → remove.
+                (onBorder || nearCuticle) && isObviousSkin(pixel, skin) -> out[i] = 0
+                // Tip/miolo com brilho de placa → reforça cobertura.
+                nearTip && looksPlate -> out[i] = 255.toByte()
+                looksPlate && geoAlpha in 1 until MASK_SOLID ->
+                    out[i] = max(geoAlpha, BOOST_ALPHA).toByte()
             }
         }
         return out
     }
 
     private fun isObviousSkin(pixel: Int, skin: SkinStats): Boolean {
-        val r = Color.red(pixel)
-        val g = Color.green(pixel)
-        val b = Color.blue(pixel)
+        val r = channelRed(pixel)
+        val g = channelGreen(pixel)
+        val b = channelBlue(pixel)
         val skinDist = colorDistance(r, g, b, skin)
         val sat = saturation(r, g, b)
         val lum = luminance(r, g, b)
         val looksLikePlate = skinDist > SKIN_SOFT_DIST ||
-            sat > 0.14f ||
-            lum > skin.lum + 22f
+            sat > PLATE_SAT_MIN ||
+            lum > skin.lum + PLATE_LUM_DELTA
+        // Dobra/pele: perto da pele e sem brilho de placa.
         return !looksLikePlate && skinDist < SKIN_REJECT_DIST
+    }
+
+    private fun looksLikeNailPlate(pixel: Int, skin: SkinStats): Boolean {
+        val r = channelRed(pixel)
+        val g = channelGreen(pixel)
+        val b = channelBlue(pixel)
+        val skinDist = colorDistance(r, g, b, skin)
+        val sat = saturation(r, g, b)
+        val lum = luminance(r, g, b)
+        val brighter = lum > skin.lum + PLATE_LUM_DELTA * 0.55f
+        val glossier = sat > PLATE_SAT_MIN * 0.85f && brighter
+        val chromatic = skinDist > SKIN_SOFT_DIST * 0.75f && brighter
+        return glossier || chromatic || (brighter && skinDist > PLATE_MIN_SKIN_DIST)
     }
 
     private fun softRasterize(poly: List<PixelPoint>, width: Int, height: Int): ByteArray {
@@ -153,6 +185,31 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
 
     private data class SkinStats(val r: Float, val g: Float, val b: Float, val lum: Float)
 
+    /** Projeção 0 (cutícula) → 1 (ponta) no eixo da ROI, em coords locais do crop. */
+    private data class AxisProjection(
+        val ox: Float,
+        val oy: Float,
+        val ux: Float,
+        val uy: Float,
+        val length: Float,
+    ) {
+        fun along01(x: Float, y: Float): Float {
+            val t = ((x - ox) * ux + (y - oy) * uy) / length.coerceAtLeast(1f)
+            return t.coerceIn(0f, 1f)
+        }
+    }
+
+    private fun axisProjection(roi: NailRoi, bounds: ImageCoordinates.PixelRect): AxisProjection {
+        val from = roi.axisFromDip
+        val to = roi.axisToTip
+        val ox = from.x - bounds.left
+        val oy = from.y - bounds.top
+        val dx = to.x - from.x
+        val dy = to.y - from.y
+        val len = hypot(dx.toDouble(), dy.toDouble()).toFloat().coerceAtLeast(1f)
+        return AxisProjection(ox, oy, dx / len, dy / len, len)
+    }
+
     private fun estimateSkinColor(pixels: IntArray, geo: ByteArray, w: Int, h: Int): SkinStats {
         var sr = 0.0
         var sg = 0.0
@@ -164,9 +221,9 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
                 val outsideGeo = geo[i] == 0.toByte()
                 if (outsideGeo && nearMask(geo, w, h, x, y, RING_RADIUS)) {
                     val c = pixels[i]
-                    sr += Color.red(c)
-                    sg += Color.green(c)
-                    sb += Color.blue(c)
+                    sr += channelRed(c)
+                    sg += channelGreen(c)
+                    sb += channelBlue(c)
                     n++
                 }
             }
@@ -175,9 +232,9 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
             for (x in 0 until w) {
                 val c1 = pixels[x]
                 val c2 = pixels[(h - 1) * w + x]
-                sr += Color.red(c1) + Color.red(c2)
-                sg += Color.green(c1) + Color.green(c2)
-                sb += Color.blue(c1) + Color.blue(c2)
+                sr += channelRed(c1) + channelRed(c2)
+                sg += channelGreen(c1) + channelGreen(c2)
+                sb += channelBlue(c1) + channelBlue(c2)
                 n += 2
             }
         }
@@ -246,8 +303,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val r2 = radius * radius
         for (y in 0 until h) {
             for (x in 0 until w) {
-                val i = y * w + x
-                out[i] = featherAlpha(src, w, h, x, y, radius, r2)
+                out[y * w + x] = featherAlpha(src, w, h, x, y, radius, r2)
             }
         }
         return out
@@ -305,6 +361,10 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         return sqrt(dr * dr + dg * dg + db * db)
     }
 
+    private fun channelRed(color: Int): Int = (color shr CHANNEL_SHIFT_RED) and CHANNEL_MASK
+    private fun channelGreen(color: Int): Int = (color shr CHANNEL_SHIFT_GREEN) and CHANNEL_MASK
+    private fun channelBlue(color: Int): Int = color and CHANNEL_MASK
+
     private fun saturation(r: Int, g: Int, b: Int): Float {
         val maxC = max(r, max(g, b)).toFloat()
         val minC = min(r, min(g, b)).toFloat()
@@ -312,16 +372,28 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
     }
 
     private fun luminance(r: Int, g: Int, b: Int): Float =
-        0.299f * r + 0.587f * g + 0.114f * b
+        LUMA_R * r + LUMA_G * g + LUMA_B * b
 
     private companion object {
-        const val SKIN_REJECT_DIST = 36f
-        const val SKIN_SOFT_DIST = 24f
+        const val CHANNEL_SHIFT_RED = 16
+        const val CHANNEL_SHIFT_GREEN = 8
+        const val CHANNEL_MASK = 0xFF
+        const val LUMA_R = 0.299f
+        const val LUMA_G = 0.587f
+        const val LUMA_B = 0.114f
+        const val SKIN_REJECT_DIST = 32f
+        const val SKIN_SOFT_DIST = 20f
+        const val PLATE_SAT_MIN = 0.12f
+        const val PLATE_LUM_DELTA = 18f
+        const val PLATE_MIN_SKIN_DIST = 12f
         const val RING_RADIUS = 3
         const val MASK_SOLID = 128
-        const val MIN_KEEP_RATIO = 0.40f
-        const val FEATHER_RADIUS = 2
-        const val CORE_FRACTION = 0.55f
+        const val BOOST_ALPHA = 200
+        const val MIN_KEEP_RATIO = 0.35f
+        const val FEATHER_RADIUS = 3
+        const val CORE_FRACTION = 0.48f
         const val EDGE_SEARCH = 6
+        const val CUTICLE_ZONE = 0.28f
+        const val TIP_ZONE = 0.62f
     }
 }
