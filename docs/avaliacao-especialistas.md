@@ -274,9 +274,26 @@ de paint path; constantes mágicas sem ground-truth.
 | P1 | Guarda `getBackStackEntry(HOME)` | Feito |
 | P1 | A11y: banner try-on + convite `maxLines` | Feito |
 | P2 | Result→mão destino; chrome Favoritos; smells History | Aberto |
-| P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Aberto |
+| P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Feito (`NailPlateCalibration` + testes) |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
 | — | A11y Scanner + smoke try-on em device | **OUT_OF_REPO** |
+
+---
+
+## Implementação — Detecção correta da área da unha
+
+`NailPlateCalibration` é a fonte única de geometria da placa (mapper ↔ ROI ↔ elipse):
+
+| Item | Comportamento |
+|------|----------------|
+| Centros / escalas / overshoot | Um só objeto; mapper e ROI via `plateFromPixels` |
+| Facing overshoot | Base = tip–pip (antes tip–dip colapsado ≈ 0) |
+| Segmenter `along01` | Eixo cutícula→ponta do **almond**, não landmark PIP→tip |
+| Elipse fallback | Fatores em calibração (rx/ry/bias/opaque) |
+
+Testes: `NailPlateCalibrationTest` (paridade mapper/ROI, facing overshoot, ponta do almond).
+
+Backlog residual: smoke em device; A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
 
 ---
 

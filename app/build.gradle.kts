@@ -206,6 +206,7 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/data/vision/nail/PolishMaskRecolorer*",
     "**/br/com/unhasdequecor/data/vision/nail/NailOverlayAnchors*",
     "**/br/com/unhasdequecor/data/vision/nail/NailLandmarkMapper*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailPlateCalibration*",
     "**/br/com/unhasdequecor/data/vision/nail/NailTryOnPipeline*",
     "**/br/com/unhasdequecor/data/vision/nail/TryOnHandReliability*",
     "**/br/com/unhasdequecor/data/vision/nail/TryOnPreviewLabels*",
