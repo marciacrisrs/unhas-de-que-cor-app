@@ -6,23 +6,23 @@
 
 ## Painel (pós follow-ups + UX #35 + vision #36)
 
-| Especialista | Veredito atualizado |
+| Especialista | Veredito atualizado (12e) |
 |--------------|---------------------|
-| Android Engineer | Ressalvas P0 tratadas; overlay DEFAULT removido (#36) |
-| Architecture Reviewer | Ciclo data↔ui, higiene e DIP tratados; flash Home via SavedStateHandle |
-| Test Engineer | Gate domain/app ≥80%; flash Home + pipeline cobertos |
-| Quality Reviewer | QG Sonar bloqueante; recolor unificado |
-| Performance Reviewer | Recycle + detect/recolor; sem Canvas DEFAULT sem detecção |
-| Security Reviewer | Allowlist path; limpeza `hand_capture`; Sobre → GitHub HTTPS |
-| Accessibility Reviewer | Contraste/FilterTab; Favoritos Voltar; banner try-on refinado |
-| UI Reviewer | AsyncContent + Home compacta + mark alinhado ao logo |
-| Documentation Reviewer | README/release/AGENTS/CHANGELOG + painéis 12c/12d |
-| Release Manager | Docs + workflow AAB + bump; keystore/Console = Márcia |
-| CI/CD Reviewer | QG, artefatos JaCoCo, Release AAB → internal |
+| Android Engineer | Aprovado c/ ressalvas (#35/#36) |
+| Architecture Reviewer | Aprovado (#36) / ressalvas (#35 Result→Home) |
+| Test Engineer | Aprovado c/ ressalvas (flash coberto; paint paths abertos) |
+| Quality Reviewer | Aprovado c/ ressalvas — merge após QG verde |
+| Performance Reviewer | Aprovado |
+| Security Reviewer | Aprovado |
+| Accessibility Reviewer | Aprovado c/ ressalvas (banner try-on; maxLines convite) |
+| UI Reviewer | Aprovado (#36) / ressalvas (#35 chrome Favoritos) |
+| Documentation Reviewer | Aprovado c/ ressalvas (este painel 12e) |
+| Release Manager | Aprovado c/ ressalvas — smoke try-on em device antes de store |
+| CI/CD Reviewer | Aprovado c/ ressalvas — Verify #35/#36 em andamento |
 
-**Síntese:** recomendações de código dos especialistas foram aplicadas. UX (#35) e
-alinhamento do try-on (#36) reavaliados em 2026-08-12d. Resta operação de loja
-(keystore + listing), fora do repositório.
+**Síntese:** pedidos de UX (#35) e correção do overlay DEFAULT (#36) aprováveis
+após CI/QG verdes. Reavaliação completa em **2026-08-12e**. Resta operação de loja
+(keystore + listing) e validação visual em device (`OUT_OF_REPO`).
 
 ---
 
@@ -188,7 +188,7 @@ de produto no bug das ovais flutuantes.
 
 | Pri | Item | Status |
 |-----|------|--------|
-| P0 | Testes `HomeViewModel` flash p/ QG #35 | Feito no #35 (`HomeViewModelTest`) |
+| P0 | Testes `HomeViewModel` flash p/ QG #35 | Feito (`HomeViewModelTest` / commit `0ab112f`) |
 | P1 | Testes ramos `paintUserPreview` (extrair se preciso) | Aberto |
 | P1 | A11y banner try-on (semantics/contraste) | Aberto |
 | P2 | Smells HistoryScreen / HandReferenceEffects | Aberto |
@@ -197,3 +197,81 @@ de produto no bug das ovais flutuantes.
 | P2 | Chrome Favoritos vs Histórico | Aceito / residual |
 | — | Keystore + listing Play | **OUT_OF_REPO** |
 | — | A11y Scanner em device | **OUT_OF_REPO** |
+
+---
+
+## Reavaliação 2026-08-12e — especialistas novamente
+
+Pedido: nova passagem completa contra `.github/agents/*` nos PRs abertos vs
+`origin/master` @ `1b42c87` (pós #33/#34 release internal Play).
+
+| PR | Branch | Escopo |
+|----|--------|--------|
+| [#35](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/35) | `cursor/ux-home-favoritos-sobre-535f` @ `0ab112f` | Home / Favoritos / Sobre / logo / Minha mão + flash |
+| [#36](https://github.com/marciacrisrs/unhas-de-que-cor-app/pull/36) | `cursor/fix-nail-overlay-offset-535f` @ `7e9201b`+ | Sem DEFAULT errado; geometria mapper/ROI |
+
+CI no momento da avaliação: ambos os jobs `Verify` **IN_PROGRESS** (Sonar ainda
+não confirmado nesta passagem). Emulador indisponível nesta VM.
+
+### Veredito global
+
+| PR | Merge | Motivo |
+|----|-------|--------|
+| #35 | **Aprovar após QG verde** | Cinco pedidos UX atendidos; `HomeViewModelTest` cobre flash; P0 restante = confirmação Sonar |
+| #36 | **Aprovar com ressalvas** | Bug das ovais flutuantes corrigido; calibração fina exige smoke em device |
+
+Sem bloqueio de produto novo. Sem overlap de arquivos entre #35 e #36.
+
+### Painel por especialista (consolidado)
+
+| Especialista | #35 | #36 | Achados principais |
+|--------------|-----|-----|-------------------|
+| Android Engineer | Ressalvas | Ressalvas | Flash/`SavedStateHandle` ok; `getBackStackEntry(HOME)` sem guarda (**P1**); constantes mapper↔ROI ainda duplicadas (**P2**) |
+| Architecture Reviewer | Ressalvas | Aprovado | Result→mão → Home perde contexto (**P2**); UI não viola camadas no try-on |
+| Test Engineer | Ressalvas | Ressalvas | Flash coberto; falta teste navegação handle (**P1**); falta ramo `emptyList()`/`paintUserPreview` e applier (**P1/P2**) |
+| Quality Reviewer | Ressalvas | Ressalvas | Merge só com Verify+QG verdes (**P0** condicional); `tipPipPx` morto no mapper (**P3**) |
+| Performance Reviewer | Aprovado | Aprovado | Menos Canvas sem detecção; Home compacta sem I/O na Main |
+| Security Reviewer | Aprovado | Aprovado | Sobre → GitHub HTTPS; vision sem superfície nova |
+| Accessibility Reviewer | Ressalvas | Ressalvas | Convite mão `maxLines=1` (**P1**); banner try-on contraste/CD (**P1** residual) |
+| UI Reviewer | Ressalvas | Aprovado | Pedidos UX feitos; chrome Favoritos ≠ Histórico (**P2**); estado “mão não detectada” honesto |
+| Documentation Reviewer | Ressalvas | Aprovado | Status P0 testes corrigido neste 12e; CHANGELOG do fix vision no próximo release |
+| Release Manager | Ressalvas | Ressalvas | Sem bump (ok); store só após smoke try-on + `OUT_OF_REPO` |
+| CI/CD Reviewer | Ressalvas | Ressalvas | Nenhum workflow alterado; aguardar Verify #35/#36 |
+
+### PR #35 — detalhe
+
+| Pedido | Status 12e |
+|--------|------------|
+| Home compacta / scroll só se necessário | Feito |
+| Favoritos com Voltar | Feito |
+| Sobre: GitHub (não e-mail) | Feito + nota privacidade Play |
+| `NailPolishMark` ≈ logo | Feito |
+| Minha mão → Home + feedback | Feito (`navigateHome` + flash + teste) |
+
+**Riscos residuais #35:** QG Sonar; crash se HOME ausente da back stack; Result
+perdido após cadastro de mão; a11y `maxLines=1` no convite.
+
+### PR #36 — detalhe
+
+| Mudança | Status 12e |
+|---------|------------|
+| Sem landmarks → `anchors = emptyList()` | Correto — não pinta DEFAULT |
+| Status approximate vs não-detectada | Melhora textual / CD |
+| Centro 0.58 / overshoot 0.02 / bias +0.04 | Coerente; device TBD |
+| Polegar proximal + `FACING_CENTER` 0.82 | Unificado mapper↔ROI |
+
+**Riscos residuais #36:** alinhamento em ângulos reais; regressão DEFAULT sem teste
+de paint path; constantes mágicas sem ground-truth.
+
+### Backlog residual (pós 12e)
+
+| Pri | Item | Status |
+|-----|------|--------|
+| P0 | Confirmar QG Sonar #35/#36 na CI | Em andamento (Verify) |
+| P1 | Testes `paintUserPreview` / empty anchors | Aberto |
+| P1 | Guarda `getBackStackEntry(HOME)` | Aberto |
+| P1 | A11y: banner try-on + convite `maxLines` | Aberto |
+| P2 | Result→mão destino; chrome Favoritos; smells History | Aberto |
+| P2 | Unit tests `DetectedNailPolishApplier`; DRY constantes vision | Aberto |
+| — | Keystore + listing Play | **OUT_OF_REPO** |
+| — | A11y Scanner + smoke try-on em device | **OUT_OF_REPO** |
