@@ -15,8 +15,8 @@ android {
         applicationId = "br.com.unhasdequecor"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 8
-        versionName = "1.0.7"
+        versionCode = 9
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Overlay de landmarks/ROI/máscara no try-on. Ative com -PdebugNailOverlay=true
