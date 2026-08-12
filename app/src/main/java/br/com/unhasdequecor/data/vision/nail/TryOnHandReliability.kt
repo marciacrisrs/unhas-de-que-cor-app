@@ -34,8 +34,8 @@ data class UserTryOnRenderPlan(
 )
 
 object TryOnHandReliability {
-    /** Abaixo disso: falso positivo típico pós-enhance — descartar. */
-    const val MIN_PRESENCE_ACCEPT = 0.28f
+    /** Abaixo disso: ruído típico — descartar. Alinhado ao limiar MediaPipe (~0.08). */
+    const val MIN_PRESENCE_ACCEPT = 0.12f
 
     /** Acima disso: claim FULL permitido (com ≥ [MIN_MASKS_FOR_FULL] máscaras). */
     const val MIN_PRESENCE_STRONG = 0.55f

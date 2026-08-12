@@ -49,4 +49,21 @@ class HandInferenceEnhancerTest {
         assertThat(HandInferenceEnhancer.mirrorXNormalized(0f)).isWithin(0.001f).of(1f)
         assertThat(HandInferenceEnhancer.mirrorXNormalized(1f)).isWithin(0.001f).of(0f)
     }
+
+    @Test
+    fun `liftBrightness brightens dark pixels toward white`() {
+        val dark = 0xFF202020.toInt()
+        val pixels = intArrayOf(dark, dark, dark, dark)
+        HandInferenceEnhancer.liftBrightnessArgb(pixels, amount = 0.28f)
+        assertThat(HandInferenceEnhancer.luminance(pixels[0])).isGreaterThan(0x20)
+        assertThat(HandInferenceEnhancer.luminance(pixels[0])).isLessThan(0xFF)
+    }
+
+    @Test
+    fun `liftBrightness zero amount is no-op`() {
+        val pixels = intArrayOf(0xFF404040.toInt())
+        val before = pixels[0]
+        HandInferenceEnhancer.liftBrightnessArgb(pixels, amount = 0f)
+        assertThat(pixels[0]).isEqualTo(before)
+    }
 }

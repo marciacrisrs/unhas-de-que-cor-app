@@ -102,7 +102,7 @@ object NailLandmarkMapper {
 
     const val PREVIEW_ASPECT = 3f / 4f
     private const val MIN_LANDMARKS = 21
-    private const val MIN_PLAUSIBLE_NAILS = 3
+    private const val MIN_PLAUSIBLE_NAILS = 2
     private const val SHORT_TIP_DIP_PX = 16f
     private const val FACING_LENGTH_SCALE = 0.48f
     private const val THUMB_LENGTH_SCALE = 0.38f
