@@ -3,6 +3,8 @@ package br.com.unhasdequecor.ui.result
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import br.com.unhasdequecor.BuildConfig
+import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.RecommendationContext
@@ -42,6 +44,7 @@ class ResultViewModel @Inject constructor(
     private val restoreRecommendation: RestoreRecommendationUseCase,
     private val toggleFavorite: ToggleFavoriteUseCase,
     observeHandReference: ObserveHandReferenceUseCase,
+    val nailTryOnPipeline: NailTryOnPipeline,
 ) : ViewModel() {
 
     private val source = ResultSources.toDomain(checkNotNull(savedStateHandle["source"]))
@@ -56,6 +59,7 @@ class ResultViewModel @Inject constructor(
     val uiState: StateFlow<ResultUiState> = _uiState.asStateFlow()
 
     init {
+        nailTryOnPipeline.debugEnabled = BuildConfig.DEBUG && BuildConfig.DEBUG_NAIL_OVERLAY
         viewModelScope.launch {
             observeHandReference().collect { hand ->
                 _uiState.update {

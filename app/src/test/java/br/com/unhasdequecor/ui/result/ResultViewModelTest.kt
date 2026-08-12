@@ -1,6 +1,7 @@
 package br.com.unhasdequecor.ui.result
 
 import androidx.lifecycle.SavedStateHandle
+import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.Mood
 import br.com.unhasdequecor.domain.model.NailColor
@@ -40,6 +41,7 @@ class ResultViewModelTest {
     private val toggleFavorite = mockk<ToggleFavoriteUseCase>(relaxed = true)
     private val handRepository = FakeHandReferenceRepository()
     private val observeHandReference = ObserveHandReferenceUseCase(handRepository)
+    private val nailTryOnPipeline = mockk<NailTryOnPipeline>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -53,6 +55,7 @@ class ResultViewModelTest {
         restoreRecommendation = restoreRecommendation,
         toggleFavorite = toggleFavorite,
         observeHandReference = observeHandReference,
+        nailTryOnPipeline = nailTryOnPipeline,
     )
 
     @Test
@@ -157,6 +160,62 @@ class ResultViewModelTest {
         assertThat(viewModel.uiState.value.hasHandReference).isTrue()
         assertThat(viewModel.uiState.value.isSampleHand).isFalse()
         assertThat(viewModel.uiState.value.handRevision).isEqualTo(capturedAt)
+    }
+
+    @Test
+    fun `generateAndSave failure surfaces error message and stops loading`() = runTest {
+        coEvery {
+            generateAndSave(any(), any(), any())
+        } throws IllegalStateException("boom")
+
+        val handle = SavedStateHandle(
+            mapOf(
+                "source" to "for_me",
+                "occasion" to "none",
+                "mood" to "none",
+                "colorId" to "none",
+            ),
+        )
+        val viewModel = viewModel(handle)
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.isLoading).isFalse()
+        assertThat(viewModel.uiState.value.errorMessage).isEqualTo("boom")
+        assertThat(viewModel.uiState.value.recommendation).isNull()
+    }
+
+    @Test
+    fun `restore returning null falls through to generateFresh`() = runTest {
+        val fresh = sampleRecommendation(colorId = "festa_vermelha", source = RecommendationSource.FOR_ME)
+        coEvery {
+            restoreRecommendation(
+                colorId = "romantico_rosa",
+                source = RecommendationSource.CONTEXT,
+                context = RecommendationContext(
+                    occasion = Occasion.ENCONTRO,
+                    mood = Mood.ROMANTICA,
+                ),
+            )
+        } returns null
+        coEvery {
+            generateAndSave(any(), any(), any())
+        } returns GeneratedRecommendation(fresh, isFavorite = false)
+
+        val handle = SavedStateHandle(
+            mapOf(
+                "source" to "context",
+                "occasion" to "ENCONTRO",
+                "mood" to "ROMANTICA",
+                "colorId" to "romantico_rosa",
+            ),
+        )
+        val viewModel = viewModel(handle)
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("festa_vermelha")
+        assertThat(viewModel.uiState.value.isLoading).isFalse()
+        assertThat(viewModel.uiState.value.errorMessage).isNull()
+        coVerify(exactly = 1) { generateAndSave(any(), any(), any()) }
     }
 
     @Test

@@ -74,5 +74,8 @@ object NailOverlayAnchors {
     private val MASK_SAMPLES = setOf(
         "clara_vermelho",
         "media_rosa",
+        "morena_nude",
+        "retinta_vinho",
+        "morena_clara_coral",
     )
 }

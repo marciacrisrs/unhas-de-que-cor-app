@@ -3,6 +3,9 @@ package br.com.unhasdequecor.domain.repository
 import br.com.unhasdequecor.domain.model.HistoryEntry
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Persistência do histórico de recomendações e dos favoritos derivados dele.
+ */
 interface HistoryRepository {
     fun observeHistory(): Flow<List<HistoryEntry>>
     fun observeFavorites(): Flow<List<HistoryEntry>>

@@ -1,0 +1,13 @@
+This directory (app/src/main/res/font/) bundles Playfair Display and Poppins,
+both licensed under the SIL Open Font License, Version 1.1 (OFL-1.1).
+
+Full license text: https://openfontlicense.org/documents/OFL.txt
+
+Sources:
+- Playfair Display — https://github.com/google/fonts/tree/main/ofl/playfairdisplay
+- Poppins — https://github.com/google/fonts/tree/main/ofl/poppins
+
+`res/font/` only accepts .ttf/.otf/.ttc/.xml files (Android resource merger
+rejects other extensions), so this license pointer lives under `assets/font/`
+instead. See docs/fonts.md for the mapping between the bundled font files and
+the app's typography (`ui/theme/Type.kt`).

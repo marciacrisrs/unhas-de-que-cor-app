@@ -18,6 +18,7 @@ class FakeHandReferenceRepository(
     var lastSavedPath: String? = null
     var lastSource: HandReferenceSource? = null
     var lastSampleId: String? = null
+    var stagingCacheCleared: Boolean = false
 
     override fun observe(): Flow<HandReference?> = state.asStateFlow()
 
@@ -64,6 +65,20 @@ class FakeHandReferenceRepository(
         lastSource = HandReferenceSource.SAMPLE
         lastSampleId = "clara_vermelho"
         return sample
+    }
+
+    override suspend fun stageFromContentUri(uriString: String): String? = uriString
+
+    override suspend fun stageSampleAsset(assetPath: String): String? = assetPath
+
+    override fun createCameraCapturePath(): String = "/tmp/capture.jpg"
+
+    override suspend fun clearStagingCache() {
+        stagingCacheCleared = true
+    }
+
+    override fun clearStagingCacheNow() {
+        stagingCacheCleared = true
     }
 
     fun emit(reference: HandReference?) {

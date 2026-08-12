@@ -1,7 +1,5 @@
 package br.com.unhasdequecor.ui.hand
 
-import android.content.Context
-import br.com.unhasdequecor.data.local.hand.HandReferenceFileStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
@@ -13,11 +11,6 @@ import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import br.com.unhasdequecor.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.just
-import io.mockk.mockk
-import io.mockk.runs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,25 +27,19 @@ class HandReferenceViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val repository = FakeHandReferenceRepository()
-    private val context = mockk<Context>(relaxed = true)
-    private val fileStore = mockk<HandReferenceFileStore>(relaxed = true)
 
     @Before
     fun setUp() {
-        coEvery { fileStore.copySampleAssetToCache(any()) } returns File("/tmp/sample.webp")
-        coEvery { fileStore.clearCaptureCache() } just runs
-        every { fileStore.clearCaptureCacheNow() } just runs
         // Espelha UnhasDeQueCorApp.onCreate → ensureDefaultHandReference.
         runBlocking { repository.ensureDefaultSample() }
     }
 
     private fun viewModel(): HandReferenceViewModel = HandReferenceViewModel(
-        context = context,
         observeHandReference = ObserveHandReferenceUseCase(repository),
         saveHandReference = SaveHandReferenceUseCase(repository) { FIXED_NOW_MS },
         useSampleHandReference = UseSampleHandReferenceUseCase(repository) { FIXED_NOW_MS },
         clearHandReference = ClearHandReferenceUseCase(repository),
-        fileStore = fileStore,
+        repository = repository,
     )
 
     @Test
@@ -181,11 +168,8 @@ class HandReferenceViewModelTest {
     }
 
     @Test
-    fun `createCameraCaptureFile delegates to file store`() {
-        val expected = File("/cache/hand_capture/capture.jpg")
-        every { fileStore.createCameraCaptureFile() } returns expected
-
-        assertThat(viewModel().createCameraCaptureFile()).isEqualTo(expected)
+    fun `createCameraCaptureFile delegates to repository`() {
+        assertThat(viewModel().createCameraCaptureFile()).isEqualTo(File("/tmp/capture.jpg"))
     }
 
     @Test

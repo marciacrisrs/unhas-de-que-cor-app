@@ -1,22 +1,20 @@
 package br.com.unhasdequecor.ui.hand
 
-import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import br.com.unhasdequecor.data.local.hand.HandReferenceFileStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
 import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.model.HandSampleCatalog
 import br.com.unhasdequecor.domain.model.HandSampleOption
+import br.com.unhasdequecor.domain.repository.HandReferenceRepository
 import br.com.unhasdequecor.domain.usecase.ClearHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,12 +43,11 @@ data class HandReferenceUiState(
 
 @HiltViewModel
 class HandReferenceViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
     observeHandReference: ObserveHandReferenceUseCase,
     private val saveHandReference: SaveHandReferenceUseCase,
     private val useSampleHandReference: UseSampleHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
-    private val fileStore: HandReferenceFileStore,
+    private val repository: HandReferenceRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HandReferenceUiState())
@@ -64,7 +61,7 @@ class HandReferenceViewModel @Inject constructor(
         }
     }
 
-    fun createCameraCaptureFile(): File = fileStore.createCameraCaptureFile()
+    fun createCameraCaptureFile(): File = File(repository.createCameraCapturePath())
 
     fun openReplaceSheet() {
         _uiState.update {
@@ -138,11 +135,7 @@ class HandReferenceViewModel @Inject constructor(
                     pendingSampleId = null,
                 )
             }
-            val prepared = runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    fileStore.copyUriStreamToCache(input)
-                }
-            }.getOrNull()
+            val prepared = repository.stageFromContentUri(uri.toString())
             if (prepared == null) {
                 _uiState.update {
                     it.copy(
@@ -152,7 +145,7 @@ class HandReferenceViewModel @Inject constructor(
                 }
                 return@launch
             }
-            stageUserPhoto(prepared.absolutePath)
+            stageUserPhoto(prepared)
         }
     }
 
@@ -181,7 +174,7 @@ class HandReferenceViewModel @Inject constructor(
 
     fun discardPendingUserPhoto() {
         viewModelScope.launch {
-            fileStore.clearCaptureCache()
+            repository.clearStagingCache()
             _uiState.update {
                 it.copy(pendingUserPreviewPath = null, isSaving = false)
             }
@@ -201,9 +194,7 @@ class HandReferenceViewModel @Inject constructor(
                     pendingUserPreviewPath = null,
                 )
             }
-            val prepared = runCatching {
-                fileStore.copySampleAssetToCache(option.assetPath)
-            }.getOrNull()
+            val prepared = repository.stageSampleAsset(option.assetPath)
             if (prepared == null) {
                 _uiState.update {
                     it.copy(
@@ -213,9 +204,8 @@ class HandReferenceViewModel @Inject constructor(
                 }
                 return@launch
             }
-            when (val outcome = useSampleHandReference(option.id, prepared.absolutePath)) {
+            when (val outcome = useSampleHandReference(option.id, prepared)) {
                 is HandReferenceSaveOutcome.Saved -> {
-                    fileStore.clearCaptureCache()
                     _uiState.update {
                         it.copy(
                             isSaving = false,
@@ -224,7 +214,6 @@ class HandReferenceViewModel @Inject constructor(
                     }
                 }
                 is HandReferenceSaveOutcome.Rejected -> {
-                    fileStore.clearCaptureCache()
                     _uiState.update {
                         it.copy(
                             isSaving = false,
@@ -252,7 +241,6 @@ class HandReferenceViewModel @Inject constructor(
     private suspend fun persistUser(path: String) {
         when (val outcome = saveHandReference(path, HandReferenceSource.USER)) {
             is HandReferenceSaveOutcome.Saved -> {
-                fileStore.clearCaptureCache()
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -262,7 +250,6 @@ class HandReferenceViewModel @Inject constructor(
                 }
             }
             is HandReferenceSaveOutcome.Rejected -> {
-                fileStore.clearCaptureCache()
                 _uiState.update {
                     it.copy(
                         isSaving = false,
@@ -286,6 +273,6 @@ class HandReferenceViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        fileStore.clearCaptureCacheNow()
+        repository.clearStagingCacheNow()
     }
 }

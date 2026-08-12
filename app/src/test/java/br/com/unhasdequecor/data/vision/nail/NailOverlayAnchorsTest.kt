@@ -31,7 +31,9 @@ class NailOverlayAnchorsTest {
     fun `mask assets exist for calibrated samples`() {
         assertThat(NailOverlayAnchors.hasMaskAsset("clara_vermelho")).isTrue()
         assertThat(NailOverlayAnchors.hasMaskAsset("media_rosa")).isTrue()
-        assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isTrue()
+        assertThat(NailOverlayAnchors.hasMaskAsset("retinta_vinho")).isTrue()
+        assertThat(NailOverlayAnchors.hasMaskAsset("morena_clara_coral")).isTrue()
         assertThat(NailOverlayAnchors.hasMaskAsset(null)).isFalse()
         assertThat(NailOverlayAnchors.hasMaskAsset("unknown")).isFalse()
     }
