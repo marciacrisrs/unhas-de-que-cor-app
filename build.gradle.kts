@@ -84,6 +84,8 @@ sonar {
                 "**/ui/navigation/AppBottomBar*",
                 "**/ui/navigation/BottomDestination*",
                 "**/data/vision/MediaPipe*",
+                "**/data/vision/HandInferenceVariants*",
+                "**/data/vision/HandInferenceVariant*",
                 "**/data/vision/nail/GeometricNailSegmenter*",
                 "**/data/vision/nail/DetectedNailPolishApplier*",
                 "**/data/vision/nail/NailTracker*",
