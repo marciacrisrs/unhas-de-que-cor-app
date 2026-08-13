@@ -155,6 +155,7 @@ fun AppNavHost() {
                 ProfileScreen(
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
                     onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onOpenAbout = { navController.navigate(Routes.ABOUT) },
                 )
             }
