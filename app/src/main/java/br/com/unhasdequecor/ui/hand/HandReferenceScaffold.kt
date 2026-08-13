@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import br.com.unhasdequecor.ui.components.NailPolishMark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +44,13 @@ internal fun HandReferenceScaffold(
                     IconButton(onClick = actions.onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
+                },
+                actions = {
+                    NailPolishMark(
+                        modifier = Modifier.padding(end = 12.dp),
+                        markSize = 40.dp,
+                        decorative = true,
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
