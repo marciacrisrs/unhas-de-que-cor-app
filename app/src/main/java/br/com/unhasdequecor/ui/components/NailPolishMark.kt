@@ -1,18 +1,10 @@
 package br.com.unhasdequecor.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -23,17 +15,22 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import br.com.unhasdequecor.R
 import br.com.unhasdequecor.ui.theme.BrandAction
 import br.com.unhasdequecor.ui.theme.BrandFun
 
 /**
- * Mark compacto alinhado ao [logo_mark] oficial: tampa alta, corpo bulboso,
- * anel com aberturas e sparkles. Tintável via [polishColor] (inspiração / resultado).
+ * Mark da marca (frasco) no canto direito das telas.
+ *
+ * - Sem [polishColor]: asset oficial `logo_mark` (claro/escuro via night).
+ * - Com [polishColor]: frasco tintável (inspiração / resultado).
  */
 @Composable
 fun NailPolishMark(
@@ -42,9 +39,54 @@ fun NailPolishMark(
     polishColor: Color? = null,
     decorative: Boolean = false,
 ) {
-    val resolvedPolish = polishColor ?: BrandFun
-    val outline = MaterialTheme.colorScheme.onBackground
-    val framed = polishColor == null
+    if (polishColor == null) {
+        OfficialBrandMark(
+            modifier = modifier,
+            markSize = markSize,
+            decorative = decorative,
+        )
+    } else {
+        TintablePolishMark(
+            modifier = modifier,
+            markSize = markSize,
+            polishColor = polishColor,
+            decorative = decorative,
+        )
+    }
+}
+
+/** Ícone oficial só do esmalte — usado à direita nas toolbars / headers. */
+@Composable
+fun OfficialBrandMark(
+    modifier: Modifier = Modifier,
+    markSize: Dp = 40.dp,
+    decorative: Boolean = true,
+) {
+    val markModifier = if (decorative) {
+        modifier
+            .size(markSize)
+            .clearAndSetSemantics { }
+    } else {
+        modifier
+            .size(markSize)
+            .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
+    }
+    Image(
+        painter = painterResource(R.drawable.logo_mark),
+        contentDescription = null,
+        modifier = markModifier,
+        contentScale = ContentScale.Fit,
+    )
+}
+
+@Composable
+private fun TintablePolishMark(
+    modifier: Modifier,
+    markSize: Dp,
+    polishColor: Color,
+    decorative: Boolean,
+) {
+    val outline = Color(0xFF400113)
     val markModifier = if (decorative) {
         modifier.size(markSize).clearAndSetSemantics { }
     } else {
@@ -52,28 +94,8 @@ fun NailPolishMark(
             .size(markSize)
             .semantics { contentDescription = "Ícone do app Unhas de Que Cor" }
     }
-
-    Box(
-        modifier = markModifier.then(
-            if (framed) {
-                Modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.65f),
-                        shape = CircleShape,
-                    )
-                    .padding(4.dp)
-            } else {
-                Modifier
-            },
-        ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawOfficialPolishMark(polishColor = resolvedPolish, outline = outline)
-        }
+    Canvas(modifier = markModifier) {
+        drawOfficialPolishMark(polishColor = polishColor, outline = outline)
     }
 }
 
@@ -90,7 +112,6 @@ private fun DrawScope.drawOfficialPolishMark(
     val arcSize = Size(radius * 2f, radius * 2f)
     val topLeft = Offset(cx - radius, cy - radius)
 
-    // Anel incompleto (aberturas no topo-direita e base-esquerda), como no logo_icone.
     drawArc(
         brush = ring,
         startAngle = -20f,
@@ -109,7 +130,6 @@ private fun DrawScope.drawOfficialPolishMark(
         size = arcSize,
         style = stroke,
     )
-    // Ponto decorativo perto da abertura superior.
     drawCircle(
         color = outline.copy(alpha = 0.7f),
         radius = strokeWidth * 0.85f,
@@ -145,7 +165,6 @@ private fun officialBottlePath(cx: Float, cy: Float, radius: Float): Path {
     val shoulderHalf = radius * 0.26f
 
     return Path().apply {
-        // Tampa alta retangular (logo oficial).
         addRoundRect(
             RoundRect(
                 left = cx - capHalf,
@@ -155,13 +174,11 @@ private fun officialBottlePath(cx: Float, cy: Float, radius: Float): Path {
                 cornerRadius = CornerRadius(capHalf * 0.35f, capHalf * 0.35f),
             ),
         )
-        // Pescoço curto.
         moveTo(cx - capHalf * 0.7f, capBottom)
         lineTo(cx + capHalf * 0.7f, capBottom)
         lineTo(cx + capHalf * 0.55f, neckY)
         lineTo(cx - capHalf * 0.55f, neckY)
         close()
-        // Corpo bulboso.
         moveTo(cx - shoulderHalf, neckY)
         lineTo(cx + shoulderHalf, neckY)
         quadraticTo(cx + bodyHalf, shoulderY, cx + bodyHalf, cy + radius * 0.15f)

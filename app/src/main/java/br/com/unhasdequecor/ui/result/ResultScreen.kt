@@ -97,6 +97,7 @@ fun ResultScreen(
                     onToggleFavorite = viewModel::onToggleFavorite,
                     onSelectColor = viewModel::selectColor,
                     onRecommendAgain = viewModel::recommendAgain,
+                    onSelectColor = viewModel::selectColor,
                     onOpenHistory = onOpenHistory,
                 )
             }
@@ -134,6 +135,7 @@ private fun ResultSuccessContent(
     onToggleFavorite: () -> Unit,
     onSelectColor: (String) -> Unit,
     onRecommendAgain: () -> Unit,
+    onSelectColor: (String) -> Unit,
     onOpenHistory: () -> Unit,
 ) {
     val color = recommendation.color

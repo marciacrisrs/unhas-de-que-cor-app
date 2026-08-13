@@ -5,6 +5,8 @@ import br.com.unhasdequecor.domain.model.Occasion
 import br.com.unhasdequecor.domain.model.RecommendationSource
 
 object Routes {
+    /** Shell com pager das abas Início / Histórico / Favoritos / Perfil. */
+    const val MAIN = "main"
     const val HOME = "home"
     const val CONTEXT = "context"
     const val STYLE = "style"
@@ -37,6 +39,10 @@ object Routes {
         val moodPath = mood?.name ?: NONE
         return "result/$sourcePath/$occasionPath/$moodPath/$colorId"
     }
+
+    /** Abre o resultado/try-on de uma cor do catálogo (ex.: inspiração do dia). */
+    fun resultForColor(colorId: String): String =
+        "result/${ResultSources.FOR_ME}/$NONE/$NONE/$colorId"
 
     fun parseOccasion(raw: String): Occasion? =
         raw.takeUnless { it == NONE }?.let { runCatching { Occasion.valueOf(it) }.getOrNull() }

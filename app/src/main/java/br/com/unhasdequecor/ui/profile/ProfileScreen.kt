@@ -30,6 +30,7 @@ import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 fun ProfileScreen(
     onOpenStyle: () -> Unit,
     onOpenHandReference: () -> Unit,
+    onOpenHistory: () -> Unit,
     onOpenAbout: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -88,6 +89,8 @@ fun ProfileScreen(
             } else {
                 "Você já explorou ${state.distinctColorCount} cores diferentes"
             },
+            onClick = onOpenHistory,
+            contentDescription = "Abrir histórico de cores",
         )
         Spacer(modifier = Modifier.height(12.dp))
         ProfileCard(
