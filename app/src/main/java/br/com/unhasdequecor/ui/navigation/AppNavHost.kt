@@ -99,6 +99,9 @@ fun AppNavHost() {
                     onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
                     onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                    onOpenInspiration = { colorId ->
+                        navController.navigate(Routes.resultForColor(colorId))
+                    },
                 )
             }
             composable(Routes.CONTEXT) {
