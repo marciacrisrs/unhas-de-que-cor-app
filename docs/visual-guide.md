@@ -37,7 +37,7 @@ Resultado: try-on sempre em foto real (amostra padrão se a usuária ainda não 
 ## Composição das telas guia
 1. **Home:** marca hero + 2 CTAs lado a lado + Inspiração do dia + explore (4) + últimas escolhas
 2. **Contexto:** cards grandes de ocasião + moods + Continuar
-3. **Resultado:** card hero visual + Salvar/Compartilhar + dica + cores parecidas
+3. **Resultado:** try-on full-bleed (herói visual) + nome/CTAs + dica + cores parecidas (trocam o try-on)
 4. **Histórico:** tabs Todas/Favoritas + grupos por mês em cards + banner de stats
 5. **Nav:** 5 destinos com FAB central “Escolher minha cor”
 6. **Marca:** frasco em círculo quebrado + sparkles; “DE QUE COR?” em gradiente; tagline com divisor ✦

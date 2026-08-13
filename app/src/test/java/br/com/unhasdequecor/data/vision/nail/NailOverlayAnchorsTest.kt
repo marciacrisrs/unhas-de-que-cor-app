@@ -28,13 +28,13 @@ class NailOverlayAnchorsTest {
     }
 
     @Test
-    fun `mask assets exist for calibrated samples`() {
+    fun `only clara_vermelho has calibrated mask asset`() {
         assertThat(NailOverlayAnchors.hasMaskAsset("clara_vermelho")).isTrue()
-        assertThat(NailOverlayAnchors.hasMaskAsset("media_rosa")).isTrue()
-        assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isTrue()
-        assertThat(NailOverlayAnchors.hasMaskAsset("retinta_vinho")).isTrue()
-        assertThat(NailOverlayAnchors.hasMaskAsset("retinta_polegar")).isTrue()
-        assertThat(NailOverlayAnchors.hasMaskAsset("morena_clara_coral")).isTrue()
+        assertThat(NailOverlayAnchors.hasMaskAsset("media_rosa")).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset("morena_nude")).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset("retinta_vinho")).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset("retinta_polegar")).isFalse()
+        assertThat(NailOverlayAnchors.hasMaskAsset("morena_clara_coral")).isFalse()
         assertThat(NailOverlayAnchors.forSample("retinta_polegar")).hasSize(5)
         assertThat(NailOverlayAnchors.forSample("retinta_polegar"))
             .isNotEqualTo(NailOverlayAnchors.DEFAULT)

@@ -81,12 +81,11 @@ object NailOverlayAnchors {
     fun hasMaskAsset(sampleId: String?): Boolean =
         sampleId != null && sampleId in MASK_SAMPLES
 
+    /**
+     * Só amostras com máscara espacialmente crível (placa, não elipse genérica).
+     * Demais IDs no catálogo usam MediaPipe na foto da amostra até remask.
+     */
     private val MASK_SAMPLES = setOf(
         "clara_vermelho",
-        "media_rosa",
-        "morena_nude",
-        "retinta_vinho",
-        "retinta_polegar",
-        "morena_clara_coral",
     )
 }

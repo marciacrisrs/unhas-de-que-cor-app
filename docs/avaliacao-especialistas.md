@@ -410,3 +410,31 @@ Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; Resu
 | Docs | Tabela presence→null stale | Feito abaixo |
 
 Presence &lt; floor: `detect` devolve snapshot `REJECTED` (motivo tipado); recycle no `process`/Dispose UI — não mais `null` + recycle imediato.
+
+---
+
+## Follow-up — Try-on visual domina + máscaras (2026-08-13)
+
+Pedido: começar pontos do Vision Try-On (máscaras de amostra) e **deixar o visual try-on dominar** o Resultado; criar especialistas se faltar cobertura.
+
+### Especialistas novos
+
+| Agente | Papel |
+|--------|--------|
+| `computer-graphics-polish-reviewer` | Render/compositing do esmalte (look, blending, sheer) |
+| `product-visual-result-reviewer` | Hierarquia do Result — try-on como herói |
+
+### Implementação in-repo
+
+| Item | Status |
+|------|--------|
+| Result: try-on full-bleed (sem card herói de texto) | Feito |
+| Cores parecidas → `selectColor` atualiza try-on | Feito |
+| Só `clara_vermelho` em `MASK_SAMPLES` (máscara crível) | Feito |
+| Outras amostras → MediaPipe na foto (sem elipse que pinta pele) | Feito |
+| Gate CI `HandSampleMaskAssetTest` (dim + cobertura) | Feito |
+| Remask pixel-accurate das 5 máscaras ruins | **Aberto** (manual / matte) — PNGs ainda no APK mas fora de `MASK_SAMPLES` |
+
+### Remask backlog (vision)
+
+Ordem sugerida: `retinta_vinho` → `morena_nude` → `morena_clara_coral` → `media_rosa` → `retinta_polegar`; regenerar âncoras pelos centróides; reativar em `MASK_SAMPLES` só após passar revisão vision + gate CI.
