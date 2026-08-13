@@ -173,6 +173,24 @@ fun AppNavHost() {
                     },
                 )
             }
+            composable(Routes.HISTORY) {
+                HistoryScreen(onOpenResult = navController::openResultFromHistory)
+            }
+            composable(Routes.FAVORITES) {
+                HistoryScreen(
+                    onOpenResult = navController::openResultFromHistory,
+                    mode = HistoryScreenMode.FAVORITES_ONLY,
+                    onBack = { navController.navigateBottomTab(Routes.HOME) },
+                )
+            }
+            composable(Routes.PROFILE) {
+                ProfileScreen(
+                    onOpenStyle = { navController.navigate(Routes.STYLE) },
+                    onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                    onOpenHistory = { navController.navigateBottomTab(Routes.HISTORY) },
+                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
+                )
+            }
             composable(Routes.ABOUT) {
                 AboutScreen(onBack = { navController.popBackStack() })
             }
