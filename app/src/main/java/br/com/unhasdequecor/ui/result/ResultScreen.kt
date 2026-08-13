@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +52,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.NailColor
-import br.com.unhasdequecor.ui.components.EmptyContent
 import br.com.unhasdequecor.ui.components.ErrorContent
 import br.com.unhasdequecor.ui.components.HandTryOnPreview
 import br.com.unhasdequecor.ui.components.InfoTag
@@ -61,10 +59,7 @@ import br.com.unhasdequecor.ui.components.LoadingContent
 import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
-import br.com.unhasdequecor.ui.components.ProgressSteps
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
-import br.com.unhasdequecor.ui.theme.FunChipShape
-import br.com.unhasdequecor.ui.theme.RecommendationCardShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
 private const val FAVORITE_BUTTON_WEIGHT = 1.2f
@@ -100,6 +95,7 @@ fun ResultScreen(
                     nailTryOnPipeline = viewModel.nailTryOnPipeline,
                     onOpenHandReference = onOpenHandReference,
                     onToggleFavorite = viewModel::onToggleFavorite,
+                    onSelectColor = viewModel::selectColor,
                     onRecommendAgain = viewModel::recommendAgain,
                     onOpenHistory = onOpenHistory,
                 )
@@ -113,7 +109,7 @@ fun ResultScreen(
 private fun ResultTopBar(onBack: () -> Unit) {
     TopAppBar(
         title = {
-            Text("Sua cor ideal", style = MaterialTheme.typography.headlineSmall)
+            Text("Sua cor ideal", style = MaterialTheme.typography.titleLarge)
         },
         navigationIcon = {
             IconButton(onClick = onBack) {
@@ -121,7 +117,7 @@ private fun ResultTopBar(onBack: () -> Unit) {
             }
         },
         actions = {
-            NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 40.dp, decorative = true)
+            NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp, decorative = true)
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
@@ -136,6 +132,7 @@ private fun ResultSuccessContent(
     nailTryOnPipeline: NailTryOnPipeline,
     onOpenHandReference: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onSelectColor: (String) -> Unit,
     onRecommendAgain: () -> Unit,
     onOpenHistory: () -> Unit,
 ) {
@@ -148,142 +145,103 @@ private fun ResultSuccessContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            ProgressSteps(current = 2, total = 2)
-            Spacer(modifier = Modifier.height(20.dp))
-            ResultHeroCard(
+            // Herói: try-on full-bleed (domina o primeiro viewport).
+            ResultTryOnHero(
                 state = state,
                 color = color,
-                rationale = recommendation.rationale,
                 nailTryOnPipeline = nailTryOnPipeline,
                 onToggleFavorite = onToggleFavorite,
                 onOpenHandReference = onOpenHandReference,
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            ResultPrimaryActions(
-                isFavorite = state.isFavorite,
-                onToggleFavorite = onToggleFavorite,
-                onShare = {
-                    val share = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(
-                            Intent.EXTRA_TEXT,
-                            "Minha cor do momento no Unhas de Que Cor? é ${color.name}.",
-                        )
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = color.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = color.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                ) {
+                    color.tags.take(3).forEach { tag ->
+                        InfoTag(label = tag.displayName)
                     }
-                    context.startActivity(Intent.createChooser(share, "Compartilhar"))
-                },
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-            ResultTip(tip = color.tip)
-            Spacer(modifier = Modifier.height(24.dp))
-            SimilarColorsSection(
-                primary = color,
-                similar = recommendation.similarColors,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(
-                onClick = onRecommendAgain,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Icon(Icons.Filled.Bookmark, contentDescription = null)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Quero outra sugestão")
+                }
+                if (!state.hasHandReference || state.isSampleHand) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    SecondaryCtaButton(
+                        text = "Usar minha mão",
+                        onClick = onOpenHandReference,
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                ResultPrimaryActions(
+                    isFavorite = state.isFavorite,
+                    onToggleFavorite = onToggleFavorite,
+                    onShare = {
+                        val share = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(
+                                Intent.EXTRA_TEXT,
+                                "Minha cor do momento no Unhas de Que Cor? é ${color.name}.",
+                            )
+                        }
+                        context.startActivity(Intent.createChooser(share, "Compartilhar"))
+                    },
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                ResultTip(tip = color.tip)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = recommendation.rationale,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                SimilarColorsSection(
+                    primary = color,
+                    similar = recommendation.similarColors,
+                    onSelectColor = onSelectColor,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    onClick = onRecommendAgain,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Icon(Icons.Filled.Bookmark, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Quero outra sugestão")
+                }
+                TextButton(
+                    onClick = onOpenHistory,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                ) {
+                    Text("Ver histórico")
+                }
+                Spacer(modifier = Modifier.height(24.dp))
             }
-            TextButton(
-                onClick = onOpenHistory,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            ) {
-                Text("Ver histórico")
-            }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun ResultHeroCard(
+private fun ResultTryOnHero(
     state: ResultUiState,
     color: NailColor,
-    rationale: String,
     nailTryOnPipeline: NailTryOnPipeline,
     onToggleFavorite: () -> Unit,
     onOpenHandReference: () -> Unit,
-) {
-    Surface(
-        shape = RecommendationCardShape,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            ResultHandPreview(
-                state = state,
-                polishColor = Color(color.hex),
-                colorName = color.name,
-                nailTryOnPipeline = nailTryOnPipeline,
-                onToggleFavorite = onToggleFavorite,
-                onImprovePhoto = onOpenHandReference,
-            )
-            if (!state.hasHandReference || state.isSampleHand) {
-                Spacer(modifier = Modifier.height(12.dp))
-                SecondaryCtaButton(
-                    text = "Usar minha mão",
-                    onClick = onOpenHandReference,
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Sua cor do momento é",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = color.name,
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-            ) {
-                color.tags.take(3).forEach { tag ->
-                    InfoTag(label = tag.displayName)
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = color.description,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = rationale,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            NailPolishMark(
-                markSize = 64.dp,
-                polishColor = Color(color.hex),
-                decorative = true,
-                modifier = Modifier.align(Alignment.End),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ResultHandPreview(
-    state: ResultUiState,
-    polishColor: Color,
-    colorName: String,
-    nailTryOnPipeline: NailTryOnPipeline,
-    onToggleFavorite: () -> Unit,
-    onImprovePhoto: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         val handPath = state.handLocalPath
@@ -291,20 +249,17 @@ private fun ResultHandPreview(
             HandTryOnPreview(
                 imagePath = handPath,
                 revision = state.handRevision,
-                polishColor = polishColor,
-                colorName = colorName,
+                polishColor = Color(color.hex),
+                colorName = color.name,
                 sampleId = state.handSampleId.takeIf { state.isSampleHand },
                 nailPipeline = nailTryOnPipeline,
-                onImprovePhoto = onImprovePhoto.takeUnless { state.isSampleHand },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
+                onImprovePhoto = onOpenHandReference.takeUnless { state.isSampleHand },
+                modifier = Modifier.fillMaxWidth(),
             )
         } else {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
                     .aspectRatio(3f / 4f)
                     .clip(SoftSurfaceShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
@@ -318,8 +273,8 @@ private fun ResultHandPreview(
         IconButton(
             onClick = onToggleFavorite,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(8.dp)
+                .align(Alignment.TopEnd)
+                .padding(12.dp)
                 .background(
                     MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                     CircleShape,
@@ -389,12 +344,20 @@ private fun ResultTip(tip: String) {
 private fun SimilarColorsSection(
     primary: NailColor,
     similar: List<NailColor>,
+    onSelectColor: (String) -> Unit,
 ) {
-    val names = (listOf(primary) + similar).joinToString { it.name }
+    val palette = listOf(primary) + similar
+    val names = palette.joinToString { it.name }
     Text(
         text = "CORES PARECIDAS",
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "Toque para ver no try-on",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(modifier = Modifier.height(12.dp))
     Row(
@@ -402,22 +365,19 @@ private fun SimilarColorsSection(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
             .semantics {
-                contentDescription = "Cores parecidas (visualização): $names"
+                contentDescription =
+                    "Cores parecidas. Toque para trocar o esmalte no try-on: $names"
             },
     ) {
-        (listOf(primary) + similar).forEach { item ->
+        palette.forEach { item ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 NailSwatch(
                     colorHex = item.hex,
                     colorName = item.name,
                     width = 48.dp,
                     height = 72.dp,
-                    decorative = true,
-                    modifier = Modifier.border(
-                        width = if (item.id == primary.id) 2.dp else 0.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = FunChipShape,
-                    ),
+                    selected = item.id == primary.id,
+                    onClick = { onSelectColor(item.id) },
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(item.name, style = MaterialTheme.typography.labelSmall)

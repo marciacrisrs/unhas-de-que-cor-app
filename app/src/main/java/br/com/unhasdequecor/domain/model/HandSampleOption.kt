@@ -11,10 +11,11 @@ data class HandSampleOption(
 }
 
 object HandSampleCatalog {
-    /**
-     * Amostra padrão quando a usuária ainda não cadastrou a própria mão.
-     * `clara_vermelho` tem máscara de unha calibrada para o try-on.
-     */
+/**
+ * Amostra padrão quando a usuária ainda não cadastrou a própria mão.
+ * `clara_vermelho` é a única com máscara de unha calibrada para o try-on;
+ * as demais fotos do catálogo usam MediaPipe até remask.
+ */
     const val DEFAULT_ID = "clara_vermelho"
 
     private const val REFERENCE_DETAIL = "Referência"

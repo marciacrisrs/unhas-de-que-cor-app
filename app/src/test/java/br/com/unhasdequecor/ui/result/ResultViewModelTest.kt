@@ -280,9 +280,93 @@ class ResultViewModelTest {
         coVerify(exactly = 2) { generateAndSave(any(), any(), any()) }
     }
 
+    @Test
+    fun `selectColor switches recommendation and try-on color`() = runTest {
+        val primary = sampleRecommendation(
+            colorId = "romantico_rosa",
+            name = "Rosa",
+            similarId = "festa_vermelha",
+            similarName = "Vermelho",
+        )
+        val switched = sampleRecommendation(
+            colorId = "festa_vermelha",
+            name = "Vermelho",
+            similarId = "romantico_rosa",
+            similarName = "Rosa",
+            source = RecommendationSource.FOR_ME,
+        )
+        coEvery {
+            generateAndSave(
+                source = RecommendationSource.FOR_ME,
+                context = RecommendationContext(),
+                idempotencyKey = any(),
+            )
+        } returns GeneratedRecommendation(primary, isFavorite = false)
+        coEvery {
+            restoreRecommendation(
+                colorId = "festa_vermelha",
+                source = RecommendationSource.FOR_ME,
+                context = RecommendationContext(),
+            )
+        } returns GeneratedRecommendation(switched, isFavorite = true)
+
+        val viewModel = viewModel(
+            SavedStateHandle(
+                mapOf(
+                    "source" to "for_me",
+                    "occasion" to "none",
+                    "mood" to "none",
+                    "colorId" to "none",
+                ),
+            ),
+        )
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("romantico_rosa")
+
+        viewModel.selectColor("festa_vermelha")
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("festa_vermelha")
+        assertThat(viewModel.uiState.value.isFavorite).isTrue()
+        coVerify(exactly = 1) {
+            restoreRecommendation(
+                colorId = "festa_vermelha",
+                source = RecommendationSource.FOR_ME,
+                context = RecommendationContext(),
+            )
+        }
+    }
+
+    @Test
+    fun `selectColor ignores unknown id outside palette`() = runTest {
+        val primary = sampleRecommendation(similarId = "festa_vermelha")
+        coEvery {
+            generateAndSave(any(), any(), any())
+        } returns GeneratedRecommendation(primary, isFavorite = false)
+
+        val viewModel = viewModel(
+            SavedStateHandle(
+                mapOf(
+                    "source" to "for_me",
+                    "occasion" to "none",
+                    "mood" to "none",
+                    "colorId" to "none",
+                ),
+            ),
+        )
+        advanceUntilIdle()
+        viewModel.selectColor("cor_que_nao_existe")
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.recommendation?.color?.id).isEqualTo("romantico_rosa")
+        coVerify(exactly = 0) { restoreRecommendation(any(), any(), any()) }
+    }
+
     private fun sampleRecommendation(
         colorId: String = "romantico_rosa",
         name: String = "Rosa",
+        similarId: String? = null,
+        similarName: String = "Parecida",
         source: RecommendationSource = RecommendationSource.CONTEXT,
     ): ColorRecommendation {
         val color = NailColor(
@@ -295,9 +379,23 @@ class ResultViewModelTest {
             occasions = setOf(Occasion.ENCONTRO),
             moods = setOf(Mood.ROMANTICA),
         )
+        val similar = similarId?.let {
+            listOf(
+                NailColor(
+                    id = it,
+                    name = similarName,
+                    hex = 0xFFC62828,
+                    tags = listOf(NailStyle.CLASSICO),
+                    description = "desc",
+                    tip = "dica",
+                    occasions = setOf(Occasion.FESTA),
+                    moods = setOf(Mood.ENERGETICA),
+                ),
+            )
+        }.orEmpty()
         return ColorRecommendation(
             color = color,
-            similarColors = emptyList(),
+            similarColors = similar,
             source = source,
             context = RecommendationContext(
                 occasion = Occasion.ENCONTRO.takeIf { source == RecommendationSource.CONTEXT },

@@ -87,12 +87,31 @@ fun NailSwatch(
     height: Dp = 56.dp,
     colorName: String? = null,
     decorative: Boolean = false,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
-    val description = colorName?.let { "Amostra da cor $it" } ?: "Amostra da cor"
-    val semanticsModifier = if (decorative) {
-        Modifier.clearAndSetSemantics { }
+    val description = when {
+        onClick != null && colorName != null -> "Usar a cor $colorName no try-on"
+        colorName != null -> "Amostra da cor $colorName"
+        else -> "Amostra da cor"
+    }
+    val interactive = onClick != null
+    val semanticsModifier = when {
+        decorative && !interactive -> Modifier.clearAndSetSemantics { }
+        interactive -> Modifier.semantics {
+            contentDescription = description
+            role = Role.Button
+        }
+        else -> Modifier.semantics { contentDescription = description }
+    }
+    val clickModifier = if (onClick != null) {
+        Modifier.clickable(
+            role = Role.Button,
+            onClickLabel = description,
+            onClick = onClick,
+        )
     } else {
-        Modifier.semantics { contentDescription = description }
+        Modifier
     }
     Box(
         modifier = modifier
@@ -101,10 +120,15 @@ fun NailSwatch(
             .clip(RoundedCornerShape(50))
             .background(Color(colorHex))
             .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                width = if (selected) 2.dp else 1.dp,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                },
                 shape = RoundedCornerShape(50),
             )
+            .then(clickModifier)
             .then(semanticsModifier),
     )
 }

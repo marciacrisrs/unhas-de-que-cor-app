@@ -326,16 +326,18 @@ private fun loadTryOnBaseAssets(
     var sampleMask: Bitmap? = null
     return try {
         decoded = OrientedBitmapDecoder.decodeFile(imagePath, maxEdge = 1280) ?: return null
-        if (sampleId != null && NailOverlayAnchors.hasMaskAsset(sampleId)) {
+        val hasCalibratedMask = sampleId != null && NailOverlayAnchors.hasMaskAsset(sampleId)
+        if (hasCalibratedMask) {
             sampleMask = PolishMaskRecolorer.loadMask(appContext, sampleId)
         }
-        val snapshot = if (sampleId == null) {
+        // Amostra sem máscara calibrada: detectar como foto real (evita elipse que pinta pele).
+        val snapshot = if (!hasCalibratedMask) {
             pipeline.detect(decoded, stabilize = false)
         } else {
             null
         }
         val noLandmarkReason =
-            if (sampleId == null && snapshot == null) {
+            if (!hasCalibratedMask && snapshot == null) {
                 diagnoseNoLandmarks(decoded)
             } else {
                 null
@@ -377,8 +379,9 @@ private fun paintPreview(
     pipeline: NailTryOnPipeline,
 ): TryOnPreviewData {
     val sampleId = assets.sampleId
-    return if (sampleId != null) {
-        paintSamplePreview(assets, polishColor, sampleId)
+    val calibratedMask = sampleId != null && assets.sampleMask != null
+    return if (calibratedMask) {
+        paintSamplePreview(assets, polishColor, checkNotNull(sampleId))
     } else {
         paintUserPreview(assets, polishColor, pipeline)
     }

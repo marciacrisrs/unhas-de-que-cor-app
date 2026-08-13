@@ -31,7 +31,12 @@ Garantir consistência visual.
 - Componentes gigantes.
 - Layouts difíceis de manter.
 
+## Resultado / try-on
+
+Na tela de Resultado, a prévia try-on deve **dominar** o primeiro viewport (ver `product-visual-result-reviewer`). Não tratar a mão como thumb dentro de um card de texto.
+
 ## Checklist
 
 - Interface consistente.
 - Componentes reutilizáveis.
+- Result: try-on como herói visual.
