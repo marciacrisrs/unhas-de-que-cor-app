@@ -20,8 +20,11 @@ import br.com.unhasdequecor.ui.about.AboutScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceViewModel
 import br.com.unhasdequecor.ui.history.HistoryRowUi
+import br.com.unhasdequecor.ui.history.HistoryScreen
+import br.com.unhasdequecor.ui.history.HistoryScreenMode
 import br.com.unhasdequecor.ui.hand.HandReferenceScreen
 import br.com.unhasdequecor.ui.home.HomeViewModel
+import br.com.unhasdequecor.ui.profile.ProfileScreen
 import br.com.unhasdequecor.ui.result.ResultScreen
 import br.com.unhasdequecor.ui.style.StyleScreen
 import kotlinx.coroutines.launch
@@ -126,12 +129,15 @@ fun AppNavHost() {
                         navController.navigate(Routes.resultForMe())
                     },
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
-                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
-                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
+                    onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
+                    onOpenFavorites = { goToSwipeTab(Routes.FAVORITES) },
                     onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
                     onOpenInspiration = { colorId ->
                         navController.navigate(Routes.resultForColor(colorId))
                     },
+                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
+                    onOpenResultFromHistory = navController::openResultFromHistory,
+                    onSwipeBackToHome = { goToSwipeTab(Routes.HOME) },
                 )
             }
             composable(Routes.CONTEXT) {
@@ -180,14 +186,14 @@ fun AppNavHost() {
                 HistoryScreen(
                     onOpenResult = navController::openResultFromHistory,
                     mode = HistoryScreenMode.FAVORITES_ONLY,
-                    onBack = { navController.navigateBottomTab(Routes.HOME) },
+                    onBack = { goToSwipeTab(Routes.HOME) },
                 )
             }
             composable(Routes.PROFILE) {
                 ProfileScreen(
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
                     onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
-                    onOpenHistory = { navController.navigateBottomTab(Routes.HISTORY) },
+                    onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
                     onOpenAbout = { navController.navigate(Routes.ABOUT) },
                 )
             }

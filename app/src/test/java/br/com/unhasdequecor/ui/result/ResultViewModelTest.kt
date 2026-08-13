@@ -368,8 +368,6 @@ class ResultViewModelTest {
         similarId: String? = null,
         similarName: String = "Parecida",
         source: RecommendationSource = RecommendationSource.CONTEXT,
-        similarId: String? = null,
-        similarName: String = "Parecida",
     ): ColorRecommendation {
         val color = NailColor(
             id = colorId,

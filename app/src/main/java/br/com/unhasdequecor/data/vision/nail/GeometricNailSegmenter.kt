@@ -117,9 +117,12 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val skinDist = colorDistance(r, g, b, skin)
         val sat = saturation(r, g, b)
         val lum = luminance(r, g, b)
+        val darkerPolish = lum < skin.lum - PLATE_LUM_DELTA * 0.45f &&
+            skinDist > SKIN_SOFT_DIST * 0.85f
         val looksLikePlate = skinDist > SKIN_SOFT_DIST ||
             sat > PLATE_SAT_MIN ||
-            lum > skin.lum + PLATE_LUM_DELTA
+            lum > skin.lum + PLATE_LUM_DELTA ||
+            darkerPolish
         // Dobra/pele: perto da pele e sem brilho de placa.
         return !looksLikePlate && skinDist < SKIN_REJECT_DIST
     }
@@ -132,9 +135,14 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val sat = saturation(r, g, b)
         val lum = luminance(r, g, b)
         val brighter = lum > skin.lum + PLATE_LUM_DELTA * 0.55f
-        val glossier = sat > PLATE_SAT_MIN * 0.85f && brighter
-        val chromatic = skinDist > SKIN_SOFT_DIST * 0.75f && brighter
-        return glossier || chromatic || (brighter && skinDist > PLATE_MIN_SKIN_DIST)
+        // Esmalte escuro (vinho/preto) em pele retinta: mais escuro que a pele, mas cromático.
+        val darkerPolish = lum < skin.lum - PLATE_LUM_DELTA * 0.45f &&
+            skinDist > SKIN_SOFT_DIST * 0.85f
+        val glossier = sat > PLATE_SAT_MIN * 0.85f && (brighter || darkerPolish)
+        val chromatic = skinDist > SKIN_SOFT_DIST * 0.75f && (brighter || darkerPolish)
+        return glossier || chromatic ||
+            (brighter && skinDist > PLATE_MIN_SKIN_DIST) ||
+            (darkerPolish && sat > PLATE_SAT_MIN * 0.55f)
     }
 
     private fun softRasterize(poly: List<PixelPoint>, width: Int, height: Int): ByteArray {

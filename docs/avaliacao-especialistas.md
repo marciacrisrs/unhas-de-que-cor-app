@@ -438,3 +438,20 @@ Pedido: começar pontos do Vision Try-On (máscaras de amostra) e **deixar o vis
 ### Remask backlog (vision)
 
 Ordem sugerida: `retinta_vinho` → `morena_nude` → `morena_clara_coral` → `media_rosa` → `retinta_polegar`; regenerar âncoras pelos centróides; reativar em `MASK_SAMPLES` só após passar revisão vision + gate CI.
+
+---
+
+## Follow-up — Pele retinta / treino (2026-08-13)
+
+Implementação das sugestões dos especialistas gráficos/visuais, priorizando **pele retinta** (caso mãe):
+
+| Item | Status |
+|------|--------|
+| Segmenter: esmalte escuro em pele profunda (`darkerPolish`) | Feito |
+| Variantes MediaPipe `deepSkinLift` (lift cedo) | Feito |
+| `MEAN_LUMA_TOO_DARK` 55→40 (não marcar retinta iluminada como TooDark) | Feito |
+| Checklist captura (`HandCaptureGuidance`) na Minha mão | Feito |
+| Cenas de treino JVM `HandTrainingScenes` (retinta primeiro) | Feito |
+| Catálogo: retinta com `deepSkinPriority` + labels de treino | Feito |
+| Docs `docs/hand-samples.md` | Feito |
+| Remask pixel-accurate retinta (assets) | **Aberto** (automático ainda pinta/falha cobertura) |

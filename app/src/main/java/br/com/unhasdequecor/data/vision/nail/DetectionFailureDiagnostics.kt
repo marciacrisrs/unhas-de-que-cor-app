@@ -19,8 +19,8 @@ object DetectionFailureDiagnostics {
     /** Tip-span abaixo → punho / ângulo ruim. */
     const val TIP_SPAN_BAD_ANGLE = HandLandmarkQuality.MIN_TIP_SPAN_FOR_EARLY_STOP
 
-    /** Média de luminância (0–255) abaixo → cena escura. */
-    const val MEAN_LUMA_TOO_DARK = 55f
+    /** Média de luminância (0–255) abaixo → cena realmente escura (não só pele retinta). */
+    const val MEAN_LUMA_TOO_DARK = 40f
 
     /** Fração de highlights acima → flash / estouro. */
     const val HIGHLIGHT_SHARE_GLARE = 0.12f
