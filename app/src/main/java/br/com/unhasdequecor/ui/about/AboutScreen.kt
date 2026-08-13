@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import br.com.unhasdequecor.BuildConfig
 import br.com.unhasdequecor.ui.components.BrandLogoLockup
+import br.com.unhasdequecor.ui.components.NailPolishMark
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
 private const val GITHUB_URL = "https://github.com/marciacrisrs/unhas-de-que-cor-app"
@@ -54,6 +55,13 @@ fun AboutScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                 }
+            },
+            actions = {
+                NailPolishMark(
+                    modifier = Modifier.padding(end = 12.dp),
+                    markSize = 40.dp,
+                    decorative = true,
+                )
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background,

@@ -47,4 +47,11 @@ class RoutesTest {
         )
         assertThat(route).isEqualTo("result/for_me/none/none/festa_vermelha")
     }
+
+    @Test
+    fun `resultForColor opens try-on for catalog color`() {
+        assertThat(Routes.resultForColor("malva_suave"))
+            .isEqualTo("result/for_me/none/none/malva_suave")
+        assertThat(Routes.parseColorId("malva_suave")).isEqualTo("malva_suave")
+    }
 }

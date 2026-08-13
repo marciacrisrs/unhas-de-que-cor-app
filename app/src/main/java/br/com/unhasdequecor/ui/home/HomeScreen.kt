@@ -70,6 +70,7 @@ fun HomeScreen(
     onOpenHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenHandReference: () -> Unit,
+    onOpenInspiration: (colorId: String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,7 +133,7 @@ fun HomeScreen(
                     title = inspiration.name,
                     subtitle = inspiration.description,
                     polishColor = Color(inspiration.hex),
-                    onClick = onChooseByContext,
+                    onClick = { onOpenInspiration(inspiration.id) },
                 )
             }
 
@@ -340,7 +341,8 @@ private fun InspirationCard(
             .clickable(onClick = onClick)
             .semantics {
                 role = Role.Button
-                contentDescription = "Inspiração do dia: $title"
+                contentDescription =
+                    "Inspiração do dia: $title. $subtitle. Toque para ver o try-on."
             },
     ) {
         Row(
