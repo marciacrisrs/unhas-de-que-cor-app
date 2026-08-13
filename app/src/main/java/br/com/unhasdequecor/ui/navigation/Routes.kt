@@ -5,6 +5,8 @@ import br.com.unhasdequecor.domain.model.Occasion
 import br.com.unhasdequecor.domain.model.RecommendationSource
 
 object Routes {
+    /** Shell com pager das abas Início / Histórico / Favoritos / Perfil. */
+    const val MAIN = "main"
     const val HOME = "home"
     const val CONTEXT = "context"
     const val STYLE = "style"
