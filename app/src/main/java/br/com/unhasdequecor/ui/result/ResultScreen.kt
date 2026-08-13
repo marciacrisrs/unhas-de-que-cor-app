@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,7 +62,6 @@ import br.com.unhasdequecor.ui.components.NailSwatch
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.ProgressSteps
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
-import br.com.unhasdequecor.ui.theme.FunChipShape
 import br.com.unhasdequecor.ui.theme.RecommendationCardShape
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
 
@@ -101,6 +99,7 @@ fun ResultScreen(
                     onOpenHandReference = onOpenHandReference,
                     onToggleFavorite = viewModel::onToggleFavorite,
                     onRecommendAgain = viewModel::recommendAgain,
+                    onSelectColor = viewModel::selectColor,
                     onOpenHistory = onOpenHistory,
                 )
             }
@@ -137,6 +136,7 @@ private fun ResultSuccessContent(
     onOpenHandReference: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRecommendAgain: () -> Unit,
+    onSelectColor: (String) -> Unit,
     onOpenHistory: () -> Unit,
 ) {
     val color = recommendation.color
@@ -182,6 +182,7 @@ private fun ResultSuccessContent(
             SimilarColorsSection(
                 primary = color,
                 similar = recommendation.similarColors,
+                onSelectColor = onSelectColor,
             )
             Spacer(modifier = Modifier.height(16.dp))
             TextButton(
@@ -389,12 +390,20 @@ private fun ResultTip(tip: String) {
 private fun SimilarColorsSection(
     primary: NailColor,
     similar: List<NailColor>,
+    onSelectColor: (String) -> Unit,
 ) {
-    val names = (listOf(primary) + similar).joinToString { it.name }
+    val palette = listOf(primary) + similar
+    val names = palette.joinToString { it.name }
     Text(
         text = "CORES PARECIDAS",
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "Toque para ver no try-on",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(modifier = Modifier.height(12.dp))
     Row(
@@ -402,22 +411,19 @@ private fun SimilarColorsSection(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
             .semantics {
-                contentDescription = "Cores parecidas (visualização): $names"
+                contentDescription =
+                    "Cores parecidas. Toque para trocar o esmalte no try-on: $names"
             },
     ) {
-        (listOf(primary) + similar).forEach { item ->
+        palette.forEach { item ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 NailSwatch(
                     colorHex = item.hex,
                     colorName = item.name,
                     width = 48.dp,
                     height = 72.dp,
-                    decorative = true,
-                    modifier = Modifier.border(
-                        width = if (item.id == primary.id) 2.dp else 0.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = FunChipShape,
-                    ),
+                    selected = item.id == primary.id,
+                    onClick = { onSelectColor(item.id) },
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(item.name, style = MaterialTheme.typography.labelSmall)

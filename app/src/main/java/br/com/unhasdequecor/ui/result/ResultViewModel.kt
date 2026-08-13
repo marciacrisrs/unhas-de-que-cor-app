@@ -154,6 +154,38 @@ class ResultViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Troca a cor exibida (try-on + detalhes) para uma das opções parecidas
+     * ou a própria cor atual — sem gerar nova recomendação.
+     */
+    fun selectColor(colorId: String) {
+        val current = _uiState.value.recommendation ?: return
+        if (colorId == current.color.id) return
+        val paletteIds = buildSet {
+            add(current.color.id)
+            current.similarColors.forEach { add(it.id) }
+        }
+        if (colorId !in paletteIds) return
+        viewModelScope.launch {
+            runCatching {
+                restoreRecommendation(
+                    colorId = colorId,
+                    source = source,
+                    context = recommendationContext,
+                ) ?: error("Cor não encontrada.")
+            }.onSuccess { generated ->
+                savedStateHandle[KEY_COLOR_ID] = colorId
+                _uiState.update {
+                    it.copy(
+                        recommendation = generated.recommendation,
+                        isFavorite = generated.isFavorite,
+                        errorMessage = null,
+                    )
+                }
+            }
+        }
+    }
+
     fun recommendAgain() {
         clearSessionCache()
         generateFresh()
