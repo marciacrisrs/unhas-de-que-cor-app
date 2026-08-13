@@ -55,4 +55,41 @@ class TryOnPreviewLabelsTest {
         val statuses = TryOnPreviewClaim.entries.map { TryOnPreviewLabels.status(it) }.toSet()
         assertThat(statuses).hasSize(TryOnPreviewClaim.entries.size)
     }
+
+    @Test
+    fun status_notDetected_usesTypedReasonMessage() {
+        val status = TryOnPreviewLabels.status(
+            TryOnPreviewClaim.NOT_DETECTED,
+            DetectionFailureReason.HandTooFar,
+        )
+        assertThat(status).isEqualTo(DetectionFailureReason.HandTooFar.userMessage)
+        assertThat(status).doesNotContain("threshold")
+    }
+
+    @Test
+    fun status_approximate_usesTypedReasonMessage() {
+        val status = TryOnPreviewLabels.status(
+            TryOnPreviewClaim.APPROXIMATE,
+            DetectionFailureReason.ExcessiveGlare,
+        )
+        assertThat(status).contains(DetectionFailureReason.ExcessiveGlare.userMessage)
+        assertThat(status).startsWith("Prévia aproximada")
+    }
+
+    @Test
+    fun contentDescription_notDetected_includesTypedReason() {
+        val cd = TryOnPreviewLabels.contentDescription(
+            colorName = "Vinho",
+            claim = TryOnPreviewClaim.NOT_DETECTED,
+            reason = DetectionFailureReason.TooDark,
+        )
+        assertThat(cd).contains("Vinho")
+        assertThat(cd).contains(DetectionFailureReason.TooDark.userMessage)
+        assertThat(cd).doesNotContain("sua mão")
+    }
+
+    @Test
+    fun retryHint_isActionable() {
+        assertThat(TryOnPreviewLabels.RETRY_HINT).contains("foto")
+    }
 }

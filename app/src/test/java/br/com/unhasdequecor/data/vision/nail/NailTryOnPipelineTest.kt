@@ -205,11 +205,151 @@ class NailTryOnPipelineTest {
 
         val snapshot = pipeline.detect(source, stabilize = false)
 
-        assertThat(snapshot).isNull()
-        verify(exactly = 1) { rotated.recycle() }
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.REJECTED)
+        assertThat(snapshot.failureReason).isEqualTo(DetectionFailureReason.HandTooFar)
+        assertThat(snapshot.rejectionBarrier).isEqualTo(RejectionBarrier.HAND_PRESENCE)
+        assertThat(snapshot.ownsWorkingBitmap).isTrue()
+        // Snapshot retido para UI — recycle fica a cargo do caller / Dispose.
+        verify(exactly = 0) { rotated.recycle() }
         verify(exactly = 0) { roiEstimator.estimateAll(any()) }
         verify(exactly = 0) { segmenter.segment(any(), any()) }
         verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
+
+    @Test
+    fun process_whenRejected_returnsNullAndRecyclesOwnedWorkingBitmap() {
+        val source = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val rotated = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.05f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(source)
+        } returns OrientedHandLandmarks(bitmap = rotated, landmarks = landmarks)
+
+        assertThat(pipeline.process(source, Color.Red)).isNull()
+        verify(exactly = 1) { rotated.recycle() }
+        verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
+
+    @Test
+    fun process_whenRejected_sameWorkingAsSource_doesNotRecycleUserPhoto() {
+        val source = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = List(21) { NormPoint(0.5f, 0.5f) },
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.05f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(source)
+        } returns OrientedHandLandmarks(bitmap = source, landmarks = landmarks)
+
+        assertThat(pipeline.process(source, Color.Red)).isNull()
+        verify(exactly = 0) { source.recycle() }
+    }
+
+    @Test
+    fun recolor_whenRejected_returnsWorkingWithoutPainting() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = openHandPoints(),
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.05f,
+        )
+        val result = pipeline.recolor(
+            NailDetectionSnapshot(
+                workingBitmap = image,
+                nails = emptyList(),
+                landmarks = landmarks,
+                ownsWorkingBitmap = false,
+                reliability = TryOnReliability.REJECTED,
+                failureReason = DetectionFailureReason.Generic,
+                rejectionBarrier = RejectionBarrier.HAND_PRESENCE,
+            ),
+            Color.Red,
+        )
+        assertThat(result.bitmap).isSameInstanceAs(image)
+        assertThat(result.paintedViaEllipse).isFalse()
+        verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
+
+    @Test
+    fun recolor_emptyNails_openHand_doesNotEllipsePaint() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = openHandPoints(),
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        val result = pipeline.recolor(
+            NailDetectionSnapshot(
+                workingBitmap = image,
+                nails = emptyList(),
+                landmarks = landmarks,
+                ownsWorkingBitmap = false,
+                reliability = TryOnReliability.STRONG,
+            ),
+            Color.Red,
+        )
+        assertThat(result.bitmap).isSameInstanceAs(image)
+        assertThat(result.paintedViaEllipse).isFalse()
+        verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
+    }
+
+    @Test
+    fun detect_dropsRoiBelowFloor_setsBarrierRoiAndNoNailVisible() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val landmarks = HandLandmarks(
+            points = openHandPoints(),
+            imageWidth = 200,
+            imageHeight = 300,
+            presenceScore = 0.80f,
+        )
+        every {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        } returns OrientedHandLandmarks(bitmap = image, landmarks = landmarks)
+        val weakRoi = sampleRoi(
+            geometricConfidence = DetectionConfidenceFloor.ROI_GEOMETRIC_MIN - 0.01f,
+        )
+        every { roiEstimator.estimateAll(landmarks) } returns listOf(weakRoi)
+
+        val snapshot = pipeline.detect(image, stabilize = false)
+
+        assertThat(snapshot!!.nails).isEmpty()
+        assertThat(snapshot.rejectionBarrier).isEqualTo(RejectionBarrier.ROI)
+        assertThat(snapshot.failureReason).isEqualTo(DetectionFailureReason.NoNailVisible)
+        verify(exactly = 0) { segmenter.segment(any(), any()) }
     }
 
     @Test
@@ -229,7 +369,10 @@ class NailTryOnPipelineTest {
             landmarkProcessor.detectLandmarksWithOrientationFallback(source)
         } returns OrientedHandLandmarks(bitmap = source, landmarks = landmarks)
 
-        assertThat(pipeline.detect(source, stabilize = false)).isNull()
+        val snapshot = pipeline.detect(source, stabilize = false)
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.REJECTED)
+        assertThat(snapshot.ownsWorkingBitmap).isFalse()
         verify(exactly = 0) { source.recycle() }
         verify(exactly = 0) { roiEstimator.estimateAll(any()) }
     }

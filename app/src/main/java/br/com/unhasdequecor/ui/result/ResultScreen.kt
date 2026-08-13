@@ -224,6 +224,7 @@ private fun ResultHeroCard(
                 colorName = color.name,
                 nailTryOnPipeline = nailTryOnPipeline,
                 onToggleFavorite = onToggleFavorite,
+                onImprovePhoto = onOpenHandReference,
             )
             if (!state.hasHandReference || state.isSampleHand) {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -282,6 +283,7 @@ private fun ResultHandPreview(
     colorName: String,
     nailTryOnPipeline: NailTryOnPipeline,
     onToggleFavorite: () -> Unit,
+    onImprovePhoto: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
         val handPath = state.handLocalPath
@@ -293,6 +295,7 @@ private fun ResultHandPreview(
                 colorName = colorName,
                 sampleId = state.handSampleId.takeIf { state.isSampleHand },
                 nailPipeline = nailTryOnPipeline,
+                onImprovePhoto = onImprovePhoto.takeUnless { state.isSampleHand },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp),

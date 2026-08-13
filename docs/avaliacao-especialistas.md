@@ -358,7 +358,7 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 
 | Regra | Comportamento |
 |-------|----------------|
-| `presenceScore` &lt; 0.12 | `REJECTED` → `detect` retorna `null` (sem claim) |
+| `presenceScore` &lt; 0.12 | `REJECTED` → snapshot com motivo tipado (sem claim / sem paint) |
 | 0.12–0.55 | `WEAK` → só `APPROXIMATE` (mesmo com ≥3 máscaras) |
 | ≥0.55 **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (0.45) | `STRONG` + `FULL` → “Prévia na sua mão” |
 | Máscaras só paintable (0.32–0.45) / elipse | Nunca `FULL` — `APPROXIMATE` |
@@ -380,4 +380,33 @@ mapper/ROI aceitam só placas usáveis (≥2 unhas); limiar MediaPipe 0.08.
 | Android | `getBackStackEntry(HOME)` sem guarda | Feito — `runCatching` + fallback `navigate(HOME)` |
 | Test | Gaps reliability / labels / applier early-return | Feito — testes + JaCoCo `TryOnPreviewLabels*` |
 
-Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
+Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; Result→mão destino / chrome Favoritos (**P2**).
+
+---
+
+## Issues #50–#56 (passagem in-repo)
+
+| Issue | Status in-repo | Entrega |
+|-------|----------------|---------|
+| #50 Try-on fotos reais | Feito (parcial device) | Pipeline + honesty; ellipse só via plan UI |
+| #51 Floor confiança | Feito | `DetectionConfidenceFloor` + `RejectionBarrier` |
+| #52 Suíte visão | Feito (JVM + matriz) | `docs/vision-test-matrix.md` + testes |
+| #53 Device real | Doc only | `docs/device-testing.md` |
+| #54 Feedback tipado | Feito | `DetectionFailureReason` + labels + CTA retry |
+| #55 A11y | Parcial | LiveRegion + retry 48dp; Scanner OUT_OF_REPO |
+| #56 Release ops | Feito (docs) | CHANGELOG 1.0.8, gitignore keystore, play-listing |
+
+### Reavaliação especialistas (pós issues #50–#56)
+
+| Especialista | Achado | Status |
+|--------------|--------|--------|
+| Vision | FULL + ellipseFallback mentia “na sua mão” | Feito — `paintedViaEllipse` demote APPROXIMATE |
+| Vision | Iluminação/glare não wired em `fromLandmarks` | Feito — `ImageLightingSampler` no detect |
+| Vision | Empty nails + mão aberta ainda podia elipse no pipeline | Feito — teste + `nails.isEmpty() → working` |
+| A11y | CTA retry &lt;48dp / sem Role.Button / alpha | Feito — `TextButton` opaco 48dp + CD com hint |
+| A11y | Spinner loading no a11y tree | Feito — `clearAndSetSemantics` |
+| Android | `getPixels` full-frame | Feito — grade `getPixel` + skip mock sem Config |
+| Test | P0 process/recolor REJECTED + barrier ROI | Feito |
+| Docs | Tabela presence→null stale | Feito abaixo |
+
+Presence &lt; floor: `detect` devolve snapshot `REJECTED` (motivo tipado); recycle no `process`/Dispose UI — não mais `null` + recycle imediato.

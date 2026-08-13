@@ -3,7 +3,9 @@
 Fluxo completo até a Play: **keystore → AAB → listing → internal test → smoke**.
 
 Textos da loja: [`docs/play-listing.md`](play-listing.md)  
-Privacidade: [`docs/privacy-policy.md`](privacy-policy.md)
+Privacidade: [`docs/privacy-policy.md`](privacy-policy.md)  
+Device smoke completo: [`docs/device-testing.md`](device-testing.md)  
+Matriz visão (JVM): [`docs/vision-test-matrix.md`](vision-test-matrix.md)
 
 ## 1. Keystore de upload
 

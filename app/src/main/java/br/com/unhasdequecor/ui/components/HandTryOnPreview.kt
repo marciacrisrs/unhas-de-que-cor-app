@@ -6,14 +6,20 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -33,8 +39,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,6 +50,9 @@ import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
 import br.com.unhasdequecor.data.vision.nail.DetectedNailPolishApplier
+import br.com.unhasdequecor.data.vision.nail.DetectionFailureDiagnostics
+import br.com.unhasdequecor.data.vision.nail.DetectionFailureReason
+import br.com.unhasdequecor.data.vision.nail.ImageLightingSampler
 import br.com.unhasdequecor.data.vision.nail.NailDetectionSnapshot
 import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
@@ -67,6 +78,7 @@ private data class TryOnPreviewData(
     val showDebug: Boolean = false,
     /** Foto da usuária: Canvas usa o mesmo tamanho da elipse (não a âncora cheia). */
     val matchEllipsePlate: Boolean = false,
+    val failureReason: DetectionFailureReason? = null,
 )
 
 /** Cache de detecção/máscara independente da cor do esmalte. */
@@ -75,6 +87,8 @@ private data class TryOnBaseAssets(
     val snapshot: NailDetectionSnapshot? = null,
     val sampleMask: Bitmap? = null,
     val sampleId: String? = null,
+    /** Motivo quando MediaPipe não devolve landmarks (sem snapshot). */
+    val noLandmarkReason: DetectionFailureReason? = null,
 )
 
 private enum class TryOnMode {
@@ -94,6 +108,7 @@ fun HandTryOnPreview(
     sampleId: String?,
     nailPipeline: NailTryOnPipeline,
     modifier: Modifier = Modifier,
+    onImprovePhoto: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val base by rememberTryOnBaseAssets(imagePath, revision, sampleId, nailPipeline, context)
@@ -104,6 +119,7 @@ fun HandTryOnPreview(
         preview = preview,
         polishColor = polishColor,
         colorName = colorName,
+        onImprovePhoto = onImprovePhoto,
         modifier = modifier,
     )
 }
@@ -173,12 +189,23 @@ private fun TryOnPreviewFrame(
     preview: TryOnPreviewData?,
     polishColor: Color,
     colorName: String,
+    onImprovePhoto: (() -> Unit)?,
     modifier: Modifier,
 ) {
     val aspect = previewAspect(preview)
     val claim = previewClaim(preview)
-    val statusLabel = TryOnPreviewLabels.status(claim)
-    val frameDescription = TryOnPreviewLabels.contentDescription(colorName, claim)
+    val reason = preview?.failureReason
+    val statusLabel = TryOnPreviewLabels.status(claim, reason)
+    val retryAction = onImprovePhoto.takeIf {
+        claim == TryOnPreviewClaim.NOT_DETECTED || claim == TryOnPreviewClaim.APPROXIMATE
+    }
+    val frameDescription = buildString {
+        append(TryOnPreviewLabels.contentDescription(colorName, claim, reason))
+        if (retryAction != null) {
+            append(' ')
+            append(TryOnPreviewLabels.RETRY_HINT)
+        }
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -187,30 +214,55 @@ private fun TryOnPreviewFrame(
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .semantics {
                 contentDescription = frameDescription
+                liveRegion = LiveRegionMode.Polite
             },
         contentAlignment = Alignment.Center,
     ) {
         if (preview == null) {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clearAndSetSemantics { },
             )
         } else {
             TryOnPreviewContent(data = preview, polishColor = polishColor)
-            Text(
-                text = statusLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(12.dp)
-                    .clip(SoftSurfaceShape)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-                    .clearAndSetSemantics { },
-            )
+                    .fillMaxWidth(0.92f),
+            ) {
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .clip(SoftSurfaceShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .clearAndSetSemantics { },
+                )
+                if (retryAction != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    TextButton(
+                        onClick = retryAction,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        shape = SoftSurfaceShape,
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        Text(
+                            text = TryOnPreviewLabels.RETRY_HINT,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -282,11 +334,18 @@ private fun loadTryOnBaseAssets(
         } else {
             null
         }
+        val noLandmarkReason =
+            if (sampleId == null && snapshot == null) {
+                diagnoseNoLandmarks(decoded)
+            } else {
+                null
+            }
         TryOnBaseAssets(
             decoded = decoded,
             snapshot = snapshot,
             sampleMask = sampleMask,
             sampleId = sampleId,
+            noLandmarkReason = noLandmarkReason,
         ).also { decoded = null }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         recycleQuietly(decoded)
@@ -373,7 +432,12 @@ private fun paintUserPreview(
     )
     return when (plan.mode) {
         UserTryOnRenderMode.NONE ->
-            paintUserNotDetected(assets, snapshot, pipeline.debugEnabled)
+            paintUserNotDetected(
+                assets = assets,
+                snapshot = snapshot,
+                showDebug = pipeline.debugEnabled,
+                fallbackReason = assets.noLandmarkReason,
+            )
         UserTryOnRenderMode.FULL ->
             paintUserFull(checkNotNull(snapshot), assets, polishColor, pipeline)
         UserTryOnRenderMode.APPROXIMATE ->
@@ -389,16 +453,28 @@ private fun paintUserPreview(
     }
 }
 
+private fun diagnoseNoLandmarks(bitmap: Bitmap): DetectionFailureReason {
+    val stats = ImageLightingSampler.sample(bitmap) ?: return DetectionFailureReason.Generic
+    return DetectionFailureDiagnostics.fromImageStats(
+        meanLuminance = stats.meanLuminance,
+        highlightShare = stats.highlightShare,
+    )
+}
+
 private fun paintUserNotDetected(
     assets: TryOnBaseAssets,
     snapshot: NailDetectionSnapshot?,
     showDebug: Boolean,
+    fallbackReason: DetectionFailureReason? = null,
 ): TryOnPreviewData {
     val displaySource = snapshot?.workingBitmap ?: assets.decoded
     val display = ownedPreviewBitmap(
         candidate = displaySource,
         protected = listOfNotNull(snapshot?.workingBitmap, assets.decoded),
     )
+    val reason = snapshot?.failureReason
+        ?: fallbackReason
+        ?: DetectionFailureReason.Generic
     return TryOnPreviewData(
         bitmap = display,
         anchors = emptyList(),
@@ -406,6 +482,7 @@ private fun paintUserNotDetected(
         nails = emptyList(),
         landmarks = null,
         showDebug = showDebug,
+        failureReason = reason,
     )
 }
 
@@ -420,13 +497,22 @@ private fun paintUserFull(
         candidate = result.bitmap,
         protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
     )
+    // Elipse sob máscara falha ≠ claim FULL (modo ≡ qualidade).
+    val mode = if (result.paintedViaEllipse) TryOnMode.APPROXIMATE else TryOnMode.DETECTED
+    val reason =
+        if (result.paintedViaEllipse) {
+            snapshot.failureReason ?: DetectionFailureReason.Generic
+        } else {
+            null
+        }
     return TryOnPreviewData(
         bitmap = painted,
         anchors = emptyList(),
-        mode = TryOnMode.DETECTED,
+        mode = mode,
         nails = result.nails,
         landmarks = result.landmarks,
         showDebug = result.debugEnabled,
+        failureReason = reason,
     )
 }
 
@@ -440,7 +526,10 @@ private fun paintUserApproximate(
     mappedAnchors: List<NailOverlayAnchor>?,
 ): TryOnPreviewData {
     if (plan.useNailMasks && snapshot.nails.isNotEmpty()) {
-        return paintUserFull(snapshot, assets, polishColor, pipeline).copy(mode = TryOnMode.APPROXIMATE)
+        return paintUserFull(snapshot, assets, polishColor, pipeline).copy(
+            mode = TryOnMode.APPROXIMATE,
+            failureReason = snapshot.failureReason,
+        )
     }
     val ellipsePainted =
         if (plan.useEllipsePaint && landmarks != null && mappedAnchors != null) {
@@ -459,6 +548,7 @@ private fun paintUserApproximate(
             mode = TryOnMode.APPROXIMATE,
             landmarks = landmarks,
             showDebug = pipeline.debugEnabled,
+            failureReason = snapshot.failureReason,
         )
     }
     val canvasAnchors =
@@ -474,6 +564,7 @@ private fun paintUserApproximate(
         landmarks = landmarks,
         showDebug = pipeline.debugEnabled,
         matchEllipsePlate = canvasAnchors.isNotEmpty(),
+        failureReason = snapshot.failureReason,
     )
 }
 

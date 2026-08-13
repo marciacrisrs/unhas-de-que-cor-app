@@ -1,4 +1,4 @@
-# Play Console — textos e assets (1.0.0)
+# Play Console — textos e assets (1.0.8)
 
 Use com [`docs/release.md`](release.md) e [`docs/privacy-policy.md`](privacy-policy.md).
 
@@ -36,16 +36,16 @@ Privacidade: o app é offline. Fotos e preferências ficam no dispositivo; a fot
 Não existe cor certa ou errada — existe a sugestão que combina com aquele momento.
 ```
 
-## O que há de novo (1.0.0)
+## O que há de novo (1.0.8)
 
 ```text
-Primeira versão na Play Store:
-• Recomendação de cores por contexto ou por mim
-• Try-on na foto da mão
-• Histórico e favoritos locais
+Try-on mais confiável na sua foto:
+• Melhor detecção com flash, contraluz e luz fraca
+• Avisos claros quando a mão ou unha não são detectadas
+• Prévia honesta (completa ou aproximada)
 ```
 
-(Detalhe técnico: ver `CHANGELOG.md`.)
+(Detalhe técnico: ver `CHANGELOG.md`. Versões anteriores: 1.0.0–1.0.7.)
 
 ## Classificação de conteúdo
 
