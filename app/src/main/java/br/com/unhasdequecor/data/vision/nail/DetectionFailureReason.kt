@@ -19,7 +19,7 @@ sealed class DetectionFailureReason {
     /** Cena escura / subexposta. */
     data object TooDark : DetectionFailureReason() {
         override val userMessage =
-            "Tente uma foto mais iluminada. Uma luz natural ou artificial ajuda."
+            "Tente luz na frente da mão (janela ou lâmpada). Em pele retinta, evite sombra e contraluz."
         override val logCode = "too_dark"
     }
 

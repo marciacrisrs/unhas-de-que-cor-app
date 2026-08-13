@@ -24,6 +24,7 @@ com landmarks/scores sintéticos + amostras de produto já versionadas.
 | Muito distante / pequena | `HandTooFar` | `DetectionFailureDiagnosticsTest` |
 | Esquerda / direita | `Handedness` no scoring | `HandPresenceScoringTest` |
 | Espelhada | Variante mirror no enhancer | `HandInferenceEnhancerTest` / variantes (MediaPipe excluído do JaCoCo) |
+| Pele retinta / subexposta | `deepSkinLift` + TooDark só &lt;40 | `HandTrainingScenesTest`, `DetectionFailureDiagnosticsTest` |
 
 ### Detecção de unha
 
@@ -33,6 +34,7 @@ com landmarks/scores sintéticos + amostras de produto já versionadas.
 | Múltiplas (2–5) | FULL com ≥3 × `NAIL_FULL_MIN` | `TryOnHandReliabilityTest` |
 | Parcial / oclusão | Tip-span baixo → WEAK / BadAngle | `TryOnDifficultConditionsTest` |
 | Placa pequena / grande | `NailPlateCalibration` + mapper | `NailPlateCalibrationTest`, `NailLandmarkMapperTest` |
+| Esmalte escuro em pele retinta | `darkerPolish` no segmenter | `GeometricNailSegmenterTest` |
 
 ### Iluminação
 

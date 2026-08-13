@@ -15,7 +15,7 @@ enum class TryOnPreviewClaim {
 object TryOnPreviewLabels {
     /** Dica genérica APPROXIMATE / NOT_DETECTED quando não há motivo tipado. */
     const val LIGHTING_HINT =
-        "luz frontal sem estouro (evite flash direto e contraluz)"
+        "luz frontal sem estouro (evite flash direto e contraluz; em pele retinta, luz na frente da mão)"
 
     /** CTA curto para nova foto (banner / botão). */
     const val RETRY_HINT = "Tentar outra foto"

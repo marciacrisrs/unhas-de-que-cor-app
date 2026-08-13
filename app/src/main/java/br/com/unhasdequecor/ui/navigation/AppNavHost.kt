@@ -1,6 +1,7 @@
 package br.com.unhasdequecor.ui.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -10,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,8 +22,11 @@ import br.com.unhasdequecor.ui.about.AboutScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceScreen
 import br.com.unhasdequecor.ui.context.ContextChoiceViewModel
 import br.com.unhasdequecor.ui.history.HistoryRowUi
+import br.com.unhasdequecor.ui.history.HistoryScreen
+import br.com.unhasdequecor.ui.history.HistoryScreenMode
 import br.com.unhasdequecor.ui.hand.HandReferenceScreen
 import br.com.unhasdequecor.ui.home.HomeViewModel
+import br.com.unhasdequecor.ui.profile.ProfileScreen
 import br.com.unhasdequecor.ui.result.ResultScreen
 import br.com.unhasdequecor.ui.style.StyleScreen
 import kotlinx.coroutines.launch
@@ -70,7 +75,6 @@ fun AppNavHost() {
         initialPage = 0,
         pageCount = { MainSwipeTabs.routes.size },
     )
-
     val onMainShell = currentRoute == Routes.MAIN
     val bottomBarRoute = if (onMainShell) {
         MainSwipeTabs.routeAt(pagerState.currentPage)
@@ -84,9 +88,7 @@ fun AppNavHost() {
             navController.navigateToMainShell()
         }
         val page = MainSwipeTabs.indexOf(route) ?: return
-        scope.launch {
-            pagerState.animateScrollToPage(page)
-        }
+        scope.launch { pagerState.animateScrollToPage(page) }
     }
 
     Scaffold(
@@ -109,91 +111,109 @@ fun AppNavHost() {
             }
         },
     ) { padding ->
-        NavHost(
+        AppNavGraph(
             navController = navController,
-            startDestination = Routes.MAIN,
+            pagerState = pagerState,
+            goToSwipeTab = { route -> goToSwipeTab(route) },
             modifier = Modifier.padding(padding),
+        )
+    }
+}
+
+@Composable
+private fun AppNavGraph(
+    navController: NavHostController,
+    pagerState: PagerState,
+    goToSwipeTab: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.MAIN,
+        modifier = modifier,
+    ) {
+        composable(Routes.MAIN) {
+            MainTabsPager(
+                pagerState = pagerState,
+                onChooseByContext = {
+                    navController.navigate(Routes.CONTEXT) {
+                        launchSingleTop = true
+                    }
+                },
+                onChooseForMe = {
+                    navController.navigate(Routes.resultForMe())
+                },
+                onOpenStyle = { navController.navigate(Routes.STYLE) },
+                onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
+                onOpenFavorites = { goToSwipeTab(Routes.FAVORITES) },
+                onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                onOpenInspiration = { colorId ->
+                    navController.navigate(Routes.resultForColor(colorId))
+                },
+                onOpenAbout = { navController.navigate(Routes.ABOUT) },
+                onOpenResultFromHistory = navController::openResultFromHistory,
+                onSwipeBackToHome = { goToSwipeTab(Routes.HOME) },
+            )
+        }
+        composable(Routes.CONTEXT) {
+            val viewModel: ContextChoiceViewModel = hiltViewModel()
+            ContextChoiceScreen(
+                viewModel = viewModel,
+                onContinue = { occasion, mood ->
+                    navController.navigate(Routes.resultByContext(occasion, mood))
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.STYLE) {
+            StyleScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.HAND_REFERENCE) {
+            HandReferenceScreen(
+                onBack = { navController.popBackStack() },
+                onHandSelected = navController::returnHomeAfterHandSelected,
+            )
+        }
+        composable(
+            route = Routes.RESULT,
+            arguments = listOf(
+                navArgument("source") { type = NavType.StringType },
+                navArgument("occasion") { type = NavType.StringType },
+                navArgument("mood") { type = NavType.StringType },
+                navArgument("colorId") { type = NavType.StringType },
+            ),
         ) {
-            composable(Routes.MAIN) {
-                MainTabsPager(
-                    pagerState = pagerState,
-                    onChooseByContext = {
-                        navController.navigate(Routes.CONTEXT) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onChooseForMe = {
-                        navController.navigate(Routes.resultForMe())
-                    },
-                    onOpenStyle = { navController.navigate(Routes.STYLE) },
-                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
-                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
-                    onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
-                    onOpenInspiration = { colorId ->
-                        navController.navigate(Routes.resultForColor(colorId))
-                    },
-                )
-            }
-            composable(Routes.CONTEXT) {
-                val viewModel: ContextChoiceViewModel = hiltViewModel()
-                ContextChoiceScreen(
-                    viewModel = viewModel,
-                    onContinue = { occasion, mood ->
-                        navController.navigate(Routes.resultByContext(occasion, mood))
-                    },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(Routes.STYLE) {
-                StyleScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.HAND_REFERENCE) {
-                HandReferenceScreen(
-                    onBack = { navController.popBackStack() },
-                    onHandSelected = navController::returnHomeAfterHandSelected,
-                )
-            }
-            composable(
-                route = Routes.RESULT,
-                arguments = listOf(
-                    navArgument("source") { type = NavType.StringType },
-                    navArgument("occasion") { type = NavType.StringType },
-                    navArgument("mood") { type = NavType.StringType },
-                    navArgument("colorId") { type = NavType.StringType },
-                ),
-            ) {
-                ResultScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenHistory = {
-                        navController.popBackStack(Routes.MAIN, inclusive = false)
-                        goToSwipeTab(Routes.HISTORY)
-                    },
-                    onOpenHandReference = {
-                        navController.navigate(Routes.HAND_REFERENCE)
-                    },
-                )
-            }
-            composable(Routes.HISTORY) {
-                HistoryScreen(onOpenResult = navController::openResultFromHistory)
-            }
-            composable(Routes.FAVORITES) {
-                HistoryScreen(
-                    onOpenResult = navController::openResultFromHistory,
-                    mode = HistoryScreenMode.FAVORITES_ONLY,
-                    onBack = { navController.navigateBottomTab(Routes.HOME) },
-                )
-            }
-            composable(Routes.PROFILE) {
-                ProfileScreen(
-                    onOpenStyle = { navController.navigate(Routes.STYLE) },
-                    onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
-                    onOpenHistory = { navController.navigateBottomTab(Routes.HISTORY) },
-                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
-                )
-            }
-            composable(Routes.ABOUT) {
-                AboutScreen(onBack = { navController.popBackStack() })
-            }
+            ResultScreen(
+                onBack = { navController.popBackStack() },
+                onOpenHistory = {
+                    navController.popBackStack(Routes.MAIN, inclusive = false)
+                    goToSwipeTab(Routes.HISTORY)
+                },
+                onOpenHandReference = {
+                    navController.navigate(Routes.HAND_REFERENCE)
+                },
+            )
+        }
+        composable(Routes.HISTORY) {
+            HistoryScreen(onOpenResult = navController::openResultFromHistory)
+        }
+        composable(Routes.FAVORITES) {
+            HistoryScreen(
+                onOpenResult = navController::openResultFromHistory,
+                mode = HistoryScreenMode.FAVORITES_ONLY,
+                onBack = { goToSwipeTab(Routes.HOME) },
+            )
+        }
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onOpenStyle = { navController.navigate(Routes.STYLE) },
+                onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
+                onOpenAbout = { navController.navigate(Routes.ABOUT) },
+            )
+        }
+        composable(Routes.ABOUT) {
+            AboutScreen(onBack = { navController.popBackStack() })
         }
     }
 }

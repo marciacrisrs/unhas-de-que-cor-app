@@ -116,6 +116,45 @@ class GeometricNailSegmenterTest {
     }
 
     @Test
+    fun `segments dark wine polish on retinta skin`() {
+        val rw = 60
+        val rh = 80
+        val scene = HandTrainingScenes.varieties.first { it.id == "retinta_wine_polish" }
+        val pixels = HandTrainingScenes.fillNailCrop(rw, rh, scene.skin, scene.plate)
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 120
+            every { height } returns 160
+            every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
+                val dest = firstArg<IntArray>()
+                System.arraycopy(pixels, 0, dest, 0, pixels.size)
+            }
+        }
+        val roi = NailRoi(
+            finger = Finger.MIDDLE,
+            bounds = PixelRect(left = 30, top = 30, right = 90, bottom = 110),
+            polygon = listOf(
+                PixelPoint(60f, 35f),
+                PixelPoint(78f, 55f),
+                PixelPoint(75f, 95f),
+                PixelPoint(45f, 95f),
+                PixelPoint(42f, 55f),
+                PixelPoint(60f, 35f),
+            ),
+            axisFromDip = PixelPoint(60f, 95f),
+            axisToTip = PixelPoint(60f, 35f),
+            lengthPx = 60f,
+            widthPx = 36f,
+            rotationDegrees = 0f,
+            geometricConfidence = 0.9f,
+        )
+
+        val mask = segmenter.segment(image, roi)
+
+        assertThat(mask).isNotNull()
+        assertThat(mask!!.filledRatio()).isGreaterThan(0.04f)
+    }
+
+    @Test
     fun `rejects tiny bounds`() {
         val image = mockk<Bitmap>(relaxed = true) {
             every { width } returns 40

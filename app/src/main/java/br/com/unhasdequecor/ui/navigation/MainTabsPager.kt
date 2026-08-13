@@ -24,6 +24,7 @@ fun MainTabsPager(
     onOpenHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenHandReference: () -> Unit,
+    onOpenInspiration: (colorId: String) -> Unit,
     onOpenAbout: () -> Unit,
     onOpenResultFromHistory: (HistoryRowUi) -> Unit,
     onSwipeBackToHome: () -> Unit,
@@ -43,6 +44,7 @@ fun MainTabsPager(
                 onOpenHistory = onOpenHistory,
                 onOpenFavorites = onOpenFavorites,
                 onOpenHandReference = onOpenHandReference,
+                onOpenInspiration = onOpenInspiration,
             )
             Routes.HISTORY -> HistoryScreen(
                 onOpenResult = onOpenResultFromHistory,
@@ -58,6 +60,7 @@ fun MainTabsPager(
             Routes.PROFILE -> ProfileScreen(
                 onOpenStyle = onOpenStyle,
                 onOpenHandReference = onOpenHandReference,
+                onOpenHistory = onOpenHistory,
                 onOpenAbout = onOpenAbout,
             )
         }

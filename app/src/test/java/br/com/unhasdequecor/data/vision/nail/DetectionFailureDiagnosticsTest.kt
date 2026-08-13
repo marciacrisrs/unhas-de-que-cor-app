@@ -27,6 +27,16 @@ class DetectionFailureDiagnosticsTest {
     }
 
     @Test
+    fun fromImageStats_midLumaRetintaIsNotTooDark() {
+        // Pele retinta bem iluminada costuma cair ~45–90 — não deve ser TooDark.
+        val reason = DetectionFailureDiagnostics.fromImageStats(
+            meanLuminance = 48f,
+            highlightShare = 0.02f,
+        )
+        assertThat(reason).isEqualTo(DetectionFailureReason.Generic)
+    }
+
+    @Test
     fun fromImageStats_genericOtherwise() {
         val reason = DetectionFailureDiagnostics.fromImageStats(
             meanLuminance = 120f,

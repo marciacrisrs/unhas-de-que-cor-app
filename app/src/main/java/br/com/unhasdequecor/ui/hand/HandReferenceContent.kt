@@ -11,7 +11,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import br.com.unhasdequecor.data.vision.nail.HandCaptureGuidance
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
 
@@ -36,10 +39,12 @@ internal fun UserPhotoConfirmContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Confira se as unhas aparecem bem e a luz está boa.",
+            text = HandCaptureGuidance.CONFIRM_LEAD,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(modifier = Modifier.height(12.dp))
+        CaptureChecklist()
         Spacer(modifier = Modifier.height(16.dp))
         HandPreview(
             path = path,
@@ -88,6 +93,8 @@ internal fun HandReferenceContent(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(modifier = Modifier.height(12.dp))
+        CaptureChecklist()
         Spacer(modifier = Modifier.height(16.dp))
         HandPreview(
             path = state.reference?.localPath,
@@ -104,6 +111,30 @@ internal fun HandReferenceContent(
             onOpenReplaceSheet = onOpenReplaceSheet,
             onOpenRemoveConfirm = onOpenRemoveConfirm,
         )
+    }
+}
+
+@Composable
+private fun CaptureChecklist() {
+    Column(
+        modifier = Modifier.semantics {
+            contentDescription = HandCaptureGuidance.asPlainText()
+        },
+    ) {
+        Text(
+            text = HandCaptureGuidance.TITLE,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        HandCaptureGuidance.checklist.forEach { tip ->
+            Text(
+                text = "• $tip",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
     }
 }
 

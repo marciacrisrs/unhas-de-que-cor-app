@@ -36,6 +36,10 @@ Matriz JVM: [`docs/vision-test-matrix.md`](vision-test-matrix.md).
 | 17 | Volta câmera/galeria sem crash | | |
 | 18 | TalkBack: banner de falha anunciado | | |
 | 19 | Accessibility Scanner sem erro bloqueante | | |
+| 20 | **Pele retinta** · luz natural frontal | | |
+| 21 | **Pele retinta** · indoor lâmpada na frente | | |
+| 22 | **Pele retinta** · esmalte escuro (vinho) | | |
+| 23 | Checklist Minha mão visível + CTA captura | | |
 
 ## Bugs
 

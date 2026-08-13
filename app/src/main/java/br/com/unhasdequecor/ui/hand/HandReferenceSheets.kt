@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import br.com.unhasdequecor.domain.model.HandSampleOption
+import br.com.unhasdequecor.data.vision.nail.HandCaptureGuidance
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
@@ -62,7 +63,7 @@ internal fun ReplaceHandSheet(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Escolha de onde vem a nova mão.",
+                text = HandCaptureGuidance.REPLACE_SHEET_HINT,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -101,7 +102,7 @@ internal fun HandSamplePickerSheet(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "A cor do esmalte no exemplo é só referência visual.",
+                text = HandCaptureGuidance.SAMPLE_PICKER_HINT,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
