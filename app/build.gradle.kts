@@ -224,6 +224,7 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/ui/home/HomeViewModel*",
     "**/br/com/unhasdequecor/ui/navigation/Routes*",
     "**/br/com/unhasdequecor/ui/navigation/ResultSources*",
+    "**/br/com/unhasdequecor/ui/navigation/MainSwipeTabs*",
 )
 
 val jacocoExcludes = listOf(

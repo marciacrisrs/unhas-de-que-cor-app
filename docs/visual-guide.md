@@ -4,6 +4,10 @@ Fonte de verdade: `design/guia/` (boards, logos e mockups claro/escuro).
 
 Logos oficiais já estão no APK como `logo_mark` / `logo_horizontal` (tema claro/escuro) e no ícone do launcher.
 
+- **Mark (só esmalte):** `drawable/logo_mark.webp` + `drawable-night/logo_mark.webp` — canto direito das páginas (`NailPolishMark` sem tint).
+- **Lockup horizontal:** `logo_horizontal` — Home / Sobre.
+- Fontes em `design/guia/logos/` (`logo-clara.png`, `logo-escura.png`).
+
 Resultado: try-on sempre em foto real (amostra padrão se a usuária ainda não cadastrou a própria). Foto própria usa MediaPipe; amostras calibradas usam máscara/âncoras. Sem ilustração vetorial.
 
 ## Paleta
