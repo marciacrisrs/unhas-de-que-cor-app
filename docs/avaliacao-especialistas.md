@@ -358,7 +358,7 @@ Camada `TryOnHandReliability` + `NailTryOnPipeline.detect` + rótulos em `HandTr
 
 | Regra | Comportamento |
 |-------|----------------|
-| `presenceScore` &lt; 0.12 | `REJECTED` → `detect` retorna `null` (sem claim) |
+| `presenceScore` &lt; 0.12 | `REJECTED` → snapshot com motivo tipado (sem claim / sem paint) |
 | 0.12–0.55 | `WEAK` → só `APPROXIMATE` (mesmo com ≥3 máscaras) |
 | ≥0.55 **e** ≥3 unhas ≥ `NAIL_FULL_MIN` (0.45) | `STRONG` + `FULL` → “Prévia na sua mão” |
 | Máscaras só paintable (0.32–0.45) / elipse | Nunca `FULL` — `APPROXIMATE` |
@@ -398,4 +398,15 @@ Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; Resu
 
 ### Reavaliação especialistas (pós issues #50–#56)
 
-_Preencher após review dos agentes vision / test / a11y / android._
+| Especialista | Achado | Status |
+|--------------|--------|--------|
+| Vision | FULL + ellipseFallback mentia “na sua mão” | Feito — `paintedViaEllipse` demote APPROXIMATE |
+| Vision | Iluminação/glare não wired em `fromLandmarks` | Feito — `ImageLightingSampler` no detect |
+| Vision | Empty nails + mão aberta ainda podia elipse no pipeline | Feito — teste + `nails.isEmpty() → working` |
+| A11y | CTA retry &lt;48dp / sem Role.Button / alpha | Feito — `TextButton` opaco 48dp + CD com hint |
+| A11y | Spinner loading no a11y tree | Feito — `clearAndSetSemantics` |
+| Android | `getPixels` full-frame | Feito — grade `getPixel` + skip mock sem Config |
+| Test | P0 process/recolor REJECTED + barrier ROI | Feito |
+| Docs | Tabela presence→null stale | Feito abaixo |
+
+Presence &lt; floor: `detect` devolve snapshot `REJECTED` (motivo tipado); recycle no `process`/Dispose UI — não mais `null` + recycle imediato.

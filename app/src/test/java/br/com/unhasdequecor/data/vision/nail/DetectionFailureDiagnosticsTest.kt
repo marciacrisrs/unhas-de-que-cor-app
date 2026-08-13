@@ -119,6 +119,48 @@ class DetectionFailureDiagnosticsTest {
         }
     }
 
+    @Test
+    fun fromLandmarks_tooDark_whenMeanLumaBelowFloor() {
+        val landmarks = openHand(presence = 0.40f)
+        val reason = DetectionFailureDiagnostics.fromLandmarks(
+            landmarks = landmarks,
+            reliability = TryOnReliability.WEAK,
+            meanLuminance = DetectionFailureDiagnostics.MEAN_LUMA_TOO_DARK - 1f,
+            highlightShare = 0.01f,
+            paintableNailCount = 2,
+            hasMappableAnchors = true,
+        )
+        assertThat(reason).isEqualTo(DetectionFailureReason.TooDark)
+    }
+
+    @Test
+    fun fromLandmarks_excessiveGlare_whenHighlightShareAboveFloor() {
+        val landmarks = openHand(presence = 0.40f)
+        val reason = DetectionFailureDiagnostics.fromLandmarks(
+            landmarks = landmarks,
+            reliability = TryOnReliability.WEAK,
+            meanLuminance = 120f,
+            highlightShare = DetectionFailureDiagnostics.HIGHLIGHT_SHARE_GLARE,
+            paintableNailCount = 2,
+            hasMappableAnchors = true,
+        )
+        assertThat(reason).isEqualTo(DetectionFailureReason.ExcessiveGlare)
+    }
+
+    @Test
+    fun fromLandmarks_largeExtent_doesNotMapToHandTooFar() {
+        val landmarks = openHand(presence = 0.60f)
+        assertThat(DetectionFailureDiagnostics.handExtentNorm(landmarks))
+            .isGreaterThan(DetectionFailureDiagnostics.HAND_EXTENT_TOO_SMALL)
+        val reason = DetectionFailureDiagnostics.fromLandmarks(
+            landmarks = landmarks,
+            reliability = TryOnReliability.STRONG,
+            paintableNailCount = 3,
+            hasMappableAnchors = true,
+        )
+        assertThat(reason).isNotEqualTo(DetectionFailureReason.HandTooFar)
+    }
+
     private fun clusteredHand(
         cx: Float,
         cy: Float,

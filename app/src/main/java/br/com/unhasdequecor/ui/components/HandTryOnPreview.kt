@@ -5,18 +5,21 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -44,12 +47,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
-import br.com.unhasdequecor.data.vision.HandInferenceEnhancer
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
 import br.com.unhasdequecor.data.vision.nail.DetectedNailPolishApplier
 import br.com.unhasdequecor.data.vision.nail.DetectionFailureDiagnostics
 import br.com.unhasdequecor.data.vision.nail.DetectionFailureReason
+import br.com.unhasdequecor.data.vision.nail.ImageLightingSampler
 import br.com.unhasdequecor.data.vision.nail.NailDetectionSnapshot
 import br.com.unhasdequecor.data.vision.nail.NailLandmarkMapper
 import br.com.unhasdequecor.data.vision.nail.NailOverlayAnchor
@@ -193,8 +196,16 @@ private fun TryOnPreviewFrame(
     val claim = previewClaim(preview)
     val reason = preview?.failureReason
     val statusLabel = TryOnPreviewLabels.status(claim, reason)
-    val frameDescription = TryOnPreviewLabels.contentDescription(colorName, claim, reason)
-    val retryAction = onImprovePhoto
+    val retryAction = onImprovePhoto.takeIf {
+        claim == TryOnPreviewClaim.NOT_DETECTED || claim == TryOnPreviewClaim.APPROXIMATE
+    }
+    val frameDescription = buildString {
+        append(TryOnPreviewLabels.contentDescription(colorName, claim, reason))
+        if (retryAction != null) {
+            append(' ')
+            append(TryOnPreviewLabels.RETRY_HINT)
+        }
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -210,7 +221,9 @@ private fun TryOnPreviewFrame(
         if (preview == null) {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clearAndSetSemantics { },
             )
         } else {
             TryOnPreviewContent(data = preview, polishColor = polishColor)
@@ -224,7 +237,7 @@ private fun TryOnPreviewFrame(
                     text = statusLabel,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onPrimary,
-                    maxLines = 3,
+                    maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .clip(SoftSurfaceShape)
@@ -232,25 +245,22 @@ private fun TryOnPreviewFrame(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                         .clearAndSetSemantics { },
                 )
-                if (retryAction != null &&
-                    (claim == TryOnPreviewClaim.NOT_DETECTED ||
-                        claim == TryOnPreviewClaim.APPROXIMATE)
-                ) {
-                    Text(
-                        text = TryOnPreviewLabels.RETRY_HINT,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier
-                            .padding(top = 6.dp)
-                            .heightIn(min = 48.dp)
-                            .clip(SoftSurfaceShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.92f))
-                            .clickable(onClick = retryAction)
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
-                            .semantics {
-                                contentDescription = TryOnPreviewLabels.RETRY_HINT
-                            },
-                    )
+                if (retryAction != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    TextButton(
+                        onClick = retryAction,
+                        modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                        shape = SoftSurfaceShape,
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    ) {
+                        Text(
+                            text = TryOnPreviewLabels.RETRY_HINT,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                 }
             }
         }
@@ -444,18 +454,11 @@ private fun paintUserPreview(
 }
 
 private fun diagnoseNoLandmarks(bitmap: Bitmap): DetectionFailureReason {
-    return runCatching {
-        val step = 8
-        val w = bitmap.width
-        val h = bitmap.height
-        if (w <= 0 || h <= 0) return@runCatching DetectionFailureReason.Generic
-        val pixels = IntArray(w * h)
-        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-        DetectionFailureDiagnostics.fromImageStats(
-            meanLuminance = DetectionFailureDiagnostics.meanLuminanceArgb(pixels, step),
-            highlightShare = HandInferenceEnhancer.highlightShareArgb(pixels, sampleStep = step),
-        )
-    }.getOrDefault(DetectionFailureReason.Generic)
+    val stats = ImageLightingSampler.sample(bitmap) ?: return DetectionFailureReason.Generic
+    return DetectionFailureDiagnostics.fromImageStats(
+        meanLuminance = stats.meanLuminance,
+        highlightShare = stats.highlightShare,
+    )
 }
 
 private fun paintUserNotDetected(
@@ -494,14 +497,22 @@ private fun paintUserFull(
         candidate = result.bitmap,
         protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
     )
+    // Elipse sob máscara falha ≠ claim FULL (modo ≡ qualidade).
+    val mode = if (result.paintedViaEllipse) TryOnMode.APPROXIMATE else TryOnMode.DETECTED
+    val reason =
+        if (result.paintedViaEllipse) {
+            snapshot.failureReason ?: DetectionFailureReason.Generic
+        } else {
+            null
+        }
     return TryOnPreviewData(
         bitmap = painted,
         anchors = emptyList(),
-        mode = TryOnMode.DETECTED,
+        mode = mode,
         nails = result.nails,
         landmarks = result.landmarks,
         showDebug = result.debugEnabled,
-        failureReason = null,
+        failureReason = reason,
     )
 }
 

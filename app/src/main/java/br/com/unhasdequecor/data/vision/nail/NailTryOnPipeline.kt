@@ -12,6 +12,8 @@ data class NailTryOnResult(
     val nails: List<DetectedNail>,
     val landmarks: HandLandmarks?,
     val debugEnabled: Boolean,
+    /** True se a cor veio de elipse (não máscara) — UI não deve claim FULL. */
+    val paintedViaEllipse: Boolean = false,
 )
 
 /**
@@ -93,8 +95,9 @@ class NailTryOnPipeline @Inject constructor(
         // Reject precoce: não gasta ROI/segmentação em presence abaixo do piso.
         // Mantém snapshot REJECTED (com motivo) para feedback tipado na UI.
         val reliability = TryOnHandReliability.classify(landmarks)
+        val lighting = ImageLightingSampler.sample(working)
         if (reliability == TryOnReliability.REJECTED) {
-            return rejectedSnapshot(working, landmarks, ownsWorking)
+            return rejectedSnapshot(working, landmarks, ownsWorking, lighting)
         }
 
         val segmented = segmentPaintableNails(working, landmarks)
@@ -117,7 +120,7 @@ class NailTryOnPipeline @Inject constructor(
             landmarks = landmarks,
             ownsWorkingBitmap = ownsWorking,
             reliability = adjusted,
-            failureReason = reasonFor(adjusted, landmarks, nails, barrier),
+            failureReason = reasonFor(adjusted, landmarks, nails, barrier, lighting),
             rejectionBarrier = barrier,
         )
     }
@@ -126,11 +129,14 @@ class NailTryOnPipeline @Inject constructor(
         working: Bitmap,
         landmarks: HandLandmarks,
         ownsWorking: Boolean,
+        lighting: ImageLightingSampler.Stats?,
     ): NailDetectionSnapshot {
         val reason = DetectionFailureDiagnostics.fromLandmarks(
             landmarks = landmarks,
             reliability = TryOnReliability.REJECTED,
             barrier = RejectionBarrier.HAND_PRESENCE,
+            meanLuminance = lighting?.meanLuminance,
+            highlightShare = lighting?.highlightShare,
         )
         return NailDetectionSnapshot(
             workingBitmap = working,
@@ -214,6 +220,7 @@ class NailTryOnPipeline @Inject constructor(
         landmarks: HandLandmarks,
         nails: List<DetectedNail>,
         barrier: RejectionBarrier,
+        lighting: ImageLightingSampler.Stats?,
     ): DetectionFailureReason? {
         if (reliability == TryOnReliability.STRONG &&
             DetectionConfidenceFloor.meetsFullNailFloor(nails)
@@ -233,6 +240,8 @@ class NailTryOnPipeline @Inject constructor(
             barrier = barrier,
             paintableNailCount = nails.size,
             hasMappableAnchors = hasMappable,
+            meanLuminance = lighting?.meanLuminance,
+            highlightShare = lighting?.highlightShare,
         )
     }
 
@@ -247,22 +256,31 @@ class NailTryOnPipeline @Inject constructor(
                 nails = emptyList(),
                 landmarks = snapshot.landmarks,
                 debugEnabled = debugEnabled,
+                paintedViaEllipse = false,
             )
         }
         // Caminho almond vs elipse: usa piso de pintura, não o de claim FULL.
         // Sem unhas paintable: não pintar elipse aqui — a UI decide via planRender.
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
-        val painted = when {
+        val (painted, viaEllipse) = when {
             paintableCount >= DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH -> {
-                colorApplier.apply(working, snapshot.nails, polishColor)
-                    ?: ellipseFallback(working, snapshot.landmarks, polishColor)
-                    ?: working
+                val maskPaint = colorApplier.apply(working, snapshot.nails, polishColor)
+                if (maskPaint != null) {
+                    maskPaint to false
+                } else {
+                    val ellipse = ellipseFallback(working, snapshot.landmarks, polishColor)
+                    (ellipse ?: working) to (ellipse != null)
+                }
             }
-            snapshot.nails.isEmpty() -> working
+            snapshot.nails.isEmpty() -> working to false
             else -> {
-                colorApplier.apply(working, snapshot.nails, polishColor)
-                    ?: ellipseFallback(working, snapshot.landmarks, polishColor)
-                    ?: working
+                val maskPaint = colorApplier.apply(working, snapshot.nails, polishColor)
+                if (maskPaint != null) {
+                    maskPaint to false
+                } else {
+                    val ellipse = ellipseFallback(working, snapshot.landmarks, polishColor)
+                    (ellipse ?: working) to (ellipse != null)
+                }
             }
         }
         return NailTryOnResult(
@@ -270,6 +288,7 @@ class NailTryOnPipeline @Inject constructor(
             nails = snapshot.nails,
             landmarks = snapshot.landmarks,
             debugEnabled = debugEnabled,
+            paintedViaEllipse = viaEllipse,
         )
     }
 

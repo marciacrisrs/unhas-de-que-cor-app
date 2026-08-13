@@ -241,6 +241,7 @@ val jacocoExcludes = listOf(
     "**/MediaPipe*",
     "**/HandInferenceVariants*",
     "**/HandInferenceVariant*",
+    "**/ImageLightingSampler*",
     "**/GeometricNailSegmenter*",
     "**/NailTryOnResult*",
     "**/NailTracker*",
