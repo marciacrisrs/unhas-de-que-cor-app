@@ -40,6 +40,10 @@ object Routes {
         return "result/$sourcePath/$occasionPath/$moodPath/$colorId"
     }
 
+    /** Abre o resultado/try-on de uma cor do catálogo (ex.: inspiração do dia). */
+    fun resultForColor(colorId: String): String =
+        "result/${ResultSources.FOR_ME}/$NONE/$NONE/$colorId"
+
     fun parseOccasion(raw: String): Occasion? =
         raw.takeUnless { it == NONE }?.let { runCatching { Occasion.valueOf(it) }.getOrNull() }
 

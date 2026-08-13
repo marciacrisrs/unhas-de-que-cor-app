@@ -126,14 +126,12 @@ fun AppNavHost() {
                         navController.navigate(Routes.resultForMe())
                     },
                     onOpenStyle = { navController.navigate(Routes.STYLE) },
-                    onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
-                    onOpenFavorites = { goToSwipeTab(Routes.FAVORITES) },
-                    onOpenHandReference = {
-                        navController.navigate(Routes.HAND_REFERENCE)
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
+                    onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                    onOpenInspiration = { colorId ->
+                        navController.navigate(Routes.resultForColor(colorId))
                     },
-                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
-                    onOpenResultFromHistory = navController::openResultFromHistory,
-                    onSwipeBackToHome = { goToSwipeTab(Routes.HOME) },
                 )
             }
             composable(Routes.CONTEXT) {
