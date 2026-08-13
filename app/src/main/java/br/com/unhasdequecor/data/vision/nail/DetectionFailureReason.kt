@@ -59,14 +59,19 @@ sealed class DetectionFailureReason {
     }
 
     companion object {
-        val all: List<DetectionFailureReason> = listOf(
-            HandTooFar,
-            TooDark,
-            ExcessiveGlare,
-            BadAngle,
-            NoNailVisible,
-            ClutteredScene,
-            Generic,
-        )
+        /**
+         * Lazy: evitar nulls por ordem de init do companion vs data objects.
+         */
+        val all: List<DetectionFailureReason> by lazy {
+            listOf(
+                HandTooFar,
+                TooDark,
+                ExcessiveGlare,
+                BadAngle,
+                NoNailVisible,
+                ClutteredScene,
+                Generic,
+            )
+        }
     }
 }

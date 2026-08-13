@@ -26,6 +26,12 @@ object DetectionFailureDiagnostics {
     const val HIGHLIGHT_SHARE_GLARE = 0.12f
 
     /**
+     * Folga no extent quando a barreira é presence (mão “ok” mas score baixo
+     * costuma ser distância, não tip-span).
+     */
+    private const val HAND_EXTENT_PRESENCE_SLACK = 1.5f
+
+    /**
      * Sem landmarks MediaPipe: só iluminação da imagem.
      */
     fun fromImageStats(
@@ -59,46 +65,96 @@ object DetectionFailureDiagnostics {
         meanLuminance: Float? = null,
         highlightShare: Float? = null,
     ): DetectionFailureReason {
-        val extent = handExtentNorm(landmarks)
-        val tipSpan = HandLandmarkQuality.tipSpanNorm(landmarks.points)
-        val glareShare = highlightShare?.coerceIn(0f, 1f)
-        val mean = meanLuminance?.coerceIn(0f, 255f)
-        val tipGlare =
-            tipPresence != null && tipPresence < HandPresenceScoring.TIP_GLARE_MAX
+        val scene = sceneReason(
+            meanLuminance = meanLuminance,
+            highlightShare = highlightShare,
+            tipPresence = tipPresence,
+            reliability = reliability,
+        )
+        if (scene != null) return scene
 
-        // Prioridade: sinais físicos da cena → geometria → unhas → genérico.
+        val geometry = geometryReason(
+            landmarks = landmarks,
+            barrier = barrier,
+        )
+        if (geometry != null) return geometry
+
+        return nailOrFallbackReason(
+            reliability = reliability,
+            barrier = barrier,
+            paintableNailCount = paintableNailCount,
+            hasMappableAnchors = hasMappableAnchors,
+            tipSpan = HandLandmarkQuality.tipSpanNorm(landmarks.points),
+        )
+    }
+
+    private fun sceneReason(
+        meanLuminance: Float?,
+        highlightShare: Float?,
+        tipPresence: Float?,
+        reliability: TryOnReliability,
+    ): DetectionFailureReason? {
+        val glareShare = highlightShare?.coerceIn(0f, 1f)
         if (glareShare != null && glareShare >= HIGHLIGHT_SHARE_GLARE) {
             return DetectionFailureReason.ExcessiveGlare
         }
+        val tipGlare =
+            tipPresence != null && tipPresence < HandPresenceScoring.TIP_GLARE_MAX
         if (tipGlare && reliability != TryOnReliability.STRONG) {
             return DetectionFailureReason.ExcessiveGlare
         }
+        val mean = meanLuminance?.coerceIn(0f, 255f)
         if (mean != null && mean < MEAN_LUMA_TOO_DARK) {
             return DetectionFailureReason.TooDark
         }
-        if (extent < HAND_EXTENT_TOO_SMALL ||
-            barrier == RejectionBarrier.HAND_PRESENCE && extent < HAND_EXTENT_TOO_SMALL * 1.5f
-        ) {
+        return null
+    }
+
+    private fun geometryReason(
+        landmarks: HandLandmarks,
+        barrier: RejectionBarrier,
+    ): DetectionFailureReason? {
+        val extent = handExtentNorm(landmarks)
+        val tipSpan = HandLandmarkQuality.tipSpanNorm(landmarks.points)
+        val farThreshold =
+            if (barrier == RejectionBarrier.HAND_PRESENCE) {
+                HAND_EXTENT_TOO_SMALL * HAND_EXTENT_PRESENCE_SLACK
+            } else {
+                HAND_EXTENT_TOO_SMALL
+            }
+        if (extent < farThreshold) {
             return DetectionFailureReason.HandTooFar
         }
         if (tipSpan < TIP_SPAN_BAD_ANGLE) {
             return DetectionFailureReason.BadAngle
         }
+        return null
+    }
+
+    private fun nailOrFallbackReason(
+        reliability: TryOnReliability,
+        barrier: RejectionBarrier,
+        paintableNailCount: Int,
+        hasMappableAnchors: Boolean,
+        tipSpan: Float,
+    ): DetectionFailureReason {
         if (reliability == TryOnReliability.REJECTED) {
             return when (barrier) {
-                RejectionBarrier.HAND_PRESENCE -> DetectionFailureReason.Generic
-                RejectionBarrier.ROI -> DetectionFailureReason.NoNailVisible
-                RejectionBarrier.NAIL_COMBINED -> DetectionFailureReason.NoNailVisible
-                RejectionBarrier.NONE -> DetectionFailureReason.Generic
+                RejectionBarrier.ROI,
+                RejectionBarrier.NAIL_COMBINED,
+                -> DetectionFailureReason.NoNailVisible
+                RejectionBarrier.HAND_PRESENCE,
+                RejectionBarrier.NONE,
+                -> DetectionFailureReason.Generic
             }
-        }
-        if (paintableNailCount == 0 && !hasMappableAnchors) {
-            return DetectionFailureReason.NoNailVisible
         }
         if (paintableNailCount == 0) {
             return DetectionFailureReason.NoNailVisible
         }
-        // WEAK / APPROXIMATE com unhas: tip de ângulo se span só “ok”.
+        // Anchors ausentes com alguma unha frágil → ainda orientar a mostrar a unha.
+        if (!hasMappableAnchors) {
+            return DetectionFailureReason.NoNailVisible
+        }
         if (reliability == TryOnReliability.WEAK &&
             tipSpan < HandLandmarkQuality.GOOD_OPEN_TIP_SPAN
         ) {

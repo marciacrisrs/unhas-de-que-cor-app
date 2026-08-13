@@ -195,9 +195,6 @@ private fun TryOnPreviewFrame(
     val statusLabel = TryOnPreviewLabels.status(claim, reason)
     val frameDescription = TryOnPreviewLabels.contentDescription(colorName, claim, reason)
     val retryAction = onImprovePhoto
-    val showRetry =
-        retryAction != null &&
-            (claim == TryOnPreviewClaim.NOT_DETECTED || claim == TryOnPreviewClaim.APPROXIMATE)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -235,7 +232,10 @@ private fun TryOnPreviewFrame(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                         .clearAndSetSemantics { },
                 )
-                if (showRetry && retryAction != null) {
+                if (retryAction != null &&
+                    (claim == TryOnPreviewClaim.NOT_DETECTED ||
+                        claim == TryOnPreviewClaim.APPROXIMATE)
+                ) {
                     Text(
                         text = TryOnPreviewLabels.RETRY_HINT,
                         style = MaterialTheme.typography.labelLarge,
