@@ -86,10 +86,10 @@ object HandTrainingScenes {
         rh: Int,
         skin: Int,
         plate: Int,
-        plateLeft: Int = rw / 4,
-        plateTop: Int = rh / 5,
-        plateRight: Int = (rw * 3) / 4,
-        plateBottom: Int = (rh * 3) / 4,
+        plateLeft: Int = rw / PLATE_LEFT_DIV,
+        plateTop: Int = rh / PLATE_TOP_DIV,
+        plateRight: Int = (rw * PLATE_RIGHT_NUM) / PLATE_RIGHT_DEN,
+        plateBottom: Int = (rh * PLATE_BOTTOM_NUM) / PLATE_BOTTOM_DEN,
     ): IntArray {
         val pixels = IntArray(rw * rh) { skin }
         for (y in plateTop until plateBottom) {
@@ -101,13 +101,27 @@ object HandTrainingScenes {
     }
 
     fun argb(r: Int, g: Int, b: Int): Int =
-        (0xFF shl 24) or (r.coerceIn(0, 255) shl 16) or
-            (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
+        (ALPHA_OPAQUE shl ALPHA_SHIFT) or
+            (r.coerceIn(0, CHANNEL_MAX) shl RED_SHIFT) or
+            (g.coerceIn(0, CHANNEL_MAX) shl GREEN_SHIFT) or
+            b.coerceIn(0, CHANNEL_MAX)
 
     private fun darken(argb: Int, factor: Float): Int {
-        val r = ((argb shr 16) and 0xFF) * factor
-        val g = ((argb shr 8) and 0xFF) * factor
-        val b = (argb and 0xFF) * factor
+        val r = ((argb shr RED_SHIFT) and CHANNEL_MAX) * factor
+        val g = ((argb shr GREEN_SHIFT) and CHANNEL_MAX) * factor
+        val b = (argb and CHANNEL_MAX) * factor
         return argb(r.toInt(), g.toInt(), b.toInt())
     }
+
+    private const val ALPHA_OPAQUE = 0xFF
+    private const val ALPHA_SHIFT = 24
+    private const val RED_SHIFT = 16
+    private const val GREEN_SHIFT = 8
+    private const val CHANNEL_MAX = 255
+    private const val PLATE_LEFT_DIV = 4
+    private const val PLATE_TOP_DIV = 5
+    private const val PLATE_RIGHT_NUM = 3
+    private const val PLATE_RIGHT_DEN = 4
+    private const val PLATE_BOTTOM_NUM = 3
+    private const val PLATE_BOTTOM_DEN = 4
 }

@@ -117,8 +117,8 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val skinDist = colorDistance(r, g, b, skin)
         val sat = saturation(r, g, b)
         val lum = luminance(r, g, b)
-        val darkerPolish = lum < skin.lum - PLATE_LUM_DELTA * 0.45f &&
-            skinDist > SKIN_SOFT_DIST * 0.85f
+        val darkerPolish = lum < skin.lum - PLATE_LUM_DELTA * DARK_POLISH_LUM_SCALE &&
+            skinDist > SKIN_SOFT_DIST * DARK_POLISH_DIST_SCALE
         val looksLikePlate = skinDist > SKIN_SOFT_DIST ||
             sat > PLATE_SAT_MIN ||
             lum > skin.lum + PLATE_LUM_DELTA ||
@@ -134,15 +134,15 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val skinDist = colorDistance(r, g, b, skin)
         val sat = saturation(r, g, b)
         val lum = luminance(r, g, b)
-        val brighter = lum > skin.lum + PLATE_LUM_DELTA * 0.55f
+        val brighter = lum > skin.lum + PLATE_LUM_DELTA * PLATE_SIGNAL_SCALE
         // Esmalte escuro (vinho/preto) em pele retinta: mais escuro que a pele, mas cromático.
-        val darkerPolish = lum < skin.lum - PLATE_LUM_DELTA * 0.45f &&
-            skinDist > SKIN_SOFT_DIST * 0.85f
-        val glossier = sat > PLATE_SAT_MIN * 0.85f && (brighter || darkerPolish)
-        val chromatic = skinDist > SKIN_SOFT_DIST * 0.75f && (brighter || darkerPolish)
+        val darkerPolish = lum < skin.lum - PLATE_LUM_DELTA * DARK_POLISH_LUM_SCALE &&
+            skinDist > SKIN_SOFT_DIST * DARK_POLISH_DIST_SCALE
+        val glossier = sat > PLATE_SAT_MIN * GLOSS_SAT_SCALE && (brighter || darkerPolish)
+        val chromatic = skinDist > SKIN_SOFT_DIST * CHROMATIC_DIST_SCALE && (brighter || darkerPolish)
         return glossier || chromatic ||
             (brighter && skinDist > PLATE_MIN_SKIN_DIST) ||
-            (darkerPolish && sat > PLATE_SAT_MIN * 0.55f)
+            (darkerPolish && sat > PLATE_SAT_MIN * DARK_POLISH_SAT_SCALE)
     }
 
     private fun softRasterize(poly: List<PixelPoint>, width: Int, height: Int): ByteArray {
@@ -413,6 +413,13 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         const val PLATE_SAT_MIN = 0.12f
         const val PLATE_LUM_DELTA = 18f
         const val PLATE_MIN_SKIN_DIST = 12f
+        /** Fração do delta de luminância / saturação para placa vs pele. */
+        const val PLATE_SIGNAL_SCALE = 0.55f
+        const val DARK_POLISH_LUM_SCALE = 0.45f
+        const val DARK_POLISH_DIST_SCALE = 0.85f
+        const val CHROMATIC_DIST_SCALE = 0.75f
+        const val GLOSS_SAT_SCALE = 0.85f
+        const val DARK_POLISH_SAT_SCALE = 0.55f
         const val RING_RADIUS = 3
         const val MASK_SOLID = 128
         const val BOOST_ALPHA = 200

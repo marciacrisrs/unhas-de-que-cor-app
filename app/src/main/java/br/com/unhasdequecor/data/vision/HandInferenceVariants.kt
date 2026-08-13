@@ -41,6 +41,8 @@ internal object HandInferenceVariants {
     const val DEEP_SKIN_LUMA_MAX = 145f
     private const val DEEP_SKIN_BRIGHTNESS = 0.36f
     private const val DEEP_SKIN_GAMMA = 0.55f
+    private const val DEEP_SKIN_MILD_BRIGHTNESS = 0.22f
+    private const val EMPTY_SCENE_MEAN_LUMA = 128f
     private const val SAMPLE_STEP = 17
     private val ROTATION_DEGREES = floatArrayOf(90f, 270f, 180f)
 
@@ -91,7 +93,7 @@ internal object HandInferenceVariants {
         enhance(inferenceBase, stretch = true, brightness = DEEP_SKIN_BRIGHTNESS)?.let {
             yield(HandInferenceVariant(it, display, remap))
         }
-        enhance(inferenceBase, gamma = DEEP_SKIN_GAMMA, brightness = 0.22f)?.let {
+        enhance(inferenceBase, gamma = DEEP_SKIN_GAMMA, brightness = DEEP_SKIN_MILD_BRIGHTNESS)?.let {
             yield(HandInferenceVariant(it, display, remap))
         }
     }
@@ -121,7 +123,7 @@ internal object HandInferenceVariants {
             n += 1
             i += SAMPLE_STEP
         }
-        return if (n == 0) 128f else sum.toFloat() / n.toFloat()
+        return if (n == 0) EMPTY_SCENE_MEAN_LUMA else sum.toFloat() / n.toFloat()
     }
 
     private fun baseEnhancements(source: Bitmap): Sequence<HandInferenceVariant> = sequence {
