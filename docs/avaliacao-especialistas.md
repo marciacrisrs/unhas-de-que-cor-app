@@ -380,4 +380,22 @@ mapper/ROI aceitam só placas usáveis (≥2 unhas); limiar MediaPipe 0.08.
 | Android | `getBackStackEntry(HOME)` sem guarda | Feito — `runCatching` + fallback `navigate(HOME)` |
 | Test | Gaps reliability / labels / applier early-return | Feito — testes + JaCoCo `TryOnPreviewLabels*` |
 
-Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; CHANGELOG no próximo release; Result→mão destino / chrome Favoritos (**P2**).
+Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; Result→mão destino / chrome Favoritos (**P2**).
+
+---
+
+## Issues #50–#56 (passagem in-repo)
+
+| Issue | Status in-repo | Entrega |
+|-------|----------------|---------|
+| #50 Try-on fotos reais | Feito (parcial device) | Pipeline + honesty; ellipse só via plan UI |
+| #51 Floor confiança | Feito | `DetectionConfidenceFloor` + `RejectionBarrier` |
+| #52 Suíte visão | Feito (JVM + matriz) | `docs/vision-test-matrix.md` + testes |
+| #53 Device real | Doc only | `docs/device-testing.md` |
+| #54 Feedback tipado | Feito | `DetectionFailureReason` + labels + CTA retry |
+| #55 A11y | Parcial | LiveRegion + retry 48dp; Scanner OUT_OF_REPO |
+| #56 Release ops | Feito (docs) | CHANGELOG 1.0.8, gitignore keystore, play-listing |
+
+### Reavaliação especialistas (pós issues #50–#56)
+
+_Preencher após review dos agentes vision / test / a11y / android._

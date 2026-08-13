@@ -6,7 +6,9 @@
     <issue id="VectorPath" severity="warning" />
     <issue id="TypographyQuotes" severity="ignore" />
 
-    <!-- Acessibilidade: manter visível no relatório. -->
+    <!-- Acessibilidade: contentDescription bloqueia CI; touch target permanece no relatório. -->
     <issue id="ContentDescription" severity="error" />
+    <!-- warning: elevar a error após pass completo no Accessibility Scanner (device). -->
     <issue id="TouchTargetSizeCheck" severity="warning" />
+    <issue id="SpeakableTextPresentCheck" severity="warning" />
 </lint>

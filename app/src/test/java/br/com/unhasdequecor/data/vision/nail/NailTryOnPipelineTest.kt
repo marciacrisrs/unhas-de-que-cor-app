@@ -205,8 +205,13 @@ class NailTryOnPipelineTest {
 
         val snapshot = pipeline.detect(source, stabilize = false)
 
-        assertThat(snapshot).isNull()
-        verify(exactly = 1) { rotated.recycle() }
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.REJECTED)
+        assertThat(snapshot.failureReason).isNotNull()
+        assertThat(snapshot.rejectionBarrier).isEqualTo(RejectionBarrier.HAND_PRESENCE)
+        assertThat(snapshot.ownsWorkingBitmap).isTrue()
+        // Snapshot retido para UI — recycle fica a cargo do caller / Dispose.
+        verify(exactly = 0) { rotated.recycle() }
         verify(exactly = 0) { roiEstimator.estimateAll(any()) }
         verify(exactly = 0) { segmenter.segment(any(), any()) }
         verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
@@ -229,7 +234,10 @@ class NailTryOnPipelineTest {
             landmarkProcessor.detectLandmarksWithOrientationFallback(source)
         } returns OrientedHandLandmarks(bitmap = source, landmarks = landmarks)
 
-        assertThat(pipeline.detect(source, stabilize = false)).isNull()
+        val snapshot = pipeline.detect(source, stabilize = false)
+        assertThat(snapshot).isNotNull()
+        assertThat(snapshot!!.reliability).isEqualTo(TryOnReliability.REJECTED)
+        assertThat(snapshot.ownsWorkingBitmap).isFalse()
         verify(exactly = 0) { source.recycle() }
         verify(exactly = 0) { roiEstimator.estimateAll(any()) }
     }

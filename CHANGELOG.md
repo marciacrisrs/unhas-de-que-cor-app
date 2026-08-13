@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.8 — (versionCode 9)
+
+### Try-on / visão
+- Floor de confiança centralizado (`DetectionConfidenceFloor`)
+- Detecção mais robusta em luz difícil (flash, contraluz, tip-glare)
+- Feedback tipado de falha (`DetectionFailureReason`) com mensagens amigáveis
+- CTA “Tentar outra foto” quando a prévia é aproximada ou não detectada
+- Claim FULL só com presence forte, tip-span aberto e ≥3 unhas de qualidade
+
+### Qualidade
+- Matriz de testes de visão documentada (`docs/vision-test-matrix.md`)
+- Checklist de device real (`docs/device-testing.md`)
+- Keystores ignorados no git
+
 ## 1.0.1 — release Play (versionCode 2)
 
 - Mesmo conteúdo da 1.0.0; bump obrigatório porque o `versionCode 1` já foi usado na Play.
