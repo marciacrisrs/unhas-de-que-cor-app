@@ -102,7 +102,6 @@ sonar {
                 "**/data/vision/nail/GeometricNailSegmenter*",
                 "**/data/vision/nail/DetectedNailPolishApplier*",
                 "**/data/vision/nail/NailTracker*",
-                "**/data/vision/nail/TryOnPipelineMetrics*",
                 "**/data/local/datastore/**",
                 "**/data/local/hand/**",
                 "**/data/local/db/dao/**",
