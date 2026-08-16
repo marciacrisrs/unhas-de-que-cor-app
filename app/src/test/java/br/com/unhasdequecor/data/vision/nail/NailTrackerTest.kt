@@ -162,6 +162,66 @@ class NailTrackerTest {
     }
 
     @Test
+    fun `degenerate recovery geometry reuses last valid nail for two frames only`() {
+        val tracker = NailTracker()
+        val valid = nail(x = 100f, y = 100f)
+        val degenerate = nail(x = 102f, y = 102f, width = 7f, length = 69f)
+
+        tracker.stabilize(listOf(valid))
+        val firstRecovery = tracker.stabilize(listOf(degenerate))
+        val secondRecovery = tracker.stabilize(listOf(degenerate))
+        val rejected = tracker.stabilize(listOf(degenerate))
+
+        assertEquals(1, firstRecovery.size)
+        assertEquals(1, secondRecovery.size)
+        assertTrue(rejected.isEmpty())
+        assertEquals(NailPredictionReason.GEOMETRY_REJECTED, tracker.lastPredictionReport.predictionReason)
+        assertEquals(NailGeometryValidator.Reason.NAIL_DIMENSIONS_INVALID, tracker.lastPredictionReport.geometryReason)
+    }
+
+    @Test
+    fun `degenerate geometry without previous nail is rejected`() {
+        val tracker = NailTracker()
+        val degenerate = nail(x = 100f, y = 100f, width = 7f, length = 69f)
+
+        val result = tracker.stabilize(listOf(degenerate))
+
+        assertTrue(result.isEmpty())
+        assertEquals(NailPredictionReason.GEOMETRY_REJECTED, tracker.lastPredictionReport.predictionReason)
+        assertEquals(NailGeometryValidator.Reason.NAIL_DIMENSIONS_INVALID, tracker.lastPredictionReport.geometryReason)
+    }
+
+    @Test
+    fun `mask origin mismatch is rejected before render`() {
+        val tracker = NailTracker()
+        val valid = nail(x = 100f, y = 100f)
+        val mismatched = nail(x = 110f, y = 100f, maskX = 116, maskY = 100)
+
+        tracker.stabilize(listOf(valid))
+        val result = tracker.stabilize(listOf(mismatched))
+
+        assertEquals(1, result.size)
+        assertEquals(valid.roi.bounds.left, result.single().roi.bounds.left)
+        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
+        assertEquals(NailGeometryValidator.Reason.MASK_ROI_MISMATCH, tracker.lastPredictionReport.geometryReason)
+    }
+
+    @Test
+    fun `reset clears invalid geometry recovery state`() {
+        val tracker = NailTracker()
+        val valid = nail(x = 100f, y = 100f)
+        val degenerate = nail(x = 102f, y = 102f, width = 7f, length = 69f)
+
+        tracker.stabilize(listOf(valid))
+        tracker.stabilize(listOf(degenerate))
+        tracker.reset()
+        val result = tracker.stabilize(listOf(degenerate))
+
+        assertTrue(result.isEmpty())
+        assertEquals(NailPredictionReason.GEOMETRY_REJECTED, tracker.lastPredictionReport.predictionReason)
+    }
+
+    @Test
     fun `reset forgets previous state and prediction`() {
         val tracker = NailTracker()
         tracker.stabilize(listOf(nail(x = 100f, y = 100f)))
