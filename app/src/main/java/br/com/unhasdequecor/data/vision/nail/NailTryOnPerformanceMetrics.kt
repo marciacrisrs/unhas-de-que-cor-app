@@ -1,5 +1,7 @@
 package br.com.unhasdequecor.data.vision.nail
 
+import kotlin.math.ceil
+
 /**
  * Métricas de uma execução do Live Try-On.
  *
@@ -62,10 +64,11 @@ class NailTryOnPerformanceWindow(
         percentile: Float,
         selector: (NailTryOnPerformanceMetrics) -> Long,
     ): Long {
+        require(percentile in 0f..1f)
         if (samples.isEmpty()) return 0L
         val sorted = samples.map(selector).sorted()
-        val index = ((sorted.lastIndex) * percentile).toInt().coerceIn(0, sorted.lastIndex)
-        return sorted[index]
+        val rank = ceil(percentile * sorted.size).toInt().coerceAtLeast(1)
+        return sorted[rank - 1].coerceAtLeast(0L)
     }
 
     companion object {
