@@ -22,7 +22,7 @@ object NailPlateCalibration {
     const val THUMB_LENGTH_SCALE = 0.38f
 
     /** Centro da placa ao longo do eixo proximal→tip (0 = cutícula/eixo, 1 = tip). */
-    const val CENTER_ALONG = 0.58f
+    const val CENTER_ALONG = 0.72f
     const val FACING_CENTER = 0.82f
     const val THUMB_CENTER = 0.78f
 
@@ -94,10 +94,10 @@ object NailPlateCalibration {
 
     fun scalesFor(finger: Finger): FingerScale = when (finger) {
         Finger.THUMB -> FingerScale(widthScale = 0.82f, lengthScale = 0.90f)
-        Finger.INDEX -> FingerScale(widthScale = 0.74f, lengthScale = 0.96f)
-        Finger.MIDDLE -> FingerScale(widthScale = 0.76f, lengthScale = 0.98f)
-        Finger.RING -> FingerScale(widthScale = 0.72f, lengthScale = 0.96f)
-        Finger.PINKY -> FingerScale(widthScale = 0.68f, lengthScale = 0.92f)
+        Finger.INDEX -> FingerScale(widthScale = 0.74f, lengthScale = 0.56f)
+        Finger.MIDDLE -> FingerScale(widthScale = 0.76f, lengthScale = 0.58f)
+        Finger.RING -> FingerScale(widthScale = 0.72f, lengthScale = 0.56f)
+        Finger.PINKY -> FingerScale(widthScale = 0.68f, lengthScale = 0.54f)
     }
 
     fun centerAlong(thumbMode: Boolean, facing: Boolean): Float = when {
