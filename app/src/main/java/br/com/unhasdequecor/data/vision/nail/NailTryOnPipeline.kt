@@ -40,7 +40,7 @@ class NailTryOnPipeline @Inject constructor(
     private val segmenter: NailSegmenter,
     private val colorApplier: NailColorApplier,
     private val tracker: NailTracker,
-    private val pipelineMetrics: TryOnPipelineMetrics,
+    private val pipelineMetrics: TryOnPipelineMetrics = TryOnPipelineMetrics(),
 ) {
     @Volatile
     var debugEnabled: Boolean = false
