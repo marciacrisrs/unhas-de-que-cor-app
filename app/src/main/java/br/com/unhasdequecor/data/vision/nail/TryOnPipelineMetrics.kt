@@ -52,9 +52,9 @@ class TryOnPipelineMetrics @Inject constructor() {
         return TryOnPipelineMetricsSnapshot(
             sampleCount = values.size,
             effectiveFps = effectiveFps,
-            p50Ms = percentile(sorted, 0.50f),
-            p90Ms = percentile(sorted, 0.90f),
-            p95Ms = percentile(sorted, 0.95f),
+            p50Ms = percentile(sorted, MEDIAN_PERCENTILE),
+            p90Ms = percentile(sorted, P90_PERCENTILE),
+            p95Ms = percentile(sorted, P95_PERCENTILE),
             maxMs = sorted.last(),
             mediaPipeMs = values.map { it.mediaPipeMs }.average().toFloat(),
             segmentationMs = values.map { it.segmentationMs }.average().toFloat(),
@@ -76,6 +76,9 @@ class TryOnPipelineMetrics @Inject constructor() {
     companion object {
         const val WINDOW_SIZE = 60
         private const val MILLIS_PER_SECOND = 1000f
+        private const val MEDIAN_PERCENTILE = 0.50f
+        private const val P90_PERCENTILE = 0.90f
+        private const val P95_PERCENTILE = 0.95f
 
         @Volatile
         var latestDebugSnapshot: TryOnPipelineMetricsSnapshot = TryOnPipelineMetricsSnapshot.EMPTY
