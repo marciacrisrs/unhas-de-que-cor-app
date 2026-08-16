@@ -30,11 +30,7 @@ object NailGeometryValidator {
         val boundsWidth = roi.bounds.width()
         val boundsHeight = roi.bounds.height()
 
-        if (roi.lengthPx < NailPlateCalibration.MIN_NAIL_LEN_PX ||
-            roi.lengthPx > NailPlateCalibration.MAX_NAIL_LEN_PX ||
-            roi.widthPx < NailPlateCalibration.MIN_NAIL_WID_PX ||
-            roi.widthPx > NailPlateCalibration.MAX_NAIL_WID_PX
-        ) {
+        if (hasInvalidNailDimensions(roi)) {
             return Result(false, Reason.NAIL_DIMENSIONS_INVALID)
         }
 
@@ -57,23 +53,35 @@ object NailGeometryValidator {
         }
 
         val mask = nail.mask
-        if (mask.width < MIN_MASK_DIMENSION_PX ||
-            mask.height < MIN_MASK_DIMENSION_PX ||
-            mask.width > MAX_MASK_DIMENSION_PX ||
-            mask.height > MAX_MASK_DIMENSION_PX ||
-            mask.alpha.size != mask.width * mask.height
-        ) {
+        if (hasInvalidMask(mask)) {
             return Result(false, Reason.MASK_INVALID)
         }
 
-        if (abs(mask.originX - roi.bounds.left) > MAX_ORIGIN_DELTA_PX ||
-            abs(mask.originY - roi.bounds.top) > MAX_ORIGIN_DELTA_PX
-        ) {
+        if (hasMaskRoiMismatch(mask, roi)) {
             return Result(false, Reason.MASK_ROI_MISMATCH)
         }
 
         return Result(true, Reason.VALID)
     }
+
+    private fun hasInvalidNailDimensions(roi: NailRoi): Boolean =
+        roi.lengthPx < NailPlateCalibration.MIN_NAIL_LEN_PX ||
+            roi.lengthPx > NailPlateCalibration.MAX_NAIL_LEN_PX ||
+            roi.widthPx < NailPlateCalibration.MIN_NAIL_WID_PX ||
+            roi.widthPx > NailPlateCalibration.MAX_NAIL_WID_PX
+
+    private fun hasInvalidMask(mask: NailMask): Boolean =
+        hasInvalidMaskDimensions(mask) || mask.alpha.size != mask.width * mask.height
+
+    private fun hasInvalidMaskDimensions(mask: NailMask): Boolean =
+        mask.width < MIN_MASK_DIMENSION_PX ||
+            mask.height < MIN_MASK_DIMENSION_PX ||
+            mask.width > MAX_MASK_DIMENSION_PX ||
+            mask.height > MAX_MASK_DIMENSION_PX
+
+    private fun hasMaskRoiMismatch(mask: NailMask, roi: NailRoi): Boolean =
+        abs(mask.originX - roi.bounds.left) > MAX_ORIGIN_DELTA_PX ||
+            abs(mask.originY - roi.bounds.top) > MAX_ORIGIN_DELTA_PX
 
     private const val MIN_ROI_WIDTH_PX = 10
     private const val MIN_ROI_HEIGHT_PX = 14
