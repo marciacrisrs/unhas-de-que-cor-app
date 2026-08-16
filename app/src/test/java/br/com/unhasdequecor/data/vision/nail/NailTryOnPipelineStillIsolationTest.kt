@@ -36,12 +36,14 @@ class NailTryOnPipelineStillIsolationTest {
         every { landmarkProcessor.detectLandmarksWithOrientationFallback(image) } returns null
 
         val valid = nail(confidence = 0.9f, x = 100f)
-        // Must remain paintable (>= 0.32) so the same frame can prove that
-        // the pre-STILL velocity is reused when temporal state is present.
-        val lowConfidence = nail(confidence = 0.4f, x = 111f)
+        // Below the paintable floor, so Live must recover using temporal state.
+        val lowConfidenceLive = nail(confidence = 0.2f, x = 111f)
+        // Above the paintable floor, so the first frame after STILL can be
+        // accepted directly and prove that no old temporal state remains.
+        val firstAfterStill = nail(confidence = 0.4f, x = 111f)
 
         tracker.stabilize(listOf(valid))
-        val liveResult = tracker.stabilize(listOf(lowConfidence))
+        val liveResult = tracker.stabilize(listOf(lowConfidenceLive))
         assertTrue(liveResult.isNotEmpty())
         assertTrue(tracker.lastPredictionReport.predictionApplied)
         assertEquals(NailPredictionReason.APPLIED, tracker.lastPredictionReport.predictionReason)
@@ -50,10 +52,10 @@ class NailTryOnPipelineStillIsolationTest {
 
         assertEquals(null, result)
 
-        // After STILL reset, the next Live frame starts from scratch. The low
-        // confidence frame is accepted as the first frame instead of being
-        // predicted from the previous Live velocity/state.
-        val afterStill = tracker.stabilize(listOf(lowConfidence))
+        // After STILL reset, the next Live frame starts from scratch. A
+        // paintable frame is accepted as-is instead of using the previous
+        // Live velocity/state.
+        val afterStill = tracker.stabilize(listOf(firstAfterStill))
         assertEquals(1, afterStill.size)
         assertEquals(111f, afterStill.single().roi.axisToTip.x, 0.001f)
         assertFalse(tracker.lastPredictionReport.predictionApplied)
