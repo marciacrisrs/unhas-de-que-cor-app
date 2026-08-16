@@ -16,30 +16,22 @@ data class NailTryOnResult(
     val paintedViaEllipse: Boolean = false,
 )
 
-/**
- * Detecção estável (landmarks + máscaras) reutilizável quando só a cor do esmalte muda.
- */
 data class NailDetectionSnapshot(
     val workingBitmap: Bitmap,
     val nails: List<DetectedNail>,
     val landmarks: HandLandmarks?,
-    /** True se [workingBitmap] é bitmap intermediária (ex.: rotação) distinta da fonte. */
     val ownsWorkingBitmap: Boolean,
     val reliability: TryOnReliability,
-    /**
-     * Motivo tipado quando a detecção é fraca / rejeitada (feedback ISSUE 005).
-     * Null em caminhos FULL saudáveis.
-     */
     val failureReason: DetectionFailureReason? = null,
-    /** Barreira do floor que limitou o resultado (rastreio / testes). */
     val rejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
 )
 
 /**
  * Pipeline: landmarks → ROI → segmentação → tracking → cor.
- * Pronto para câmera ao vivo; hoje usado na foto estática do Resultado.
  *
- * Separe [detect] de [recolor] para não reprocessar MediaPipe a cada troca de cor.
+ * `stabilize=false` é o contrato do STILL: a captura é one-shot e não pode
+ * herdar estado temporal de uma sessão Live anterior. Por isso o tracker é
+ * limpo antes de qualquer early return desse caminho.
  */
 @Singleton
 class NailTryOnPipeline @Inject constructor(
@@ -72,7 +64,6 @@ class NailTryOnPipeline @Inject constructor(
             return null
         }
         val result = recolor(snapshot, polishColor)
-        // process() é one-shot: se a pintura gerou bitmap nova e working era intermediária, libera.
         if (result.bitmap !== snapshot.workingBitmap &&
             snapshot.ownsWorkingBitmap &&
             !snapshot.workingBitmap.isRecycled
@@ -86,14 +77,18 @@ class NailTryOnPipeline @Inject constructor(
         image: Bitmap,
         stabilize: Boolean = false,
     ): NailDetectionSnapshot? {
+        // STILL is a one-shot boundary. Reset before detection so even a
+        // missing/failed frame cannot leave temporal state behind for Live.
+        if (!stabilize) {
+            tracker.reset()
+        }
+
         val oriented = landmarkProcessor.detectLandmarksWithOrientationFallback(image)
             ?: return null
         val landmarks = oriented.landmarks
         val working = oriented.bitmap
         val ownsWorking = working !== image
 
-        // Reject precoce: não gasta ROI/segmentação em presence abaixo do piso.
-        // Mantém snapshot REJECTED (com motivo) para feedback tipado na UI.
         val reliability = TryOnHandReliability.classify(landmarks)
         val lighting = ImageLightingSampler.sample(working)
         if (reliability == TryOnReliability.REJECTED) {
@@ -101,10 +96,7 @@ class NailTryOnPipeline @Inject constructor(
         }
 
         val segmented = segmentPaintableNails(working, landmarks)
-        val rawNails = if (stabilize) tracker.stabilize(segmented.nails) else {
-            tracker.reset()
-            segmented.nails
-        }
+        val rawNails = if (stabilize) tracker.stabilize(segmented.nails) else segmented.nails
         val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
         val adjusted = adjustReliability(reliability, nails)
         val barrier = resolveBarrier(
@@ -195,7 +187,6 @@ class NailTryOnPipeline @Inject constructor(
         reliability: TryOnReliability,
         nails: List<DetectedNail>,
     ): TryOnReliability {
-        // Uma única unha paintable (assimétrico vs mapper ≥2): não claim STRONG.
         val demote =
             reliability == TryOnReliability.STRONG &&
                 nails.size in 1 until NailLandmarkMapper.MIN_PLAUSIBLE_NAILS &&
@@ -259,8 +250,6 @@ class NailTryOnPipeline @Inject constructor(
                 paintedViaEllipse = false,
             )
         }
-        // Caminho almond vs elipse: usa piso de pintura, não o de claim FULL.
-        // Sem unhas paintable: não pintar elipse aqui — a UI decide via planRender.
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
         val (painted, viaEllipse) = when {
             paintableCount >= DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH -> {
@@ -310,13 +299,11 @@ class NailTryOnPipeline @Inject constructor(
 
     private fun segmentationConfidence(mask: NailMask, roi: NailRoi): Float {
         val filled = mask.filledRatio()
-        // Cobertura relativa à área da placa (não ao crop com padding).
         val plateArea = (roi.lengthPx * roi.widthPx).coerceAtLeast(1f)
         val solidPixels = mask.width * mask.height * filled
         val coverage = (solidPixels / plateArea).coerceIn(0f, COVERAGE_CLAMP)
         return when {
             filled < FILL_TOO_LOW -> SCORE_VERY_LOW
-            // Soft almond + pad costuma encher o crop; não trate isso como pele.
             filled > FILL_TOO_HIGH && coverage < SKIN_RISK_COVERAGE_MAX -> SCORE_SKIN_RISK
             coverage in COVERAGE_GOOD -> SCORE_HIGH
             coverage in COVERAGE_OK -> SCORE_MID
@@ -325,7 +312,6 @@ class NailTryOnPipeline @Inject constructor(
     }
 
     private companion object {
-        // Prioriza geometria: unhas naturais falham em heurística de pele.
         const val GEO_WEIGHT = 0.65f
         const val SEG_WEIGHT = 0.35f
         const val COVERAGE_CLAMP = 1.8f
