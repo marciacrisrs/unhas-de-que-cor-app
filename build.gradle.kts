@@ -24,11 +24,10 @@ sonar {
         )
 
         property("sonar.sourceEncoding", "UTF-8")
-        // Explicitly anchor the analysis in the Android module. Without this,
-        // imported JaCoCo/Detekt/Lint paths can be resolved against the root
-        // project and Sonar reports existing Kotlin files as "not found".
-        property("sonar.sources", "app/src/main")
-        property("sonar.tests", "app/src/test")
+        // Restrict Sonar to JVM source sets. Android resources under res/ are
+        // not source code and must not be indexed by the scanner.
+        property("sonar.sources", "app/src/main/java")
+        property("sonar.tests", "app/src/test/java")
 
         val appBuildDir = project(":app").layout.buildDirectory.get().asFile
         property(
@@ -47,7 +46,6 @@ sonar {
         // Default true: CI/PR só fica verde com Quality Gate aprovado.
         property("sonar.qualitygate.wait", envOrProp("SONAR_QUALITY_GATE_WAIT") ?: "true")
 
-        // Paths absolutos: o scanner resolve relativos a partir de :app → `app/app/build/...`.
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
             "${appBuildDir}/reports/jacoco/jacocoAppReport/jacocoAppReport.xml",
