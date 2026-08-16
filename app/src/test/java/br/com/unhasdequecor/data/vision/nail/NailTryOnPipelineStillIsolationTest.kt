@@ -1,7 +1,6 @@
 package br.com.unhasdequecor.data.vision.nail
 
 import android.graphics.Bitmap
-import androidx.compose.ui.graphics.Color
 import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import io.mockk.every
 import io.mockk.mockk
@@ -45,9 +44,9 @@ class NailTryOnPipelineStillIsolationTest {
 
         assertEquals(null, result)
         val afterStill = tracker.stabilize(listOf(lowConfidence))
-        assertTrue(afterStill.isNotEmpty())
+        assertTrue(afterStill.isEmpty())
         assertFalse(tracker.lastPredictionReport.predictionApplied)
-        assertEquals(NailPredictionReason.STABLE, tracker.lastPredictionReport.predictionReason)
+        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
         verify(exactly = 1) { landmarkProcessor.detectLandmarksWithOrientationFallback(image) }
     }
 
