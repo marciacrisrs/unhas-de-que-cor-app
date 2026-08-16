@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
+import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetrics
 import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetricsSnapshot
 
 /**
@@ -26,7 +27,7 @@ import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetricsSnapshot
 fun NailDebugOverlay(
     landmarks: HandLandmarks?,
     nails: List<DetectedNail>,
-    metrics: TryOnPipelineMetricsSnapshot = TryOnPipelineMetricsSnapshot.EMPTY,
+    metrics: TryOnPipelineMetricsSnapshot = TryOnPipelineMetrics.latestDebugSnapshot,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
