@@ -60,9 +60,9 @@ class NailTryOnPipelineStillFixtureTest {
                 snapshot.nails.forEach { detected ->
                     assertThat(detected.confidence)
                         .isAtLeast(DetectionConfidenceFloor.NAIL_FULL_MIN)
-                    assertThat(detected.mask.width)
+                    assertThat(detected.mask.width())
                         .isEqualTo(detected.roi.bounds.width)
-                    assertThat(detected.mask.height)
+                    assertThat(detected.mask.height())
                         .isEqualTo(detected.roi.bounds.height)
                     assertThat(detected.mask.originX)
                         .isEqualTo(detected.roi.bounds.left)
