@@ -18,8 +18,8 @@ import javax.inject.Singleton
  *
  * Em fotos difíceis (contraluz, mão escura, horizontal), avalia variantes
  * (contraste/gamma/brilho/espelho/rotação) e escolhe a de maior
- * [HandLandmarkQuality.rankingScore] (presence + span das tips) — não fica na
- * primeira detecção fraca nem na primeira presence só “forte”.
+ * [HandLandmarkQuality.rankingScore] — não fica na primeira detecção fraca nem
+ * na primeira presence só “forte”.
  */
 @Singleton
 class MediaPipeHandNailDetector @Inject constructor(
@@ -31,6 +31,21 @@ class MediaPipeHandNailDetector @Inject constructor(
 
     override fun detectLandmarks(bitmap: Bitmap): HandLandmarks? =
         detectLandmarksOnBitmap(bitmap, remap = { it })
+
+    /**
+     * Live path: run the raw frame first and pay the enhancement/rotation fan-out
+     * only when the raw result is missing or not strong/open enough to be a safe
+     * early-stop candidate. Stable frames therefore avoid several bitmap copies
+     * and MediaPipe IMAGE inferences while difficult frames retain the existing
+     * recovery behavior.
+     */
+    override fun detectLandmarksForLive(bitmap: Bitmap): OrientedHandLandmarks? {
+        val raw = detectLandmarks(bitmap)
+        if (raw != null && HandLandmarkQuality.shouldStopSearching(raw)) {
+            return OrientedHandLandmarks(bitmap = bitmap, landmarks = raw)
+        }
+        return detectLandmarksWithOrientationFallback(bitmap)
+    }
 
     override fun detectLandmarksWithOrientationFallback(bitmap: Bitmap): OrientedHandLandmarks? {
         val created = ArrayList<Bitmap>(OWNED_VARIANT_CAPACITY)
