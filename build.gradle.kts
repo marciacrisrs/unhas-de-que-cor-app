@@ -24,10 +24,6 @@ sonar {
         )
 
         property("sonar.sourceEncoding", "UTF-8")
-        // Restrict Sonar to JVM source sets. Android resources under res/ are
-        // not source code and must not be indexed by the scanner.
-        property("sonar.sources", "app/src/main/java")
-        property("sonar.tests", "app/src/test/java")
 
         val appBuildDir = project(":app").layout.buildDirectory.get().asFile
         property(
