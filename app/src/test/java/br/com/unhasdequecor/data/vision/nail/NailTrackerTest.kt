@@ -195,7 +195,14 @@ class NailTrackerTest {
     fun `mask origin mismatch is rejected before render`() {
         val tracker = NailTracker()
         val valid = nail(x = 100f, y = 100f)
-        val mismatched = nail(x = 110f, y = 100f, maskX = 116, maskY = 100)
+        val mismatched = nail(
+            x = 110f,
+            y = 100f,
+            maskX = 116,
+            maskY = 100,
+            boundsX = 110,
+            boundsY = 100,
+        )
 
         tracker.stabilize(listOf(valid))
         val result = tracker.stabilize(listOf(mismatched))
@@ -241,6 +248,8 @@ class NailTrackerTest {
         y: Float,
         maskX: Int = x.toInt(),
         maskY: Int = y.toInt(),
+        boundsX: Int = maskX,
+        boundsY: Int = maskY,
         rotation: Float = 0f,
         length: Float = 40f,
         width: Float = 20f,
@@ -250,7 +259,7 @@ class NailTrackerTest {
     ): DetectedNail {
         val roi = NailRoi(
             finger = Finger.INDEX,
-            bounds = PixelRect(maskX, maskY, maskX + width.toInt(), maskY + length.toInt()),
+            bounds = PixelRect(boundsX, boundsY, boundsX + width.toInt(), boundsY + length.toInt()),
             polygon = listOf(
                 PixelPoint(x, y),
                 PixelPoint(x + width, y),
