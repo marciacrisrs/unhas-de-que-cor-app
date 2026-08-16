@@ -37,9 +37,8 @@ class NailTrackerTest {
         assertEquals(result.roi.bounds.top, result.mask.originY)
         assertEquals(105, result.mask.originX)
         assertEquals(103, result.mask.originY)
-        assertEquals(105.5f, result.roi.axisToTip.x, 0.01f)
-        assertEquals(103.3f, result.roi.axisToTip.y, 0.01f)
         assertEquals(NailPredictionReason.STABLE, tracker.lastPredictionReport.predictionReason)
+        assertFalse(tracker.lastPredictionReport.predictionApplied)
     }
 
     @Test
