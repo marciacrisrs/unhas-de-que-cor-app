@@ -5,7 +5,6 @@ import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.OrientedHandLandmarks
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.NormPoint
-import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -93,7 +92,4 @@ class NailTryOnPipelineLivePathTest {
         NormPoint(0.74f, 0.23f),
         NormPoint(0.38f, 0.58f),
     )
-
-    @Suppress("unused")
-    private fun sanity(value: Any?) = assertThat(value).isNotNull()
 }
