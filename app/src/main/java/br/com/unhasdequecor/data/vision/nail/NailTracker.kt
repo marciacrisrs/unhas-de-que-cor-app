@@ -17,6 +17,7 @@ import javax.inject.Singleton
 class NailTracker @Inject constructor() {
     private val previous = linkedMapOf<Finger, DetectedNail>()
     private val velocity = linkedMapOf<Finger, PixelPoint>()
+    private val invalidGeometryRecoveryFrames = linkedMapOf<Finger, Int>()
 
     @Volatile
     var lastPredictionReport: NailPredictionReport = NailPredictionReport.stable()
@@ -25,6 +26,7 @@ class NailTracker @Inject constructor() {
     fun reset() {
         previous.clear()
         velocity.clear()
+        invalidGeometryRecoveryFrames.clear()
         lastPredictionReport = NailPredictionReport.stable()
     }
 
@@ -49,6 +51,13 @@ class NailTracker @Inject constructor() {
     }
 
     private fun stabilizeNail(nail: DetectedNail): StabilizedNail {
+        val geometry = NailGeometryValidator.validate(nail)
+        if (!geometry.valid) {
+            return recoverInvalidGeometry(nail, geometry.reason)
+        }
+
+        invalidGeometryRecoveryFrames.remove(nail.finger)
+
         val prev = previous[nail.finger]
             ?: return StabilizedNail(
                 nail = nail,
@@ -63,6 +72,39 @@ class NailTracker @Inject constructor() {
             isRecoverableLowConfidence(nail, prev) -> recoverLowConfidence(nail, prev, motion)
             else -> blendLowConfidence(prev, nail, motion)
         }
+    }
+
+    private fun recoverInvalidGeometry(
+        nail: DetectedNail,
+        reason: NailGeometryValidator.Reason,
+    ): StabilizedNail {
+        val prev = previous[nail.finger]
+        val usedFrames = invalidGeometryRecoveryFrames[nail.finger] ?: 0
+        if (prev == null || usedFrames >= MAX_INVALID_GEOMETRY_RECOVERY_FRAMES) {
+            return StabilizedNail(
+                nail = null,
+                report = NailPredictionReport(
+                    predictionApplied = false,
+                    trans = PixelPoint(0f, 0f),
+                    predictionReason = NailPredictionReason.GEOMETRY_REJECTED,
+                    geometryReason = reason,
+                ),
+            )
+        }
+
+        invalidGeometryRecoveryFrames[nail.finger] = usedFrames + 1
+        val recovered = prev.copy(
+            confidence = prev.confidence * INVALID_RECOVERY_CONFIDENCE_DECAY,
+        )
+        return StabilizedNail(
+            nail = recovered,
+            report = NailPredictionReport(
+                predictionApplied = false,
+                trans = PixelPoint(0f, 0f),
+                predictionReason = NailPredictionReason.RECOVERY,
+                geometryReason = reason,
+            ),
+        )
     }
 
     private fun acceptConfidentFrame(
@@ -245,6 +287,8 @@ class NailTracker @Inject constructor() {
         const val SCALE_REJECTION_RATIO = 0.15f
         const val BLEND_ALPHA = 0.55f
         const val RECOVERY_CONFIDENCE_DECAY = 0.92f
+        const val INVALID_RECOVERY_CONFIDENCE_DECAY = 0.94f
+        const val MAX_INVALID_GEOMETRY_RECOVERY_FRAMES = 2
     }
 }
 
@@ -264,6 +308,7 @@ enum class NailPredictionReason {
     ROTATION,
     SCALE,
     RECOVERY,
+    GEOMETRY_REJECTED,
     STABLE,
 }
 
@@ -271,6 +316,7 @@ data class NailPredictionReport(
     val predictionApplied: Boolean,
     val trans: PixelPoint,
     val predictionReason: NailPredictionReason,
+    val geometryReason: NailGeometryValidator.Reason? = null,
 ) {
     companion object {
         fun stable() = NailPredictionReport(

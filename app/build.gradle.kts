@@ -225,6 +225,7 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/ui/navigation/Routes*",
     "**/br/com/unhasdequecor/ui/navigation/ResultSources*",
     "**/br/com/unhasdequecor/ui/navigation/MainSwipeTabs*",
+    "**/br/com/unhasdequecor/data/vision/nail/NailGeometryValidator*",
 )
 
 val jacocoExcludes = listOf(

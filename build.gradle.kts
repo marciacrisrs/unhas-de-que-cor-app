@@ -24,11 +24,24 @@ sonar {
         )
 
         property("sonar.sourceEncoding", "UTF-8")
+
+        val appBuildDir = project(":app").layout.buildDirectory.get().asFile
+        property(
+            "sonar.java.binaries",
+            listOf(
+                appBuildDir.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
+                appBuildDir.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
+            ).joinToString(","),
+        )
+        property(
+            "sonar.java.test.binaries",
+            appBuildDir.resolve("intermediates/javac/debugUnitTest/compileDebugUnitTestJavaWithJavac/classes")
+                .absolutePath,
+        )
+
         // Default true: CI/PR só fica verde com Quality Gate aprovado.
         property("sonar.qualitygate.wait", envOrProp("SONAR_QUALITY_GATE_WAIT") ?: "true")
 
-        // Paths absolutos: o scanner resolve relativos a partir de :app → `app/app/build/...`.
-        val appBuildDir = project(":app").layout.buildDirectory.get().asFile
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
             "${appBuildDir}/reports/jacoco/jacocoAppReport/jacocoAppReport.xml",
