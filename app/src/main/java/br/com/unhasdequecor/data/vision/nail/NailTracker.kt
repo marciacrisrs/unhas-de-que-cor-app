@@ -3,7 +3,6 @@ package br.com.unhasdequecor.data.vision.nail
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelRect
 import kotlin.math.abs
-import kotlin.math.hypot
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,112 +30,131 @@ class NailTracker @Inject constructor() {
 
     fun stabilize(current: List<DetectedNail>): List<DetectedNail> {
         if (current.isEmpty()) {
-            lastPredictionReport = NailPredictionReport(
-                predictionApplied = false,
-                trans = PixelPoint(0f, 0f),
-                predictionReason = NailPredictionReason.RECOVERY,
-            )
+            lastPredictionReport = NailPredictionReport.recovery()
             return emptyList()
         }
 
         var report = NailPredictionReport.stable()
         val out = ArrayList<DetectedNail>(current.size)
         for (nail in current) {
-            val prev = previous[nail.finger]
-            if (prev == null) {
-                out += nail
-                previous[nail.finger] = nail
-                velocity[nail.finger] = PixelPoint(0f, 0f)
-                continue
+            val result = stabilizeNail(nail)
+            if (result.nail != null && DetectionConfidenceFloor.acceptsNail(result.nail.confidence)) {
+                out += result.nail
+                previous[nail.finger] = result.nail
             }
-
-            val delta = translation(prev, nail)
-            val rotationDelta = abs(shortestAngleDelta(prev.roi.rotationDegrees, nail.roi.rotationDegrees))
-            val scaleDelta = scaleDelta(prev, nail)
-            val translational = rotationDelta <= ROTATION_REJECTION_DEG && scaleDelta <= SCALE_REJECTION_RATIO
-
-            val stabilized = when {
-                nail.confidence >= prev.confidence -> {
-                    if (translational) {
-                        velocity[nail.finger] = delta
-                        report = NailPredictionReport(
-                            predictionApplied = false,
-                            trans = delta,
-                            predictionReason = NailPredictionReason.STABLE,
-                        )
-                    } else {
-                        velocity[nail.finger] = PixelPoint(0f, 0f)
-                        report = NailPredictionReport(
-                            predictionApplied = false,
-                            trans = delta,
-                            predictionReason = if (rotationDelta > ROTATION_REJECTION_DEG) {
-                                NailPredictionReason.ROTATION
-                            } else {
-                                NailPredictionReason.SCALE
-                            },
-                        )
-                    }
-                    nail
-                }
-
-                !DetectionConfidenceFloor.acceptsNail(nail.confidence) &&
-                    DetectionConfidenceFloor.acceptsNail(prev.confidence) -> {
-                    if (translational) {
-                        val predicted = translate(prev, velocity[nail.finger] ?: delta)
-                        report = NailPredictionReport(
-                            predictionApplied = true,
-                            trans = velocity[nail.finger] ?: delta,
-                            predictionReason = NailPredictionReason.APPLIED,
-                        )
-                        predicted.copy(confidence = prev.confidence * RECOVERY_CONFIDENCE_DECAY)
-                    } else {
-                        velocity[nail.finger] = PixelPoint(0f, 0f)
-                        report = NailPredictionReport(
-                            predictionApplied = false,
-                            trans = delta,
-                            predictionReason = NailPredictionReason.RECOVERY,
-                        )
-                        nail
-                    }
-                }
-
-                else -> {
-                    val blended = blend(prev, nail, alpha = BLEND_ALPHA)
-                    velocity[nail.finger] = delta
-                    report = NailPredictionReport(
-                        predictionApplied = false,
-                        trans = delta,
-                        predictionReason = if (rotationDelta > ROTATION_REJECTION_DEG) {
-                            NailPredictionReason.ROTATION
-                        } else if (scaleDelta > SCALE_REJECTION_RATIO) {
-                            NailPredictionReason.SCALE
-                        } else {
-                            NailPredictionReason.STABLE
-                        },
-                    )
-                    blended
-                }
-            }
-
-            if (DetectionConfidenceFloor.acceptsNail(stabilized.confidence)) {
-                out += stabilized
-                previous[nail.finger] = stabilized
-            }
+            report = result.report
         }
         lastPredictionReport = report
         return out
     }
 
+    private fun stabilizeNail(nail: DetectedNail): StabilizedNail {
+        val prev = previous[nail.finger]
+            ?: return StabilizedNail(
+                nail = nail,
+                report = NailPredictionReport.stable(),
+            ).also {
+                velocity[nail.finger] = PixelPoint(0f, 0f)
+            }
+
+        val motion = classifyMotion(prev, nail)
+        return when {
+            nail.confidence >= prev.confidence -> acceptConfidentFrame(nail, motion)
+            isRecoverableLowConfidence(nail, prev) -> recoverLowConfidence(nail, prev, motion)
+            else -> blendLowConfidence(prev, nail, motion)
+        }
+    }
+
+    private fun acceptConfidentFrame(
+        nail: DetectedNail,
+        motion: MotionClassification,
+    ): StabilizedNail {
+        velocity[nail.finger] = if (motion.isTranslational) motion.delta else PixelPoint(0f, 0f)
+        return StabilizedNail(
+            nail = nail,
+            report = NailPredictionReport(
+                predictionApplied = false,
+                trans = motion.delta,
+                predictionReason = motion.reason,
+            ),
+        )
+    }
+
+    private fun recoverLowConfidence(
+        nail: DetectedNail,
+        prev: DetectedNail,
+        motion: MotionClassification,
+    ): StabilizedNail {
+        if (!motion.isTranslational) {
+            velocity[nail.finger] = PixelPoint(0f, 0f)
+            return StabilizedNail(
+                nail = nail,
+                report = NailPredictionReport(
+                    predictionApplied = false,
+                    trans = motion.delta,
+                    predictionReason = NailPredictionReason.RECOVERY,
+                ),
+            )
+        }
+
+        val prediction = velocity[nail.finger] ?: motion.delta
+        val predicted = translate(prev, prediction)
+        return StabilizedNail(
+            nail = predicted.copy(confidence = prev.confidence * RECOVERY_CONFIDENCE_DECAY),
+            report = NailPredictionReport(
+                predictionApplied = true,
+                trans = prediction,
+                predictionReason = NailPredictionReason.APPLIED,
+            ),
+        )
+    }
+
+    private fun blendLowConfidence(
+        prev: DetectedNail,
+        next: DetectedNail,
+        motion: MotionClassification,
+    ): StabilizedNail {
+        velocity[next.finger] = motion.delta
+        return StabilizedNail(
+            nail = blend(prev, next, alpha = BLEND_ALPHA),
+            report = NailPredictionReport(
+                predictionApplied = false,
+                trans = motion.delta,
+                predictionReason = motion.reason,
+            ),
+        )
+    }
+
+    private fun classifyMotion(prev: DetectedNail, next: DetectedNail): MotionClassification {
+        val delta = translation(prev, next)
+        val rotationDelta = abs(shortestAngleDelta(prev.roi.rotationDegrees, next.roi.rotationDegrees))
+        val scaleChange = scaleDelta(prev, next)
+        val reason = when {
+            rotationDelta > ROTATION_REJECTION_DEG -> NailPredictionReason.ROTATION
+            scaleChange > SCALE_REJECTION_RATIO -> NailPredictionReason.SCALE
+            else -> NailPredictionReason.STABLE
+        }
+        return MotionClassification(
+            delta = delta,
+            isTranslational = reason == NailPredictionReason.STABLE,
+            reason = reason,
+        )
+    }
+
+    private fun isRecoverableLowConfidence(
+        nail: DetectedNail,
+        prev: DetectedNail,
+    ): Boolean =
+        !DetectionConfidenceFloor.acceptsNail(nail.confidence) &&
+            DetectionConfidenceFloor.acceptsNail(prev.confidence)
+
     private fun blend(prev: DetectedNail, next: DetectedNail, alpha: Float): DetectedNail {
         val t = alpha.coerceIn(0f, 1f)
-        val rotationDelta = abs(shortestAngleDelta(prev.roi.rotationDegrees, next.roi.rotationDegrees))
-        val scaleDelta = scaleDelta(prev, next)
+        val motion = classifyMotion(prev, next)
 
         // Mudança relevante de escala/rotação: nunca combine geometria antiga
         // com máscara nova. O frame NEXT é a unidade coerente.
-        if (rotationDelta > ROTATION_REJECTION_DEG || scaleDelta > SCALE_REJECTION_RATIO) {
-            return next
-        }
+        if (!motion.isTranslational) return next
 
         val pb = prev.roi.bounds
         val nb = next.roi.bounds
@@ -159,13 +177,13 @@ class NailTracker @Inject constructor() {
             geometricConfidence = maxOf(prev.roi.geometricConfidence, next.roi.geometricConfidence),
         )
 
-        val mask = when {
-            sameMaskShape(prev.mask, next.mask) -> {
-                val originX = lerp(prev.mask.originX, next.mask.originX, t)
-                val originY = lerp(prev.mask.originY, next.mask.originY, t)
-                next.mask.copy(originX = originX, originY = originY)
-            }
-            else -> next.mask
+        val mask = if (sameMaskShape(prev.mask, next.mask)) {
+            next.mask.copy(
+                originX = lerp(prev.mask.originX, next.mask.originX, t),
+                originY = lerp(prev.mask.originY, next.mask.originY, t),
+            )
+        } else {
+            next.mask
         }
 
         return DetectedNail(
@@ -233,6 +251,17 @@ class NailTracker @Inject constructor() {
     }
 }
 
+private data class MotionClassification(
+    val delta: PixelPoint,
+    val isTranslational: Boolean,
+    val reason: NailPredictionReason,
+)
+
+private data class StabilizedNail(
+    val nail: DetectedNail?,
+    val report: NailPredictionReport,
+)
+
 enum class NailPredictionReason {
     APPLIED,
     ROTATION,
@@ -251,6 +280,12 @@ data class NailPredictionReport(
             predictionApplied = false,
             trans = PixelPoint(0f, 0f),
             predictionReason = NailPredictionReason.STABLE,
+        )
+
+        fun recovery() = NailPredictionReport(
+            predictionApplied = false,
+            trans = PixelPoint(0f, 0f),
+            predictionReason = NailPredictionReason.RECOVERY,
         )
     }
 }
