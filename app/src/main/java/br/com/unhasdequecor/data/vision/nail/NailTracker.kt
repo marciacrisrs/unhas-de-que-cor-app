@@ -152,9 +152,10 @@ class NailTracker @Inject constructor() {
         val t = alpha.coerceIn(0f, 1f)
         val motion = classifyMotion(prev, next)
 
-        // Mudança relevante de escala/rotação: nunca combine geometria antiga
-        // com máscara nova. O frame NEXT é a unidade coerente.
-        if (!motion.isTranslational) return next
+        // Mudança relevante de escala/rotação ou incompatibilidade de máscara:
+        // nunca combine geometria antiga com uma máscara nova. O frame NEXT é
+        // a unidade coerente de máscara + ROI.
+        if (!motion.isTranslational || !sameMaskShape(prev.mask, next.mask)) return next
 
         val pb = prev.roi.bounds
         val nb = next.roi.bounds
@@ -177,14 +178,10 @@ class NailTracker @Inject constructor() {
             geometricConfidence = maxOf(prev.roi.geometricConfidence, next.roi.geometricConfidence),
         )
 
-        val mask = if (sameMaskShape(prev.mask, next.mask)) {
-            next.mask.copy(
-                originX = lerp(prev.mask.originX, next.mask.originX, t),
-                originY = lerp(prev.mask.originY, next.mask.originY, t),
-            )
-        } else {
-            next.mask
-        }
+        val mask = next.mask.copy(
+            originX = lerp(prev.mask.originX, next.mask.originX, t),
+            originY = lerp(prev.mask.originY, next.mask.originY, t),
+        )
 
         return DetectedNail(
             finger = next.finger,
