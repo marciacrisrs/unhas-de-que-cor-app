@@ -89,7 +89,11 @@ class NailTryOnPipeline @Inject constructor(
         }
 
         val mediaPipeStartNs = System.nanoTime()
-        val oriented = landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        val oriented = if (stabilize) {
+            landmarkProcessor.detectLandmarksForLive(image)
+        } else {
+            landmarkProcessor.detectLandmarksWithOrientationFallback(image)
+        }
         val mediaPipeMs = elapsedMs(mediaPipeStartNs)
         if (oriented == null) {
             recordMetrics(
