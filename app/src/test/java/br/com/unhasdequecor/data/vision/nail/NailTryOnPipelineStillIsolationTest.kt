@@ -7,6 +7,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,18 +36,31 @@ class NailTryOnPipelineStillIsolationTest {
         every { landmarkProcessor.detectLandmarksWithOrientationFallback(image) } returns null
 
         val valid = nail(confidence = 0.9f, x = 100f)
-        val lowConfidence = nail(confidence = 0.2f, x = 111f)
+        // Below the paintable floor, so Live must recover using temporal state.
+        val lowConfidenceLive = nail(confidence = 0.2f, x = 111f)
+        // Above the paintable floor, so the first frame after STILL can be
+        // accepted directly and prove that no old temporal state remains.
+        val firstAfterStill = nail(confidence = 0.4f, x = 111f)
 
         tracker.stabilize(listOf(valid))
-        assertTrue(tracker.stabilize(listOf(lowConfidence)).isNotEmpty())
+        val liveResult = tracker.stabilize(listOf(lowConfidenceLive))
+        assertTrue(liveResult.isNotEmpty())
+        assertTrue(tracker.lastPredictionReport.predictionApplied)
+        assertEquals(NailPredictionReason.APPLIED, tracker.lastPredictionReport.predictionReason)
 
         val result = pipeline.detect(image, stabilize = false)
 
         assertEquals(null, result)
-        val afterStill = tracker.stabilize(listOf(lowConfidence))
-        assertTrue(afterStill.isEmpty())
+
+        // After STILL reset, the next Live frame starts from scratch. A
+        // paintable frame is accepted as-is instead of using the previous
+        // Live velocity/state.
+        val afterStill = tracker.stabilize(listOf(firstAfterStill))
+        assertEquals(1, afterStill.size)
+        assertEquals(111f, afterStill.single().roi.axisToTip.x, 0.001f)
         assertFalse(tracker.lastPredictionReport.predictionApplied)
-        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
+        assertEquals(NailPredictionReason.STABLE, tracker.lastPredictionReport.predictionReason)
+        assertNotNull(afterStill.single())
         verify(exactly = 1) { landmarkProcessor.detectLandmarksWithOrientationFallback(image) }
     }
 
