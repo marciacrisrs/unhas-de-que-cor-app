@@ -7,6 +7,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,15 +39,24 @@ class NailTryOnPipelineStillIsolationTest {
         val lowConfidence = nail(confidence = 0.2f, x = 111f)
 
         tracker.stabilize(listOf(valid))
-        assertTrue(tracker.stabilize(listOf(lowConfidence)).isNotEmpty())
+        val liveResult = tracker.stabilize(listOf(lowConfidence))
+        assertTrue(liveResult.isNotEmpty())
+        assertTrue(tracker.lastPredictionReport.predictionApplied)
+        assertEquals(NailPredictionReason.APPLIED, tracker.lastPredictionReport.predictionReason)
 
         val result = pipeline.detect(image, stabilize = false)
 
         assertEquals(null, result)
+
+        // After STILL reset, the next Live frame starts from scratch. The low
+        // confidence frame is accepted as the first frame instead of being
+        // predicted from the previous Live velocity/state.
         val afterStill = tracker.stabilize(listOf(lowConfidence))
-        assertTrue(afterStill.isEmpty())
+        assertEquals(1, afterStill.size)
+        assertEquals(111f, afterStill.single().roi.axisToTip.x, 0.001f)
         assertFalse(tracker.lastPredictionReport.predictionApplied)
-        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
+        assertEquals(NailPredictionReason.STABLE, tracker.lastPredictionReport.predictionReason)
+        assertNotNull(afterStill.single())
         verify(exactly = 1) { landmarkProcessor.detectLandmarksWithOrientationFallback(image) }
     }
 
