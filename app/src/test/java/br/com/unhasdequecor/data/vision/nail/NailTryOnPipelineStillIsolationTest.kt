@@ -36,7 +36,9 @@ class NailTryOnPipelineStillIsolationTest {
         every { landmarkProcessor.detectLandmarksWithOrientationFallback(image) } returns null
 
         val valid = nail(confidence = 0.9f, x = 100f)
-        val lowConfidence = nail(confidence = 0.2f, x = 111f)
+        // Must remain paintable (>= 0.32) so the same frame can prove that
+        // the pre-STILL velocity is reused when temporal state is present.
+        val lowConfidence = nail(confidence = 0.4f, x = 111f)
 
         tracker.stabilize(listOf(valid))
         val liveResult = tracker.stabilize(listOf(lowConfidence))
