@@ -24,6 +24,7 @@ class TryOnPipelineMetrics @Inject constructor() {
             if (samples.size == WINDOW_SIZE) samples.removeFirst()
             samples.addLast(sample)
             latestSnapshot = buildSnapshot(samples)
+            latestDebugSnapshot = latestSnapshot
         }
     }
 
@@ -33,6 +34,7 @@ class TryOnPipelineMetrics @Inject constructor() {
         synchronized(lock) {
             samples.clear()
             latestSnapshot = TryOnPipelineMetricsSnapshot.EMPTY
+            latestDebugSnapshot = TryOnPipelineMetricsSnapshot.EMPTY
         }
     }
 
@@ -74,6 +76,10 @@ class TryOnPipelineMetrics @Inject constructor() {
     companion object {
         const val WINDOW_SIZE = 60
         private const val MILLIS_PER_SECOND = 1000f
+
+        @Volatile
+        var latestDebugSnapshot: TryOnPipelineMetricsSnapshot = TryOnPipelineMetricsSnapshot.EMPTY
+            private set
     }
 }
 
