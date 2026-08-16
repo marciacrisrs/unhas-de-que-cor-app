@@ -40,6 +40,7 @@ class NailTryOnPipeline @Inject constructor(
     private val segmenter: NailSegmenter,
     private val colorApplier: NailColorApplier,
     private val tracker: NailTracker,
+    private val pipelineMetrics: TryOnPipelineMetrics = TryOnPipelineMetrics(),
 ) {
     @Volatile
     var debugEnabled: Boolean = false
@@ -47,6 +48,8 @@ class NailTryOnPipeline @Inject constructor(
     fun resetTracking() {
         tracker.reset()
     }
+
+    fun metricsSnapshot(): TryOnPipelineMetricsSnapshot = pipelineMetrics.snapshot()
 
     fun process(
         image: Bitmap,
@@ -77,14 +80,30 @@ class NailTryOnPipeline @Inject constructor(
         image: Bitmap,
         stabilize: Boolean = false,
     ): NailDetectionSnapshot? {
+        val frameStartNs = System.nanoTime()
+
         // STILL is a one-shot boundary. Reset before detection so even a
         // missing/failed frame cannot leave temporal state behind for Live.
         if (!stabilize) {
             tracker.reset()
         }
 
+        val mediaPipeStartNs = System.nanoTime()
         val oriented = landmarkProcessor.detectLandmarksWithOrientationFallback(image)
-            ?: return null
+        val mediaPipeMs = elapsedMs(mediaPipeStartNs)
+        if (oriented == null) {
+            recordMetrics(
+                frameStartNs = frameStartNs,
+                mediaPipeMs = mediaPipeMs,
+                segmentationMs = 0f,
+                trackingMs = 0f,
+                stabilized = stabilize,
+                nails = 0,
+                failureReason = DetectionFailureReason.Generic,
+            )
+            return null
+        }
+
         val landmarks = oriented.landmarks
         val working = oriented.bitmap
         val ownsWorking = working !== image
@@ -92,11 +111,26 @@ class NailTryOnPipeline @Inject constructor(
         val reliability = TryOnHandReliability.classify(landmarks)
         val lighting = ImageLightingSampler.sample(working)
         if (reliability == TryOnReliability.REJECTED) {
-            return rejectedSnapshot(working, landmarks, ownsWorking, lighting)
+            val snapshot = rejectedSnapshot(working, landmarks, ownsWorking, lighting)
+            recordMetrics(
+                frameStartNs = frameStartNs,
+                mediaPipeMs = mediaPipeMs,
+                segmentationMs = 0f,
+                trackingMs = 0f,
+                stabilized = stabilize,
+                nails = 0,
+                failureReason = snapshot.failureReason,
+            )
+            return snapshot
         }
 
+        val segmentationStartNs = System.nanoTime()
         val segmented = segmentPaintableNails(working, landmarks)
+        val segmentationMs = elapsedMs(segmentationStartNs)
+
+        val trackingStartNs = System.nanoTime()
         val rawNails = if (stabilize) tracker.stabilize(segmented.nails) else segmented.nails
+        val trackingMs = elapsedMs(trackingStartNs)
         val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
         val adjusted = adjustReliability(reliability, nails)
         val barrier = resolveBarrier(
@@ -106,16 +140,55 @@ class NailTryOnPipeline @Inject constructor(
             hadRois = segmented.hadRois,
             detectedEmpty = segmented.nails.isEmpty(),
         )
-        return NailDetectionSnapshot(
+        val failureReason = reasonFor(adjusted, landmarks, nails, barrier, lighting)
+        val snapshot = NailDetectionSnapshot(
             workingBitmap = working,
             nails = nails,
             landmarks = landmarks,
             ownsWorkingBitmap = ownsWorking,
             reliability = adjusted,
-            failureReason = reasonFor(adjusted, landmarks, nails, barrier, lighting),
+            failureReason = failureReason,
             rejectionBarrier = barrier,
         )
+        recordMetrics(
+            frameStartNs = frameStartNs,
+            mediaPipeMs = mediaPipeMs,
+            segmentationMs = segmentationMs,
+            trackingMs = trackingMs,
+            stabilized = stabilize,
+            nails = nails.size,
+            failureReason = failureReason,
+        )
+        return snapshot
     }
+
+    private fun recordMetrics(
+        frameStartNs: Long,
+        mediaPipeMs: Float,
+        segmentationMs: Float,
+        trackingMs: Float,
+        stabilized: Boolean,
+        nails: Int,
+        failureReason: DetectionFailureReason?,
+    ) {
+        val report = tracker.lastPredictionReport
+        pipelineMetrics.record(
+            TryOnPipelineMetricsSample(
+                totalMs = elapsedMs(frameStartNs),
+                mediaPipeMs = mediaPipeMs,
+                segmentationMs = segmentationMs,
+                trackingMs = trackingMs,
+                stabilized = stabilized,
+                nailsDetected = nails,
+                predictionApplied = report.predictionApplied,
+                predictionReason = report.predictionReason,
+                failureReason = failureReason,
+            ),
+        )
+    }
+
+    private fun elapsedMs(startNs: Long): Float =
+        (System.nanoTime() - startNs) / NANOS_PER_MILLISECOND
 
     private fun rejectedSnapshot(
         working: Bitmap,
@@ -323,6 +396,7 @@ class NailTryOnPipeline @Inject constructor(
         const val SCORE_HIGH = 0.92f
         const val SCORE_MID = 0.75f
         const val SCORE_LOW = 0.50f
+        const val NANOS_PER_MILLISECOND = 1_000_000f
         val COVERAGE_GOOD = 0.25f..1.4f
         val COVERAGE_OK = 0.14f..1.6f
     }

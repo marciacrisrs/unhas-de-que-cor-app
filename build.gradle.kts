@@ -1,3 +1,5 @@
+import org.gradle.testing.jacoco.tasks.JacocoReport
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
@@ -112,6 +114,24 @@ sonar {
                 "**/BuildConfig.*",
             ).joinToString(","),
         )
+    }
+}
+
+// Keep the Sonar JaCoCo scope aligned with the unit-tested try-on metrics.
+// The app module intentionally keeps an explicit coverage allow-list; this adds
+// the newly introduced metrics class to the report without excluding it from analysis.
+project(":app") {
+    afterEvaluate {
+        tasks.named<JacocoReport>("jacocoAppReport") {
+            val metricsClasses = fileTree(
+                layout.buildDirectory.get().asFile.resolve(
+                    "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes",
+                ),
+            ) {
+                include("**/br/com/unhasdequecor/data/vision/nail/TryOnPipelineMetrics*")
+            }
+            classDirectories.from(metricsClasses)
+        }
     }
 }
 
