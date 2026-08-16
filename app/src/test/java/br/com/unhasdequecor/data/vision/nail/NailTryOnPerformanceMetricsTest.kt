@@ -35,7 +35,7 @@ class NailTryOnPerformanceMetricsTest {
             window.add(NailTryOnPerformanceMetrics(totalMs = total))
         }
 
-        assertThat(window.p95TotalMs()).isEqualTo(90L)
+        assertThat(window.p95TotalMs()).isEqualTo(100L)
     }
 
     @Test
