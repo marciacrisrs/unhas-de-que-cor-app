@@ -7,12 +7,10 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class RoutesTest {
-
     @Test
     fun `resultForMe uses none sentinels including colorId`() {
         assertThat(Routes.resultForMe()).isEqualTo("result/for_me/none/none/none")
-        assertThat(ResultSources.toDomain(ResultSources.FOR_ME))
-            .isEqualTo(RecommendationSource.FOR_ME)
+        assertThat(ResultSources.toDomain(ResultSources.FOR_ME)).isEqualTo(RecommendationSource.FOR_ME)
     }
 
     @Test
@@ -27,31 +25,25 @@ class RoutesTest {
 
     @Test
     fun `resultFromHistory restores color and context`() {
-        val route = Routes.resultFromHistory(
-            source = RecommendationSource.CONTEXT,
-            occasion = Occasion.ENCONTRO,
-            mood = Mood.ROMANTICA,
-            colorId = "romantico_rosa",
-        )
+        val route = Routes.resultFromHistory(RecommendationSource.CONTEXT, Occasion.ENCONTRO, Mood.ROMANTICA, "romantico_rosa")
         assertThat(route).isEqualTo("result/context/ENCONTRO/ROMANTICA/romantico_rosa")
         assertThat(Routes.parseColorId("romantico_rosa")).isEqualTo("romantico_rosa")
     }
 
     @Test
     fun `resultFromHistory allows null occasion and mood`() {
-        val route = Routes.resultFromHistory(
-            source = RecommendationSource.FOR_ME,
-            occasion = null,
-            mood = null,
-            colorId = "festa_vermelha",
-        )
+        val route = Routes.resultFromHistory(RecommendationSource.FOR_ME, null, null, "festa_vermelha")
         assertThat(route).isEqualTo("result/for_me/none/none/festa_vermelha")
     }
 
     @Test
     fun `resultForColor opens try-on for catalog color`() {
-        assertThat(Routes.resultForColor("malva_suave"))
-            .isEqualTo("result/for_me/none/none/malva_suave")
+        assertThat(Routes.resultForColor("malva_suave")).isEqualTo("result/for_me/none/none/malva_suave")
         assertThat(Routes.parseColorId("malva_suave")).isEqualTo("malva_suave")
+    }
+
+    @Test
+    fun `live try-on has dedicated route`() {
+        assertThat(Routes.LIVE_TRY_ON).isEqualTo("live_try_on")
     }
 }
