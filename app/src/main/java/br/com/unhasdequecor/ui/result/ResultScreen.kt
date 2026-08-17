@@ -71,22 +71,15 @@ fun ResultScreen(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenHandReference: () -> Unit,
+    onOpenLiveTryOn: () -> Unit,
     viewModel: ResultViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        ResultTopBar(onBack = onBack)
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        ResultTopBar(onBack)
         when {
             state.isLoading -> LoadingContent()
-            state.errorMessage != null -> ErrorContent(
-                message = state.errorMessage.orEmpty(),
-                onRetry = viewModel::recommendAgain,
-            )
+            state.errorMessage != null -> ErrorContent(state.errorMessage.orEmpty(), viewModel::recommendAgain)
             else -> {
                 val recommendation = state.recommendation ?: return
                 ResultSuccessContent(
@@ -94,6 +87,7 @@ fun ResultScreen(
                     recommendation = recommendation,
                     nailTryOnPipeline = viewModel.nailTryOnPipeline,
                     onOpenHandReference = onOpenHandReference,
+                    onOpenLiveTryOn = onOpenLiveTryOn,
                     onToggleFavorite = viewModel::onToggleFavorite,
                     onSelectColor = viewModel::selectColor,
                     onRecommendAgain = viewModel::recommendAgain,
@@ -108,20 +102,10 @@ fun ResultScreen(
 @Composable
 private fun ResultTopBar(onBack: () -> Unit) {
     TopAppBar(
-        title = {
-            Text("Sua cor ideal", style = MaterialTheme.typography.titleLarge)
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-            }
-        },
-        actions = {
-            NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp, decorative = true)
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-        ),
+        title = { Text("Sua cor ideal", style = MaterialTheme.typography.titleLarge) },
+        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") } },
+        actions = { NailPolishMark(modifier = Modifier.padding(end = 12.dp), markSize = 36.dp, decorative = true) },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
     )
 }
 
@@ -131,6 +115,7 @@ private fun ResultSuccessContent(
     recommendation: ColorRecommendation,
     nailTryOnPipeline: NailTryOnPipeline,
     onOpenHandReference: () -> Unit,
+    onOpenLiveTryOn: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSelectColor: (String) -> Unit,
     onRecommendAgain: () -> Unit,
@@ -138,112 +123,56 @@ private fun ResultSuccessContent(
 ) {
     val color = recommendation.color
     val context = LocalContext.current
-    AnimatedVisibility(
-        visible = true,
-        enter = fadeIn() + slideInVertically { it / 5 },
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-        ) {
-            // Herói: try-on full-bleed (domina o primeiro viewport).
-            ResultTryOnHero(
-                state = state,
-                color = color,
-                nailTryOnPipeline = nailTryOnPipeline,
-                onToggleFavorite = onToggleFavorite,
-                onOpenHandReference = onOpenHandReference,
-            )
-            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = color.name,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = color.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                ) {
-                    color.tags.take(3).forEach { tag ->
-                        InfoTag(label = tag.displayName)
-                    }
+    AnimatedVisibility(true, enter = fadeIn() + slideInVertically { it / 5 }) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            ResultTryOnHero(state, color, nailTryOnPipeline, onToggleFavorite, onOpenHandReference)
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(16.dp))
+                Text(color.name, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(Modifier.height(6.dp))
+                Text(color.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    color.tags.take(3).forEach { InfoTag(label = it.displayName) }
                 }
+                Spacer(Modifier.height(14.dp))
+                PrimaryCtaButton(text = "Experimentar ao vivo", onClick = onOpenLiveTryOn, modifier = Modifier.fillMaxWidth())
                 if (!state.hasHandReference || state.isSampleHand) {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    SecondaryCtaButton(
-                        text = "Usar minha mão",
-                        onClick = onOpenHandReference,
-                    )
+                    Spacer(Modifier.height(10.dp))
+                    SecondaryCtaButton(text = "Usar minha mão", onClick = onOpenHandReference)
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
                 ResultPrimaryActions(
                     isFavorite = state.isFavorite,
                     onToggleFavorite = onToggleFavorite,
                     onShare = {
                         val share = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(
-                                Intent.EXTRA_TEXT,
-                                "Minha cor do momento no Unhas de Que Cor? é ${color.name}.",
-                            )
+                            putExtra(Intent.EXTRA_TEXT, "Minha cor do momento no Unhas de Que Cor? é ${color.name}.")
                         }
                         context.startActivity(Intent.createChooser(share, "Compartilhar"))
                     },
                 )
-                Spacer(modifier = Modifier.height(14.dp))
-                ResultTip(tip = color.tip)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = recommendation.rationale,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                SimilarColorsSection(
-                    primary = color,
-                    similar = recommendation.similarColors,
-                    onSelectColor = onSelectColor,
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                TextButton(
-                    onClick = onRecommendAgain,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) {
-                    Icon(Icons.Filled.Bookmark, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Quero outra sugestão")
+                Spacer(Modifier.height(14.dp))
+                ResultTip(color.tip)
+                Spacer(Modifier.height(8.dp))
+                Text(recommendation.rationale, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(20.dp))
+                SimilarColorsSection(color, recommendation.similarColors, onSelectColor)
+                Spacer(Modifier.height(16.dp))
+                TextButton(onClick = onRecommendAgain, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Icon(Icons.Filled.Bookmark, null); Spacer(Modifier.width(6.dp)); Text("Quero outra sugestão")
                 }
-                TextButton(
-                    onClick = onOpenHistory,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) {
-                    Text("Ver histórico")
-                }
-                Spacer(modifier = Modifier.height(24.dp))
+                TextButton(onClick = onOpenHistory, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Ver histórico") }
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ResultTryOnHero(
-    state: ResultUiState,
-    color: NailColor,
-    nailTryOnPipeline: NailTryOnPipeline,
-    onToggleFavorite: () -> Unit,
-    onOpenHandReference: () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxWidth()) {
+private fun ResultTryOnHero(state: ResultUiState, color: NailColor, nailTryOnPipeline: NailTryOnPipeline, onToggleFavorite: () -> Unit, onOpenHandReference: () -> Unit) {
+    Box(Modifier.fillMaxWidth()) {
         val handPath = state.handLocalPath
         if (handPath != null) {
             HandTryOnPreview(
@@ -257,130 +186,49 @@ private fun ResultTryOnHero(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(3f / 4f)
-                    .clip(SoftSurfaceShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(SoftSurfaceShape).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
-        IconButton(
-            onClick = onToggleFavorite,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp)
-                .background(
-                    MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                    CircleShape,
-                ),
-        ) {
-            Icon(
-                imageVector = if (state.isFavorite) {
-                    Icons.Filled.Favorite
-                } else {
-                    Icons.Filled.FavoriteBorder
-                },
-                contentDescription = if (state.isFavorite) {
-                    "Remover dos favoritos"
-                } else {
-                    "Salvar nos favoritos"
-                },
-                tint = MaterialTheme.colorScheme.primary,
-            )
+        IconButton(onClick = onToggleFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f), CircleShape)) {
+            Icon(if (state.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, if (state.isFavorite) "Remover dos favoritos" else "Salvar nos favoritos", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
 
 @Composable
-private fun ResultPrimaryActions(
-    isFavorite: Boolean,
-    onToggleFavorite: () -> Unit,
-    onShare: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        PrimaryCtaButton(
-            text = if (isFavorite) "Salvo" else "Salvar nos favoritos",
-            onClick = onToggleFavorite,
-            modifier = Modifier.weight(FAVORITE_BUTTON_WEIGHT),
-        )
-        OutlinedButton(
-            onClick = onShare,
-            modifier = Modifier
-                .weight(SHARE_BUTTON_WEIGHT)
-                .height(52.dp),
-            shape = SoftSurfaceShape,
-        ) {
-            Icon(Icons.Outlined.Share, contentDescription = null)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Compartilhar", style = MaterialTheme.typography.labelLarge)
+private fun ResultPrimaryActions(isFavorite: Boolean, onToggleFavorite: () -> Unit, onShare: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        PrimaryCtaButton(text = if (isFavorite) "Salvo" else "Salvar nos favoritos", onClick = onToggleFavorite, modifier = Modifier.weight(FAVORITE_BUTTON_WEIGHT))
+        OutlinedButton(onClick = onShare, modifier = Modifier.weight(SHARE_BUTTON_WEIGHT).height(52.dp), shape = SoftSurfaceShape) {
+            Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(6.dp)); Text("Compartilhar", style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
 @Composable
 private fun ResultTip(tip: String) {
-    Surface(
-        shape = SoftSurfaceShape,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-    ) {
-        Text(
-            text = "Dica: $tip",
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    Surface(shape = SoftSurfaceShape, color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)) {
+        Text("Dica: $tip", Modifier.padding(horizontal = 18.dp, vertical = 14.dp), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
-private fun SimilarColorsSection(
-    primary: NailColor,
-    similar: List<NailColor>,
-    onSelectColor: (String) -> Unit,
-) {
+private fun SimilarColorsSection(primary: NailColor, similar: List<NailColor>, onSelectColor: (String) -> Unit) {
     val palette = listOf(primary) + similar
     val names = palette.joinToString { it.name }
-    Text(
-        text = "CORES PARECIDAS",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-    )
-    Spacer(modifier = Modifier.height(8.dp))
-    Text(
-        text = "Toque para ver no try-on",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(modifier = Modifier.height(12.dp))
+    Text("CORES PARECIDAS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+    Spacer(Modifier.height(8.dp))
+    Text("Toque para ver no try-on", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(12.dp))
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .horizontalScroll(rememberScrollState())
-            .semantics {
-                contentDescription =
-                    "Cores parecidas. Toque para trocar o esmalte no try-on: $names"
-            },
+        modifier = Modifier.horizontalScroll(rememberScrollState()).semantics { contentDescription = "Cores parecidas. Toque para trocar o esmalte no try-on: $names" },
     ) {
         palette.forEach { item ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                NailSwatch(
-                    colorHex = item.hex,
-                    colorName = item.name,
-                    width = 48.dp,
-                    height = 72.dp,
-                    selected = item.id == primary.id,
-                    onClick = { onSelectColor(item.id) },
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(item.name, style = MaterialTheme.typography.labelSmall)
+                NailSwatch(colorHex = item.hex, colorName = item.name, width = 48.dp, height = 72.dp, selected = item.id == primary.id, onClick = { onSelectColor(item.id) })
+                Spacer(Modifier.height(6.dp)); Text(item.name, style = MaterialTheme.typography.labelSmall)
             }
         }
     }
