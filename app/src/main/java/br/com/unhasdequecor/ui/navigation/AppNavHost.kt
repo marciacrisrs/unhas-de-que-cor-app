@@ -29,37 +29,23 @@ import br.com.unhasdequecor.ui.home.HomeViewModel
 import br.com.unhasdequecor.ui.profile.ProfileScreen
 import br.com.unhasdequecor.ui.result.ResultScreen
 import br.com.unhasdequecor.ui.style.StyleScreen
+import br.com.unhasdequecor.ui.tryon.LiveTryOnScreen
 import kotlinx.coroutines.launch
 
 private fun NavController.openResultFromHistory(entry: HistoryRowUi) {
-    navigate(
-        Routes.resultFromHistory(
-            source = entry.source,
-            occasion = entry.occasion,
-            mood = entry.mood,
-            colorId = entry.colorId,
-        ),
-    )
+    navigate(Routes.resultFromHistory(entry.source, entry.occasion, entry.mood, entry.colorId))
 }
 
 private fun NavController.returnHomeAfterHandSelected(flash: String?) {
     runCatching { getBackStackEntry(Routes.MAIN) }
-        .getOrNull()
-        ?.savedStateHandle
-        ?.set(HomeViewModel.FLASH_MESSAGE_KEY, flash)
+        .getOrNull()?.savedStateHandle?.set(HomeViewModel.FLASH_MESSAGE_KEY, flash)
     val popped = popBackStack(Routes.MAIN, inclusive = false)
-    if (!popped) {
-        navigate(Routes.MAIN) {
-            launchSingleTop = true
-        }
-    }
+    if (!popped) navigate(Routes.MAIN) { launchSingleTop = true }
 }
 
 private fun NavController.navigateToMainShell() {
     navigate(Routes.MAIN) {
-        popUpTo(graph.findStartDestination().id) {
-            saveState = true
-        }
+        popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
@@ -71,22 +57,13 @@ fun AppNavHost() {
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val pagerState = rememberPagerState(
-        initialPage = 0,
-        pageCount = { MainSwipeTabs.routes.size },
-    )
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { MainSwipeTabs.routes.size })
     val onMainShell = currentRoute == Routes.MAIN
-    val bottomBarRoute = if (onMainShell) {
-        MainSwipeTabs.routeAt(pagerState.currentPage)
-    } else {
-        currentRoute
-    }
+    val bottomBarRoute = if (onMainShell) MainSwipeTabs.routeAt(pagerState.currentPage) else currentRoute
     val showBottomBar = onMainShell || currentRoute == Routes.CONTEXT
 
     fun goToSwipeTab(route: String) {
-        if (!onMainShell) {
-            navController.navigateToMainShell()
-        }
+        if (!onMainShell) navController.navigateToMainShell()
         val page = MainSwipeTabs.indexOf(route) ?: return
         scope.launch { pagerState.animateScrollToPage(page) }
     }
@@ -98,11 +75,7 @@ fun AppNavHost() {
                     currentRoute = bottomBarRoute,
                     onNavigate = { route ->
                         when {
-                            route == Routes.CONTEXT -> {
-                                navController.navigate(Routes.CONTEXT) {
-                                    launchSingleTop = true
-                                }
-                            }
+                            route == Routes.CONTEXT -> navController.navigate(Routes.CONTEXT) { launchSingleTop = true }
                             MainSwipeTabs.contains(route) -> goToSwipeTab(route)
                             else -> navController.navigateToMainShell()
                         }
@@ -111,12 +84,7 @@ fun AppNavHost() {
             }
         },
     ) { padding ->
-        AppNavGraph(
-            navController = navController,
-            pagerState = pagerState,
-            goToSwipeTab = { route -> goToSwipeTab(route) },
-            modifier = Modifier.padding(padding),
-        )
+        AppNavGraph(navController, pagerState, { route -> goToSwipeTab(route) }, Modifier.padding(padding))
     }
 }
 
@@ -127,29 +95,17 @@ private fun AppNavGraph(
     goToSwipeTab: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = Routes.MAIN,
-        modifier = modifier,
-    ) {
+    NavHost(navController = navController, startDestination = Routes.MAIN, modifier = modifier) {
         composable(Routes.MAIN) {
             MainTabsPager(
                 pagerState = pagerState,
-                onChooseByContext = {
-                    navController.navigate(Routes.CONTEXT) {
-                        launchSingleTop = true
-                    }
-                },
-                onChooseForMe = {
-                    navController.navigate(Routes.resultForMe())
-                },
+                onChooseByContext = { navController.navigate(Routes.CONTEXT) { launchSingleTop = true } },
+                onChooseForMe = { navController.navigate(Routes.resultForMe()) },
                 onOpenStyle = { navController.navigate(Routes.STYLE) },
                 onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
                 onOpenFavorites = { goToSwipeTab(Routes.FAVORITES) },
                 onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
-                onOpenInspiration = { colorId ->
-                    navController.navigate(Routes.resultForColor(colorId))
-                },
+                onOpenInspiration = { colorId -> navController.navigate(Routes.resultForColor(colorId)) },
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
                 onOpenResultFromHistory = navController::openResultFromHistory,
                 onSwipeBackToHome = { goToSwipeTab(Routes.HOME) },
@@ -157,22 +113,19 @@ private fun AppNavGraph(
         }
         composable(Routes.CONTEXT) {
             val viewModel: ContextChoiceViewModel = hiltViewModel()
-            ContextChoiceScreen(
-                viewModel = viewModel,
-                onContinue = { occasion, mood ->
-                    navController.navigate(Routes.resultByContext(occasion, mood))
-                },
-                onBack = { navController.popBackStack() },
-            )
+            ContextChoiceScreen(viewModel, { occasion, mood -> navController.navigate(Routes.resultByContext(occasion, mood)) }) {
+                navController.popBackStack()
+            }
         }
-        composable(Routes.STYLE) {
-            StyleScreen(onBack = { navController.popBackStack() })
-        }
+        composable(Routes.STYLE) { StyleScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.HAND_REFERENCE) {
             HandReferenceScreen(
                 onBack = { navController.popBackStack() },
                 onHandSelected = navController::returnHomeAfterHandSelected,
             )
+        }
+        composable(Routes.LIVE_TRY_ON) {
+            LiveTryOnScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = Routes.RESULT,
@@ -189,14 +142,11 @@ private fun AppNavGraph(
                     navController.popBackStack(Routes.MAIN, inclusive = false)
                     goToSwipeTab(Routes.HISTORY)
                 },
-                onOpenHandReference = {
-                    navController.navigate(Routes.HAND_REFERENCE)
-                },
+                onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
+                onOpenLiveTryOn = { navController.navigate(Routes.LIVE_TRY_ON) },
             )
         }
-        composable(Routes.HISTORY) {
-            HistoryScreen(onOpenResult = navController::openResultFromHistory)
-        }
+        composable(Routes.HISTORY) { HistoryScreen(onOpenResult = navController::openResultFromHistory) }
         composable(Routes.FAVORITES) {
             HistoryScreen(
                 onOpenResult = navController::openResultFromHistory,
@@ -212,8 +162,6 @@ private fun AppNavGraph(
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
             )
         }
-        composable(Routes.ABOUT) {
-            AboutScreen(onBack = { navController.popBackStack() })
-        }
+        composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
     }
 }
