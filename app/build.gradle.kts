@@ -17,9 +17,7 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 12
         versionName = "1.0.11"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Overlay de landmarks/ROI/máscara no try-on. Ative com -PdebugNailOverlay=true
         buildConfigField(
             "boolean",
             "DEBUG_NAIL_OVERLAY",
@@ -31,13 +29,11 @@ android {
         create("release") {
             val rawStorePath = (project.findProperty("RELEASE_STORE_FILE") as String?)
                 ?: System.getenv("RELEASE_STORE_FILE")
-            // Trim + tira aspas “inteligentes”/normais (comum no Windows ao colar path).
             val storeFilePath = rawStorePath
                 ?.trim()
                 ?.trim('"', '\'', '\u201C', '\u201D', '\u2018', '\u2019')
                 ?.takeIf { it.isNotBlank() }
             if (storeFilePath != null) {
-                // rootProject.file: absoluto fica absoluto; relativo à raiz do repo (não :app).
                 storeFile = rootProject.file(storeFilePath)
                 storePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
                     ?: System.getenv("RELEASE_STORE_PASSWORD")
@@ -50,28 +46,14 @@ android {
     }
 
     buildTypes {
-        debug {
-            enableUnitTestCoverage = true
-        }
+        debug { enableUnitTestCoverage = true }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
-            // MediaPipe (.so) → Play pede símbolos nativos p/ crashes/ANRs.
-            // SYMBOL_TABLE: nomes de função (suficiente; FULL estoura tamanho fácil).
-            ndk {
-                debugSymbolLevel = "SYMBOL_TABLE"
-            }
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
             val releaseSigning = signingConfigs.getByName("release")
-            signingConfig = if (releaseSigning.storeFile != null) {
-                releaseSigning
-            } else {
-                // CI/local sem keystore: assina com debug (ver docs/release.md).
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = if (releaseSigning.storeFile != null) releaseSigning else signingConfigs.getByName("debug")
         }
     }
 
@@ -79,24 +61,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-
+    kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+    buildFeatures { compose = true; buildConfig = true }
+    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
     lint {
         abortOnError = true
         warningsAsErrors = false
@@ -105,10 +72,7 @@ android {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-    arg("room.generateKotlin", "true")
-}
+ksp { arg("room.schemaLocation", "$projectDir/schemas"); arg("room.generateKotlin", "true") }
 
 detekt {
     toolVersion = libs.versions.detekt.get()
@@ -129,25 +93,25 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
-
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
-
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
-
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
@@ -155,7 +119,6 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.sqlite.jdbc)
-
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -170,7 +133,6 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     reports {
         html.required.set(true)
         sarif.required.set(true)
-        // Checkstyle XML → sonar.kotlin.detekt.reportPaths
         checkstyle.required.set(true)
         markdown.required.set(true)
     }
@@ -181,15 +143,9 @@ tasks.withType<dev.detekt.gradle.DetektCreateBaselineTask>().configureEach {
     exclude("**/build/**")
 }
 
-jacoco {
-    toolVersion = "0.8.13"
-}
+jacoco { toolVersion = "0.8.13" }
 
-val domainCoverageIncludes = listOf(
-    "**/br/com/unhasdequecor/domain/**",
-)
-
-/** Pacotes/classes com testes unitários estáveis — relatório Sonar. */
+val domainCoverageIncludes = listOf("**/br/com/unhasdequecor/domain/**")
 val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/domain/**",
     "**/br/com/unhasdequecor/data/catalog/**",
@@ -227,128 +183,45 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/ui/navigation/MainSwipeTabs*",
     "**/br/com/unhasdequecor/data/vision/nail/NailGeometryValidator*",
 )
-
 val jacocoExcludes = listOf(
-    "**/R.class",
-    "**/R$*.class",
-    "**/BuildConfig.*",
-    "**/Manifest*.*",
-    "**/*_Hilt*",
-    "**/Hilt_*.*",
-    "**/*_Factory*",
-    "**/*_MembersInjector*",
-    "**/*Module*",
-    "**/*Module$*",
-    "**/di/**",
-    "**/MediaPipe*",
-    "**/HandInferenceVariants*",
-    "**/HandInferenceVariant*",
-    "**/ImageLightingSampler*",
-    "**/GeometricNailSegmenter*",
-    "**/NailTryOnResult*",
-    "**/NailTracker*",
-    "**/DetectedNailPolishApplier*",
-    "**/dao/**",
+    "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*", "**/*_Hilt*",
+    "**/Hilt_*.*", "**/*_Factory*", "**/*_MembersInjector*", "**/*Module*", "**/*Module$*",
+    "**/di/**", "**/MediaPipe*", "**/HandInferenceVariants*", "**/HandInferenceVariant*",
+    "**/ImageLightingSampler*", "**/GeometricNailSegmenter*", "**/NailTryOnResult*", "**/NailTracker*",
+    "**/DetectedNailPolishApplier*", "**/dao/**",
 )
-
 fun Project.jacocoClassDirectories(includes: List<String>): FileCollection {
     val buildDirPath = layout.buildDirectory.get().asFile
-    // AGP 9 (built-in Kotlin compiler): classes live under intermediates/, not tmp/kotlin-classes.
-    val kotlinTree = fileTree(
-        buildDirPath.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
-    ) {
-        include(includes)
-        exclude(jacocoExcludes)
+    val kotlinTree = fileTree(buildDirPath.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")) {
+        include(includes); exclude(jacocoExcludes)
     }
-    val javaTree = fileTree(
-        buildDirPath.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes"),
-    ) {
-        include(includes)
-        exclude(jacocoExcludes)
+    val javaTree = fileTree(buildDirPath.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes")) {
+        include(includes); exclude(jacocoExcludes)
     }
     return files(kotlinTree, javaTree)
 }
-
 fun Project.domainClassDirectories(): FileCollection = jacocoClassDirectories(domainCoverageIncludes)
-
 fun Project.appClassDirectories(): FileCollection = jacocoClassDirectories(appCoverageIncludes)
-
-fun Project.jacocoExecutionData(): FileCollection =
-    fileTree(layout.buildDirectory.get().asFile) {
-        include(
-            "outputs/unit_test_code_coverage/debugUnitTest/*.exec",
-            "jacoco/testDebugUnitTest.exec",
-        )
-    }
-
+fun Project.jacocoExecutionData(): FileCollection = fileTree(layout.buildDirectory.get().asFile) {
+    include("outputs/unit_test_code_coverage/debugUnitTest/*.exec", "jacoco/testDebugUnitTest.exec")
+}
 tasks.register<JacocoReport>("jacocoDomainReport") {
-    group = "verification"
-    description = "Gera relatório JaCoCo focado no pacote domain."
-    dependsOn("testDebugUnitTest")
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        csv.required.set(false)
-    }
-
-    sourceDirectories.setFrom(files("src/main/java"))
-    classDirectories.setFrom(domainClassDirectories())
-    executionData.setFrom(jacocoExecutionData())
+    group = "verification"; description = "Gera relatório JaCoCo focado no pacote domain."; dependsOn("testDebugUnitTest")
+    reports { xml.required.set(true); html.required.set(true); csv.required.set(false) }
+    sourceDirectories.setFrom(files("src/main/java")); classDirectories.setFrom(domainClassDirectories()); executionData.setFrom(jacocoExecutionData())
 }
-
 tasks.register<JacocoReport>("jacocoAppReport") {
-    group = "verification"
-    description = "Gera relatório JaCoCo da lógica coberta por testes unitários (domain + data + VMs)."
-    dependsOn("testDebugUnitTest")
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        csv.required.set(false)
-    }
-
-    sourceDirectories.setFrom(files("src/main/java"))
-    classDirectories.setFrom(appClassDirectories())
-    executionData.setFrom(jacocoExecutionData())
+    group = "verification"; description = "Gera relatório JaCoCo da lógica coberta por testes unitários (domain + data + VMs)."; dependsOn("testDebugUnitTest")
+    reports { xml.required.set(true); html.required.set(true); csv.required.set(false) }
+    sourceDirectories.setFrom(files("src/main/java")); classDirectories.setFrom(appClassDirectories()); executionData.setFrom(jacocoExecutionData())
 }
-
 tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
-    group = "verification"
-    description = "Exige ≥80% de cobertura de linhas no pacote domain."
-    dependsOn("jacocoDomainReport")
-
-    sourceDirectories.setFrom(files("src/main/java"))
-    classDirectories.setFrom(domainClassDirectories())
-    executionData.setFrom(jacocoExecutionData())
-
-    violationRules {
-        rule {
-            limit {
-                counter = "LINE"
-                value = "COVEREDRATIO"
-                minimum = "0.80".toBigDecimal()
-            }
-        }
-    }
+    group = "verification"; description = "Exige ≥80% de cobertura de linhas no pacote domain."; dependsOn("jacocoDomainReport")
+    sourceDirectories.setFrom(files("src/main/java")); classDirectories.setFrom(domainClassDirectories()); executionData.setFrom(jacocoExecutionData())
+    violationRules { rule { limit { counter = "LINE"; value = "COVEREDRATIO"; minimum = "0.80".toBigDecimal() } } }
 }
-
 tasks.register<JacocoCoverageVerification>("jacocoAppCoverageVerification") {
-    group = "verification"
-    description = "Exige ≥80% de cobertura de linhas no escopo app (relatório Sonar)."
-    dependsOn("jacocoAppReport")
-
-    sourceDirectories.setFrom(files("src/main/java"))
-    classDirectories.setFrom(appClassDirectories())
-    executionData.setFrom(jacocoExecutionData())
-
-    violationRules {
-        rule {
-            limit {
-                counter = "LINE"
-                value = "COVEREDRATIO"
-                minimum = "0.80".toBigDecimal()
-            }
-        }
-    }
+    group = "verification"; description = "Exige ≥80% de cobertura de linhas no escopo app (relatório Sonar)."; dependsOn("jacocoAppReport")
+    sourceDirectories.setFrom(files("src/main/java")); classDirectories.setFrom(appClassDirectories()); executionData.setFrom(jacocoExecutionData())
+    violationRules { rule { limit { counter = "LINE"; value = "COVEREDRATIO"; minimum = "0.80".toBigDecimal() } } }
 }
