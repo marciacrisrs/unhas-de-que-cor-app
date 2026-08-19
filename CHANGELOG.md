@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Try-on / visão
+- Entrada navegável **Try-on ao vivo** a partir do Resultado (câmera frontal + `stabilize=true`)
+- Rótulos honestos no Live (FULL / aproximada / mão não detectada); overlay some quando a detecção é rejeitada
+- CameraX no app (`camera-core` / `camera2` / `lifecycle` / `view`) com checksums no `verification-metadata.xml`
+
 ## 1.0.8 — (versionCode 9)
 
 ### Try-on / visão

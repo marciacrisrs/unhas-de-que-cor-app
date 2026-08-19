@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
-import br.com.unhasdequecor.domain.model.ColorRecommendation
 import br.com.unhasdequecor.domain.model.NailColor
 import br.com.unhasdequecor.ui.components.ErrorContent
 import br.com.unhasdequecor.ui.components.HandTryOnPreview
@@ -71,6 +70,7 @@ fun ResultScreen(
     onBack: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenHandReference: () -> Unit,
+    onOpenLiveTryOn: (String) -> Unit,
     viewModel: ResultViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,9 +91,9 @@ fun ResultScreen(
                 val recommendation = state.recommendation ?: return
                 ResultSuccessContent(
                     state = state,
-                    recommendation = recommendation,
                     nailTryOnPipeline = viewModel.nailTryOnPipeline,
                     onOpenHandReference = onOpenHandReference,
+                    onOpenLiveTryOn = { onOpenLiveTryOn(recommendation.color.id) },
                     onToggleFavorite = viewModel::onToggleFavorite,
                     onSelectColor = viewModel::selectColor,
                     onRecommendAgain = viewModel::recommendAgain,
@@ -128,14 +128,15 @@ private fun ResultTopBar(onBack: () -> Unit) {
 @Composable
 private fun ResultSuccessContent(
     state: ResultUiState,
-    recommendation: ColorRecommendation,
     nailTryOnPipeline: NailTryOnPipeline,
     onOpenHandReference: () -> Unit,
+    onOpenLiveTryOn: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSelectColor: (String) -> Unit,
     onRecommendAgain: () -> Unit,
     onOpenHistory: () -> Unit,
 ) {
+    val recommendation = checkNotNull(state.recommendation)
     val color = recommendation.color
     val context = LocalContext.current
     AnimatedVisibility(
@@ -185,6 +186,15 @@ private fun ResultSuccessContent(
                         onClick = onOpenHandReference,
                     )
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                SecondaryCtaButton(
+                    text = "Experimentar ao vivo",
+                    onClick = onOpenLiveTryOn,
+                    modifier = Modifier.semantics {
+                        contentDescription =
+                            "Experimentar a cor ${color.name} ao vivo na câmera"
+                    },
+                )
                 Spacer(modifier = Modifier.height(16.dp))
                 ResultPrimaryActions(
                     isFavorite = state.isFavorite,

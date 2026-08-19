@@ -15,6 +15,8 @@ O app recomenda cores considerando ocasião, humor e estilo — ou escolhe por v
 - Tela inicial, escolha por contexto / por mim, preferências de estilo
 - Motor de recomendação + tela de resultado com **try-on em foto real** (MediaPipe + máscara)
 - Cadastro de **minha mão** (câmera/galeria) ou amostras curadas
+- Try-on em foto real **e ao vivo** (câmera frontal, a partir do Resultado)
+- Histórico e favoritos locais (Room + DataStore), schema exportado e migrações
 - Histórico e favoritos locais (Room + DataStore), schema exportado e migrações
 - Result idempotente (SavedStateHandle + `idempotencyKey`); Histórico/Favoritos restauram sem novo save
 - Release com R8/minify + checklist Play (`docs/release.md`, `docs/play-listing.md`)
