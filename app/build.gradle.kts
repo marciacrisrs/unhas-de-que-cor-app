@@ -148,6 +148,10 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
@@ -213,6 +217,7 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/data/vision/nail/DetectionFailureReason*",
     "**/br/com/unhasdequecor/data/vision/nail/DetectionFailureDiagnostics*",
     "**/br/com/unhasdequecor/data/vision/nail/TryOnPreviewLabels*",
+    "**/br/com/unhasdequecor/data/vision/nail/LiveTryOnClaimMapper*",
     "**/br/com/unhasdequecor/data/vision/HandInferenceEnhancer*",
     "**/br/com/unhasdequecor/data/vision/HandLandmarkQuality*",
     "**/br/com/unhasdequecor/data/vision/HandPresenceScoring*",
@@ -222,6 +227,7 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/ui/result/ResultViewModel*",
     "**/br/com/unhasdequecor/ui/hand/HandReferenceViewModel*",
     "**/br/com/unhasdequecor/ui/home/HomeViewModel*",
+    "**/br/com/unhasdequecor/ui/tryon/LiveTryOnViewModel*",
     "**/br/com/unhasdequecor/ui/navigation/Routes*",
     "**/br/com/unhasdequecor/ui/navigation/ResultSources*",
     "**/br/com/unhasdequecor/ui/navigation/MainSwipeTabs*",

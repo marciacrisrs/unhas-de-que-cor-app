@@ -29,6 +29,7 @@ import br.com.unhasdequecor.ui.home.HomeViewModel
 import br.com.unhasdequecor.ui.profile.ProfileScreen
 import br.com.unhasdequecor.ui.result.ResultScreen
 import br.com.unhasdequecor.ui.style.StyleScreen
+import br.com.unhasdequecor.ui.tryon.LiveTryOnScreen
 import kotlinx.coroutines.launch
 
 private fun NavController.openResultFromHistory(entry: HistoryRowUi) {
@@ -192,6 +193,9 @@ private fun AppNavGraph(
                 onOpenHandReference = {
                     navController.navigate(Routes.HAND_REFERENCE)
                 },
+                onOpenLiveTryOn = { colorId ->
+                    navController.navigate(Routes.liveTryOn(colorId))
+                },
             )
         }
         composable(Routes.HISTORY) {
@@ -211,6 +215,14 @@ private fun AppNavGraph(
                 onOpenHistory = { goToSwipeTab(Routes.HISTORY) },
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
             )
+        }
+        composable(
+            route = Routes.LIVE_TRY_ON,
+            arguments = listOf(
+                navArgument("colorId") { type = NavType.StringType },
+            ),
+        ) {
+            LiveTryOnScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.ABOUT) {
             AboutScreen(onBack = { navController.popBackStack() })

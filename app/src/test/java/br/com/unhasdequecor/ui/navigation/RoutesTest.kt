@@ -54,4 +54,11 @@ class RoutesTest {
             .isEqualTo("result/for_me/none/none/malva_suave")
         assertThat(Routes.parseColorId("malva_suave")).isEqualTo("malva_suave")
     }
+
+    @Test
+    fun `liveTryOn encodes catalog colorId`() {
+        assertThat(Routes.liveTryOn("festa_vermelha"))
+            .isEqualTo("live_try_on/festa_vermelha")
+        assertThat(Routes.LIVE_TRY_ON).isEqualTo("live_try_on/{colorId}")
+    }
 }

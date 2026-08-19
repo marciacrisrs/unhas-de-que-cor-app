@@ -15,6 +15,7 @@ object Routes {
     const val FAVORITES = "favorites"
     const val PROFILE = "profile"
     const val HAND_REFERENCE = "hand_reference"
+    const val LIVE_TRY_ON = "live_try_on/{colorId}"
     const val ABOUT = "about"
 
     const val NONE = "none"
@@ -43,6 +44,8 @@ object Routes {
     /** Abre o resultado/try-on de uma cor do catálogo (ex.: inspiração do dia). */
     fun resultForColor(colorId: String): String =
         "result/${ResultSources.FOR_ME}/$NONE/$NONE/$colorId"
+
+    fun liveTryOn(colorId: String): String = "live_try_on/$colorId"
 
     fun parseOccasion(raw: String): Occasion? =
         raw.takeUnless { it == NONE }?.let { runCatching { Occasion.valueOf(it) }.getOrNull() }
