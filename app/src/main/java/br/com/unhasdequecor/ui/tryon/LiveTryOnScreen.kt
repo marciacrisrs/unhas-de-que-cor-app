@@ -1,6 +1,7 @@
 package br.com.unhasdequecor.ui.tryon
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -50,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.unhasdequecor.data.vision.nail.TryOnPreviewLabels
@@ -57,6 +60,7 @@ import br.com.unhasdequecor.ui.components.ErrorContent
 import br.com.unhasdequecor.ui.components.NailDebugOverlay
 import br.com.unhasdequecor.ui.components.PrimaryCtaButton
 import br.com.unhasdequecor.ui.components.SecondaryCtaButton
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @Composable
@@ -84,6 +88,7 @@ fun LiveTryOnScreen(
             state = state,
             onBack = onBack,
             onFrame = viewModel::consumeFrame,
+            onCameraError = viewModel::onCameraUnavailable,
         )
     }
 }
@@ -105,6 +110,7 @@ private fun LiveTryOnPermissionGate(
     state: LiveTryOnUiState,
     onBack: () -> Unit,
     onFrame: (Bitmap) -> Unit,
+    onCameraError: () -> Unit,
 ) {
     val context = LocalContext.current
     val cameraAvailable = remember {
@@ -135,6 +141,7 @@ private fun LiveTryOnPermissionGate(
             state = state,
             onBack = onBack,
             onFrame = onFrame,
+            onCameraError = onCameraError,
         )
         else -> PermissionPane(
             title = "Precisamos da câmera para o try-on ao vivo.",
@@ -178,6 +185,7 @@ private fun LiveCameraPane(
     state: LiveTryOnUiState,
     onBack: () -> Unit,
     onFrame: (Bitmap) -> Unit,
+    onCameraError: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -191,34 +199,16 @@ private fun LiveCameraPane(
     )
 
     DisposableEffect(lifecycleOwner) {
-        val providerFuture = ProcessCameraProvider.getInstance(context)
-        providerFuture.addListener(
-            {
-                val provider = providerFuture.get()
-                val preview = Preview.Builder().build().also { useCase ->
-                    useCase.surfaceProvider = previewView.surfaceProvider
-                }
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                    .build()
-                    .also { useCase ->
-                        useCase.setAnalyzer(executor, LiveFrameAnalyzer(onFrame))
-                    }
-                provider.unbindAll()
-                provider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
-                    preview,
-                    analysis,
-                )
-            },
-            ContextCompat.getMainExecutor(context),
+        val session = LiveCameraSession(
+            context = context,
+            lifecycleOwner = lifecycleOwner,
+            previewView = previewView,
+            executor = executor,
+            onFrame = onFrame,
+            onCameraError = onCameraError,
         )
-        onDispose {
-            runCatching { providerFuture.get().unbindAll() }
-            executor.shutdownNow()
-        }
+        session.start()
+        onDispose { session.release() }
     }
 
     Box(
@@ -303,13 +293,107 @@ private fun LiveTryOnChrome(
     }
 }
 
+private class LiveCameraSession(
+    context: Context,
+    private val lifecycleOwner: LifecycleOwner,
+    private val previewView: PreviewView,
+    private val executor: ExecutorService,
+    private val onFrame: (Bitmap) -> Unit,
+    private val onCameraError: () -> Unit,
+) {
+    private val mainExecutor = ContextCompat.getMainExecutor(context)
+    private val providerFuture = ProcessCameraProvider.getInstance(context)
+    @Volatile
+    private var disposed = false
+
+    fun start() {
+        providerFuture.addListener(::onProviderReady, mainExecutor)
+    }
+
+    fun release() {
+        disposed = true
+        if (providerFuture.isDone) {
+            runCatching { providerFuture.get().unbindAll() }
+        }
+        executor.shutdown()
+    }
+
+    private fun onProviderReady() {
+        if (disposed) return
+        val provider = runCatching { providerFuture.get() }.getOrNull()
+        if (disposed) return
+        if (provider == null) {
+            onCameraError()
+            return
+        }
+        val lens = LiveTryOnCamera.lens(
+            hasFront = hasLens(provider, CameraSelector.DEFAULT_FRONT_CAMERA),
+            hasBack = hasLens(provider, CameraSelector.DEFAULT_BACK_CAMERA),
+        )
+        if (lens == null) {
+            onCameraError()
+            return
+        }
+        bindUseCases(provider, lens)
+    }
+
+    private fun bindUseCases(provider: ProcessCameraProvider, lens: LiveTryOnLens) {
+        val cameraSelector = when (lens) {
+            LiveTryOnLens.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+            LiveTryOnLens.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+        }
+        val preview = Preview.Builder().build().also { useCase ->
+            useCase.surfaceProvider = previewView.surfaceProvider
+        }
+        val analysis = ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .build()
+            .also { useCase ->
+                useCase.setAnalyzer(
+                    executor,
+                    LiveFrameAnalyzer(
+                        onFrame = onFrame,
+                        mirror = LiveTryOnCamera.shouldMirror(lens),
+                    ),
+                )
+            }
+        val bound = runCatching {
+            if (disposed ||
+                !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.INITIALIZED)
+            ) {
+                return@runCatching
+            }
+            provider.unbindAll()
+            if (disposed) return@runCatching
+            provider.bindToLifecycle(
+                lifecycleOwner,
+                cameraSelector,
+                preview,
+                analysis,
+            )
+        }
+        if (bound.isFailure && !disposed) {
+            onCameraError()
+        }
+    }
+
+    private fun hasLens(provider: ProcessCameraProvider, selector: CameraSelector): Boolean =
+        runCatching { provider.hasCamera(selector) }.getOrDefault(false)
+}
+
 private class LiveFrameAnalyzer(
     private val onFrame: (Bitmap) -> Unit,
+    private val mirror: Boolean,
 ) : ImageAnalysis.Analyzer {
     override fun analyze(image: ImageProxy) {
         try {
             val raw = image.toBitmap()
-            val oriented = orientFrontCamera(raw, image.imageInfo.rotationDegrees)
+            val oriented = orientLiveFrame(
+                source = raw,
+                rotationDegrees = image.imageInfo.rotationDegrees,
+                mirror = mirror,
+            )
             if (oriented !== raw && !raw.isRecycled) {
                 raw.recycle()
             }
@@ -320,12 +404,19 @@ private class LiveFrameAnalyzer(
     }
 }
 
-internal fun orientFrontCamera(source: Bitmap, rotationDegrees: Int): Bitmap {
+internal fun orientLiveFrame(
+    source: Bitmap,
+    rotationDegrees: Int,
+    mirror: Boolean,
+): Bitmap {
+    if (rotationDegrees == 0 && !mirror) return source
     val matrix = Matrix()
     if (rotationDegrees != 0) {
         matrix.postRotate(rotationDegrees.toFloat())
     }
-    matrix.postScale(-1f, 1f)
+    if (mirror) {
+        matrix.postScale(-1f, 1f)
+    }
     return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, false)
 }
 

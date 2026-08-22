@@ -157,10 +157,47 @@ class LiveTryOnViewModelTest {
     }
 
     @Test
-    fun `releaseSession resets live tracker state`() {
+    fun `releaseSession drops later frames without another detect`() {
+        val frame = bitmap()
+        val viewModel = viewModel("festa_vermelha")
+
+        viewModel.releaseSession()
+        viewModel.consumeFrame(frame)
+
+        verify(exactly = 0) { pipeline.detect(any(), any()) }
+        verify { frame.recycle() }
+    }
+
+    @Test
+    fun `camera unavailable shows error and ignores frames`() {
+        val frame = bitmap()
+        val viewModel = viewModel("festa_vermelha")
+
+        viewModel.onCameraUnavailable()
+        viewModel.consumeFrame(frame)
+
+        assertThat(viewModel.uiState.value.errorMessage).isNotNull()
+        verify(exactly = 0) { pipeline.detect(any(), any()) }
+        verify { frame.recycle() }
+        verify { pipeline.resetTracking() }
+    }
+
+    @Test
+    fun `camera unavailable does not overwrite a known color error`() {
+        val viewModel = viewModel("cor_inexistente")
+        val original = viewModel.uiState.value.errorMessage
+
+        viewModel.onCameraUnavailable()
+
+        assertThat(viewModel.uiState.value.errorMessage).isEqualTo(original)
+    }
+
+    @Test
+    fun `releaseSession is idempotent`() {
         val viewModel = viewModel("festa_vermelha")
         viewModel.releaseSession()
-        verify { pipeline.resetTracking() }
+        viewModel.releaseSession()
+        verify(exactly = 1) { pipeline.resetTracking() }
     }
 
     private fun bitmap(): Bitmap = mockk(relaxed = true) {

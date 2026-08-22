@@ -43,6 +43,8 @@ class LiveTryOnViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val processing = AtomicBoolean(false)
+    private val sessionClosed = AtomicBoolean(false)
+    private val sessionReleased = AtomicBoolean(false)
     private var displayedOverlay: Bitmap? = null
     private var retiringOverlay: Bitmap? = null
 
@@ -67,23 +69,54 @@ class LiveTryOnViewModel @Inject constructor(
     }
 
     fun consumeFrame(frame: Bitmap) {
-        if (_uiState.value.errorMessage != null || !processing.compareAndSet(false, true)) {
+        if (_uiState.value.errorMessage != null ||
+            sessionClosed.get() ||
+            !processing.compareAndSet(false, true)
+        ) {
             recycleQuietly(frame)
             return
         }
         try {
+            if (sessionClosed.get()) {
+                recycleQuietly(frame)
+                return
+            }
             interpret(frame)
         } finally {
-            processing.set(false)
+            try {
+                if (sessionClosed.get()) {
+                    releaseSession()
+                }
+            } finally {
+                processing.set(false)
+            }
+        }
+    }
+
+    fun onCameraUnavailable() {
+        sessionClosed.set(true)
+        _uiState.update { current ->
+            current.copy(
+                errorMessage = current.errorMessage ?: CAMERA_UNAVAILABLE_MESSAGE,
+                overlay = null,
+            )
+        }
+        if (!processing.get()) {
+            releaseSession()
         }
     }
 
     override fun onCleared() {
-        releaseSession()
+        sessionClosed.set(true)
+        if (!processing.get()) {
+            releaseSession()
+        }
         super.onCleared()
     }
 
     internal fun releaseSession() {
+        sessionClosed.set(true)
+        if (!sessionReleased.compareAndSet(false, true)) return
         pipeline.resetTracking()
         recycleQuietly(retiringOverlay)
         recycleQuietly(displayedOverlay)
@@ -188,5 +221,7 @@ class LiveTryOnViewModel @Inject constructor(
 
     private companion object {
         const val COLOR_ID_KEY = "colorId"
+        const val CAMERA_UNAVAILABLE_MESSAGE =
+            "Não foi possível abrir a câmera para o try-on ao vivo."
     }
 }
