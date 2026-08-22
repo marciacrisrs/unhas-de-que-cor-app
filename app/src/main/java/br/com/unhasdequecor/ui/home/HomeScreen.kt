@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -96,8 +97,6 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                // Compacto no primeiro viewport; scroll só se a altura for insuficiente
-                // (fonte grande / convite de mão + recentes).
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .alpha(alpha),
@@ -207,17 +206,17 @@ private fun RecentChoicesCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(-RecentSwatchOverlap)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(-RecentSwatchOverlap),
+                modifier = Modifier.clearAndSetSemantics { },
+            ) {
                 recentColors.forEach { entry ->
                     Box(
                         modifier = Modifier
                             .size(26.dp)
                             .clip(CircleShape)
                             .background(Color(entry.colorHex))
-                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                            .semantics {
-                                contentDescription = "Cor recente ${entry.colorName}"
-                            },
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
                     )
                 }
             }

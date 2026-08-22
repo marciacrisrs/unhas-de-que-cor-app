@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -51,6 +51,7 @@ fun StyleChip(
     }
     Row(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(FunChipShape)
             .background(background)
             .border(
@@ -58,12 +59,12 @@ fun StyleChip(
                 color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outline,
                 shape = FunChipShape,
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-            .semantics {
-                role = Role.Checkbox
-                contentDescription = if (selected) "$label selecionado" else label
-            },
+            .toggleable(
+                value = selected,
+                role = Role.Checkbox,
+                onValueChange = { onClick() },
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (selected) {
