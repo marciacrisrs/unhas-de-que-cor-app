@@ -12,6 +12,10 @@ import javax.inject.Singleton
  * Contrato importante: a máscara e a ROI precisam representar a mesma origem
  * geométrica. Em mudanças de escala/rotação, o par `next.mask + next.roi` é
  * mantido junto. Em translação pura, a origem da máscara acompanha a ROI.
+ *
+ * Singleton compartilhado por STILL e Live: [reset] e [stabilize] são
+ * sincronizados para não corromper o estado interno quando a tela Live
+ * fecha no meio de um frame e o Result volta a detectar.
  */
 @Singleton
 class NailTracker @Inject constructor() {
@@ -23,6 +27,7 @@ class NailTracker @Inject constructor() {
     var lastPredictionReport: NailPredictionReport = NailPredictionReport.stable()
         private set
 
+    @Synchronized
     fun reset() {
         previous.clear()
         velocity.clear()
@@ -30,6 +35,7 @@ class NailTracker @Inject constructor() {
         lastPredictionReport = NailPredictionReport.stable()
     }
 
+    @Synchronized
     fun stabilize(current: List<DetectedNail>): List<DetectedNail> {
         if (current.isEmpty()) {
             lastPredictionReport = NailPredictionReport.recovery()

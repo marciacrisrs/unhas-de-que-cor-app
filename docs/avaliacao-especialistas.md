@@ -455,3 +455,53 @@ Implementação das sugestões dos especialistas gráficos/visuais, priorizando 
 | Catálogo: retinta com `deepSkinPriority` + labels de treino | Feito |
 | Docs `docs/hand-samples.md` | Feito |
 | Remask pixel-accurate retinta (assets) | **Aberto** (automático ainda pinta/falha cobertura) |
+
+---
+
+## Follow-up — Entrada Live Try-On (2026-08-19)
+
+Pedido: verificar o estado do repositório e as issues faltantes, reunir os especialistas e implementar o próximo passo.
+
+### Estado na reunião
+
+`master` @ `809d9e1` (CameraX só no catálogo Gradle, sem tela). Issues abertas:
+
+| Issue | O que falta | In-repo agora? |
+|-------|-------------|----------------|
+| #53 Live no aparelho | Entrada de UI + matriz em device | UI sim; device **OUT_OF_REPO** |
+| #67 FPS/latência | Bloqueada pela #53 | Não mexer |
+| #55 A11y final | TalkBack/Scanner em device | Parcial (código já no master) |
+| #56 Release MVP | Depende de #53/#55/#67 + ops | Não |
+
+O PR draft **#95** tentou a entrada Live, mas o CI falhou (`verification-metadata` sem CameraX) e o diff truncava `ResultScreen` / `AppNavHost`. Esta passagem reimplementa a entrada a partir do `master`, sem essas regressões.
+
+### Painel
+
+| Especialista | Veredito | Notas |
+|--------------|----------|-------|
+| Android Engineer | Aprovado c/ ressalvas | CameraX + permissão; ViewModel processa o frame |
+| Architecture Reviewer | Aprovado c/ ressalvas | Pipeline injetado no VM; UI não recebe `NailTryOnPipeline` |
+| Vision Try-On Reviewer | Aprovado c/ ressalvas | `stabilize=true`; overlay some em REJECTED; claim via `planRender` |
+| Computer Graphics | Aprovado | Recolor existente; sem blending novo |
+| Product Visual Result | Aprovado | CTA abaixo do herói still; try-on still continua dominante |
+| Performance Reviewer | Aprovado c/ ressalvas | `KEEP_ONLY_LATEST` + RGBA; **sem** fast path da #67 |
+| Accessibility Reviewer | Aprovado c/ ressalvas | LiveRegion + rótulos honestos; Scanner em device TBD |
+| UI Reviewer | Aprovado c/ ressalvas | CTA `SecondaryCtaButton`; chrome não cobre a placa |
+| Test Engineer | Aprovado c/ ressalvas | Mapper + ViewModel + rota; câmera Compose fora do JaCoCo |
+| Quality / CI/CD | Aprovado c/ ressalvas | Checksums CameraX; `verifyCi` |
+| Security Reviewer | Aprovado | CAMERA já no manifesto; feature opcional |
+| Documentation / Release | Aprovado c/ ressalvas | Sem bump de loja; #53 continua aberta até a matriz em device |
+
+**Veredito global:** implementar a entrada Live agora para destravar a validação física da #53. Não otimizar FPS. Não fechar #53/#67/#55/#56 nesta passagem.
+
+### Implementação in-repo
+
+| Item | Status |
+|------|--------|
+| Dependências CameraX em `:app` + `verification-metadata.xml` | Feito |
+| Rota `live_try_on/{colorId}` + CTA no Resultado | Feito |
+| `ImageAnalysis` → `NailTryOnPipeline.detect/recolor` com `stabilize=true` | Feito |
+| Cor do catálogo (não hex hardcoded) | Feito |
+| Overlay limpo em REJECTED / plano NONE | Feito |
+| `resetTracking()` ao sair da sessão Live | Feito |
+| Testes `LiveTryOnClaimMapper` / `LiveTryOnViewModel` / rota | Feito |

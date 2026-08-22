@@ -13,6 +13,29 @@ Matriz JVM: [`docs/vision-test-matrix.md`](vision-test-matrix.md).
 - [ ] APK/AAB da build a validar (`assembleRelease` ou artifact do workflow)
 - [ ] Limpar dados do app entre rodadas críticas
 
+## Live Try-On (issue #53)
+
+A tela **não** está na bottom bar. Caminho:
+
+1. Gerar uma cor (Início → por contexto / por mim, ou inspiração do dia).
+2. No Resultado, abaixo da prévia still, tocar **Experimentar ao vivo**.
+3. Conceder permissão de câmera se pedida.
+
+Matriz Live (além da tabela geral abaixo):
+
+| # | Caso Live | Pass? | Notas |
+|---|-----------|-------|-------|
+| L1 | Mão parada | | |
+| L2 | Translação lenta | | |
+| L3 | Translação rápida | | |
+| L4 | Rotação | | |
+| L5 | Mudança de escala/distância | | |
+| L6 | Queda de confiança / recovery | | Sem máscara velha |
+| L7 | Entrada/saída do frame | | Overlay some sem mão |
+| L8 | Troca de mão/orientação | | |
+
+Não usar o trecho Live para fechar a #67 (FPS). Performance entra só depois desta matriz.
+
 ## Relatório (copie por device)
 
 | # | Caso | Pass? | Notas / tempo |

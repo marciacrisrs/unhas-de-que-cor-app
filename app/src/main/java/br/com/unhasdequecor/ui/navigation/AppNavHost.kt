@@ -142,8 +142,12 @@ private fun AppNavGraph(
                     navController.popBackStack(Routes.MAIN, inclusive = false)
                     goToSwipeTab(Routes.HISTORY)
                 },
-                onOpenHandReference = { navController.navigate(Routes.HAND_REFERENCE) },
-                onOpenLiveTryOn = { navController.navigate(Routes.LIVE_TRY_ON) },
+                onOpenHandReference = {
+                    navController.navigate(Routes.HAND_REFERENCE)
+                },
+                onOpenLiveTryOn = { colorId ->
+                    navController.navigate(Routes.liveTryOn(colorId))
+                },
             )
         }
         composable(Routes.HISTORY) { HistoryScreen(onOpenResult = navController::openResultFromHistory) }
@@ -162,6 +166,16 @@ private fun AppNavGraph(
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
             )
         }
-        composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
+        composable(
+            route = Routes.LIVE_TRY_ON,
+            arguments = listOf(
+                navArgument("colorId") { type = NavType.StringType },
+            ),
+        ) {
+            LiveTryOnScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ABOUT) {
+            AboutScreen(onBack = { navController.popBackStack() })
+        }
     }
 }

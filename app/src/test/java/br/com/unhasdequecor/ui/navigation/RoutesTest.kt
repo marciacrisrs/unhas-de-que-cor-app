@@ -43,7 +43,9 @@ class RoutesTest {
     }
 
     @Test
-    fun `live try-on has dedicated route`() {
-        assertThat(Routes.LIVE_TRY_ON).isEqualTo("live_try_on")
+    fun `liveTryOn encodes catalog colorId`() {
+        assertThat(Routes.liveTryOn("festa_vermelha"))
+            .isEqualTo("live_try_on/festa_vermelha")
+        assertThat(Routes.LIVE_TRY_ON).isEqualTo("live_try_on/{colorId}")
     }
 }
