@@ -182,7 +182,7 @@ class MediaPipeHandNailDetector @Inject constructor(
                         .build(),
                 )
                 .setRunningMode(RunningMode.IMAGE)
-                .setNumHands(2)
+                .setNumHands(1)
                 .setMinHandDetectionConfidence(MIN_CONFIDENCE)
                 .setMinHandPresenceConfidence(MIN_CONFIDENCE)
                 .setMinTrackingConfidence(MIN_CONFIDENCE)
@@ -216,7 +216,13 @@ class MediaPipeHandNailDetector @Inject constructor(
         const val MODEL_ASSET = "hand_landmarker.task"
         /** Mais permissivo: fotos com contraluz / mão retinta falhavam em 0.20. */
         private const val MIN_CONFIDENCE = DetectionConfidenceFloor.MEDIAPIPE_MIN
-        private const val MAX_INFERENCE_EDGE = 1280
+        /**
+         * Limita o frame de inferência, não o frame exibido. Landmarks são
+         * normalizados e continuam sendo remapeados para o bitmap de display.
+         * 720p mantém detalhe suficiente para unhas e reduz o custo do modelo
+         * em relação ao limite anterior de 1280 px.
+         */
+        private const val MAX_INFERENCE_EDGE = 720
         /** Bitmaps intermediários (flash/espelho/rotação) — evita realocar a lista quente. */
         private const val OWNED_VARIANT_CAPACITY = 40
     }
