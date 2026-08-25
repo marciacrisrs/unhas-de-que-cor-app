@@ -89,6 +89,23 @@ class NailTrackerTest {
     }
 
     @Test
+    fun `translational prediction can move mask origin off the image`() {
+        val tracker = NailTracker()
+        val first = nail(x = 12f, y = 40f, confidence = 0.9f)
+        val second = nail(x = 2f, y = 40f, confidence = 0.9f)
+        val low = nail(x = 3f, y = 40f, confidence = 0.2f)
+
+        tracker.stabilize(listOf(first))
+        tracker.stabilize(listOf(second))
+        val result = tracker.stabilize(listOf(low)).single()
+
+        assertTrue(tracker.lastPredictionReport.predictionApplied)
+        assertEquals(-8, result.mask.originX)
+        assertEquals(-8f, result.roi.axisToTip.x, 0.01f)
+        assertEquals(40f, result.roi.axisToTip.y, 0.01f)
+    }
+
+    @Test
     fun `low confidence rotation does not apply translational prediction`() {
         val tracker = NailTracker()
         val first = nail(x = 100f, y = 100f, rotation = 0f, confidence = 0.9f)

@@ -157,4 +157,130 @@ class NailMaskAndColorTest {
         assertThat(result).isNull()
         verify(exactly = 1) { out.recycle() }
     }
+
+    @Test
+    fun `apply clips mask origin that tracking pushed past the left and top edges`() {
+        val source = mockk<Bitmap>(relaxed = true)
+        val out = bitmapWithSize(32, 32)
+        every { source.copy(any(), any()) } returns out
+        val nail = paintableNail(
+            originX = -8,
+            originY = -4,
+            maskWidth = 20,
+            maskHeight = 20,
+        )
+
+        val result = NailColorApplier().apply(source, listOf(nail), Color.Red)
+
+        assertThat(result).isSameInstanceAs(out)
+        verify { out.getPixels(any(), any(), any(), 0, 0, 12, 16) }
+        verify { out.setPixels(any(), any(), any(), 0, 0, 12, 16) }
+        verify(exactly = 0) { out.recycle() }
+    }
+
+    @Test
+    fun `apply clips mask that extends past the right and bottom edges`() {
+        val source = mockk<Bitmap>(relaxed = true)
+        val out = bitmapWithSize(32, 32)
+        every { source.copy(any(), any()) } returns out
+        val nail = paintableNail(
+            originX = 24,
+            originY = 20,
+            maskWidth = 20,
+            maskHeight = 20,
+        )
+
+        val result = NailColorApplier().apply(source, listOf(nail), Color.Red)
+
+        assertThat(result).isSameInstanceAs(out)
+        verify { out.getPixels(any(), any(), any(), 24, 20, 8, 12) }
+        verify { out.setPixels(any(), any(), any(), 24, 20, 8, 12) }
+    }
+
+    @Test
+    fun `apply recycles output when tracked mask is completely outside the frame`() {
+        val source = mockk<Bitmap>(relaxed = true)
+        val out = bitmapWithSize(32, 32)
+        every { source.copy(any(), any()) } returns out
+        val nail = paintableNail(
+            originX = -40,
+            originY = 0,
+            maskWidth = 20,
+            maskHeight = 20,
+        )
+
+        val result = NailColorApplier().apply(source, listOf(nail), Color.Red)
+
+        assertThat(result).isNull()
+        verify(exactly = 0) { out.getPixels(any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 1) { out.recycle() }
+    }
+
+    private fun bitmapWithSize(width: Int, height: Int): Bitmap {
+        val bitmap = mockk<Bitmap>(relaxed = true)
+        every { bitmap.width } returns width
+        every { bitmap.height } returns height
+        every { bitmap.isRecycled } returns false
+        every { bitmap.getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
+            val x = invocation.args[3] as Int
+            val y = invocation.args[4] as Int
+            val w = invocation.args[5] as Int
+            val h = invocation.args[6] as Int
+            require(x >= 0 && y >= 0 && x + w <= width && y + h <= height) {
+                "getPixels out of bounds: x=$x y=$y w=$w h=$h on ${width}x$height"
+            }
+            firstArg<IntArray>().fill(0xFF808080.toInt())
+        }
+        every { bitmap.setPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
+            val x = invocation.args[3] as Int
+            val y = invocation.args[4] as Int
+            val w = invocation.args[5] as Int
+            val h = invocation.args[6] as Int
+            require(x >= 0 && y >= 0 && x + w <= width && y + h <= height) {
+                "setPixels out of bounds: x=$x y=$y w=$w h=$h on ${width}x$height"
+            }
+        }
+        return bitmap
+    }
+
+    private fun paintableNail(
+        originX: Int,
+        originY: Int,
+        maskWidth: Int,
+        maskHeight: Int,
+    ): DetectedNail {
+        val roi = NailRoi(
+            finger = Finger.INDEX,
+            bounds = PixelRect(
+                originX,
+                originY,
+                originX + maskWidth,
+                originY + maskHeight,
+            ),
+            polygon = listOf(
+                PixelPoint(originX.toFloat(), originY.toFloat()),
+                PixelPoint((originX + maskWidth).toFloat(), originY.toFloat()),
+                PixelPoint((originX + maskWidth).toFloat(), (originY + maskHeight).toFloat()),
+                PixelPoint(originX.toFloat(), (originY + maskHeight).toFloat()),
+            ),
+            axisFromDip = PixelPoint(originX + maskWidth / 2f, originY + maskHeight.toFloat()),
+            axisToTip = PixelPoint(originX + maskWidth / 2f, originY.toFloat()),
+            lengthPx = maskHeight.toFloat(),
+            widthPx = maskWidth.toFloat(),
+            rotationDegrees = 0f,
+            geometricConfidence = 0.9f,
+        )
+        return DetectedNail(
+            finger = Finger.INDEX,
+            roi = roi,
+            mask = NailMask(
+                width = maskWidth,
+                height = maskHeight,
+                alpha = ByteArray(maskWidth * maskHeight) { 255.toByte() },
+                originX = originX,
+                originY = originY,
+            ),
+            confidence = 0.9f,
+        )
+    }
 }
