@@ -20,4 +20,7 @@ interface FavoriteDao {
 
     @Query("SELECT colorId FROM favorites")
     fun observeFavoriteIds(): Flow<List<String>>
+
+    @Query("SELECT * FROM favorites ORDER BY favoritedAtEpochMs DESC")
+    fun observeAll(): Flow<List<FavoriteEntity>>
 }

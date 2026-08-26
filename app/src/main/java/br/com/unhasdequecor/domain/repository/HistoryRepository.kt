@@ -4,7 +4,9 @@ import br.com.unhasdequecor.domain.model.HistoryEntry
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Persistência do histórico de recomendações e dos favoritos derivados dele.
+ * Persistência do histórico de recomendações e dos favoritos.
+ * Favoritos têm SoT na tabela `favorites` e aparecem mesmo sem linha de histórico
+ * (ex.: coração no Result aberto pela inspiração do dia).
  */
 interface HistoryRepository {
     fun observeHistory(): Flow<List<HistoryEntry>>
