@@ -15,6 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,6 +28,13 @@ class HandReferenceRepositoryImpl @Inject constructor(
     private val fileStore: HandReferenceFileStore,
     private val clock: Clock,
 ) : HandReferenceRepository {
+
+    /**
+     * Serializes persist + DataStore + purge. Sem isso, dois saves simultâneos
+     * (ex.: double-tap no picker) apontam o DataStore para um JPEG que o outro
+     * save já apagou em [HandReferenceFileStore.purgeObsoleteHandFiles].
+     */
+    private val writeMutex = Mutex()
 
     override fun observe(): Flow<HandReference?> = preferences.observe().map { reference ->
         when {
@@ -45,41 +54,37 @@ class HandReferenceRepositoryImpl @Inject constructor(
         source: HandReferenceSource,
         sampleId: String?,
     ): HandReferenceSaveOutcome = withContext(Dispatchers.IO) {
-        val outcome = fileStore.persist(
-            sourceAbsolutePath = sourceAbsolutePath,
-            capturedAtEpochMs = capturedAtEpochMs,
-            source = source,
-            sampleId = sampleId,
-        )
-        when (outcome) {
-            is HandReferenceSaveOutcome.Saved -> {
-                preferences.save(outcome.reference)
-                // Só depois do DataStore apontar para o path novo.
-                fileStore.purgeObsoleteHandFiles(outcome.reference.localPath)
-            }
-            is HandReferenceSaveOutcome.Rejected -> Unit
+        writeMutex.withLock {
+            saveUnlocked(
+                sourceAbsolutePath = sourceAbsolutePath,
+                capturedAtEpochMs = capturedAtEpochMs,
+                source = source,
+                sampleId = sampleId,
+            )
         }
-        // Staging (câmera/galeria/amostra) já foi consumido pelo persist acima.
-        fileStore.clearCaptureCache()
-        outcome
     }
 
     override suspend fun clear() = withContext(Dispatchers.IO) {
-        fileStore.deleteStoredImage()
-        preferences.clear()
+        writeMutex.withLock {
+            fileStore.deleteStoredImage()
+            preferences.clear()
+        }
     }
 
     override suspend fun ensureDefaultSample(): HandReference? = withContext(Dispatchers.IO) {
-        val current = observe().first()
-        if (current != null) {
-            return@withContext current
+        writeMutex.withLock {
+            val current = observe().first()
+            if (current != null) {
+                current
+            } else {
+                persistDefaultSampleUnlocked()
+            }
         }
-        persistDefaultSample()
     }
 
     override suspend fun resetToDefaultSample(): HandReference? = withContext(Dispatchers.IO) {
         // Salva a amostra diretamente (sem preferences.clear) para o Flow não emitir null.
-        persistDefaultSample()
+        writeMutex.withLock { persistDefaultSampleUnlocked() }
     }
 
     override suspend fun stageFromContentUri(uriString: String): String? = withContext(Dispatchers.IO) {
@@ -100,11 +105,11 @@ class HandReferenceRepositoryImpl @Inject constructor(
 
     override fun clearStagingCacheNow() = fileStore.clearCaptureCacheNow()
 
-    private suspend fun persistDefaultSample(): HandReference? {
+    private suspend fun persistDefaultSampleUnlocked(): HandReference? {
         val sample = HandSampleCatalog.defaultOption
         val prepared = fileStore.copySampleAssetToCache(sample.assetPath)
         return when (
-            val outcome = save(
+            val outcome = saveUnlocked(
                 sourceAbsolutePath = prepared.absolutePath,
                 capturedAtEpochMs = clock.now(),
                 source = HandReferenceSource.SAMPLE,
@@ -114,5 +119,30 @@ class HandReferenceRepositoryImpl @Inject constructor(
             is HandReferenceSaveOutcome.Saved -> outcome.reference
             is HandReferenceSaveOutcome.Rejected -> null
         }
+    }
+
+    private suspend fun saveUnlocked(
+        sourceAbsolutePath: String,
+        capturedAtEpochMs: Long,
+        source: HandReferenceSource,
+        sampleId: String?,
+    ): HandReferenceSaveOutcome {
+        val outcome = fileStore.persist(
+            sourceAbsolutePath = sourceAbsolutePath,
+            capturedAtEpochMs = capturedAtEpochMs,
+            source = source,
+            sampleId = sampleId,
+        )
+        when (outcome) {
+            is HandReferenceSaveOutcome.Saved -> {
+                preferences.save(outcome.reference)
+                // Só depois do DataStore apontar para o path novo.
+                fileStore.purgeObsoleteHandFiles(outcome.reference.localPath)
+            }
+            is HandReferenceSaveOutcome.Rejected -> Unit
+        }
+        // Staging (câmera/galeria/amostra) já foi consumido pelo persist acima.
+        fileStore.clearCaptureCache()
+        return outcome
     }
 }

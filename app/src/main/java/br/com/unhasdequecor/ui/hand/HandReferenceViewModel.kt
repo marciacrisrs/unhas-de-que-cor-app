@@ -98,6 +98,7 @@ class HandReferenceViewModel @Inject constructor(
 
     fun confirmPendingSample() {
         val sampleId = _uiState.value.pendingSampleId ?: return
+        if (_uiState.value.isSaving) return
         useSampleHand(sampleId)
     }
 
@@ -110,8 +111,8 @@ class HandReferenceViewModel @Inject constructor(
     }
 
     fun confirmRemove() {
+        if (!beginSave { it.copy(showRemoveConfirm = false) }) return
         viewModelScope.launch {
-            _uiState.update { it.copy(showRemoveConfirm = false, isSaving = true) }
             val restored = clearHandReference()
             _uiState.update {
                 it.copy(
@@ -129,16 +130,17 @@ class HandReferenceViewModel @Inject constructor(
     }
 
     fun importFromGallery(uri: Uri) {
-        viewModelScope.launch {
-            _uiState.update {
+        if (!beginSave {
                 it.copy(
-                    isSaving = true,
-                    message = null,
                     showSamplePicker = false,
                     showReplaceSheet = false,
                     pendingSampleId = null,
                 )
             }
+        ) {
+            return
+        }
+        viewModelScope.launch {
             val prepared = repository.stageFromContentUri(uri.toString())
             if (prepared == null) {
                 _uiState.update {
@@ -154,25 +156,35 @@ class HandReferenceViewModel @Inject constructor(
     }
 
     fun importFromCameraCapture(file: File) {
-        viewModelScope.launch {
-            _uiState.update {
+        if (!beginSave {
                 it.copy(
-                    isSaving = true,
-                    message = null,
                     showSamplePicker = false,
                     showReplaceSheet = false,
                     pendingSampleId = null,
                 )
             }
+        ) {
+            return
+        }
+        viewModelScope.launch {
             stageUserPhoto(file.absolutePath)
         }
     }
 
     fun confirmPendingUserPhoto() {
-        val path = _uiState.value.pendingUserPreviewPath ?: return
+        var path: String? = null
+        _uiState.update { current ->
+            if (current.isSaving || current.pendingUserPreviewPath == null) {
+                path = null
+                current
+            } else {
+                path = current.pendingUserPreviewPath
+                current.copy(isSaving = true, message = null)
+            }
+        }
+        val captured = path ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, message = null) }
-            persistUser(path)
+            persistUser(captured)
         }
     }
 
@@ -187,17 +199,18 @@ class HandReferenceViewModel @Inject constructor(
 
     fun useSampleHand(sampleId: String) {
         val option = HandSampleCatalog.findById(sampleId) ?: return
-        viewModelScope.launch {
-            _uiState.update {
+        if (!beginSave {
                 it.copy(
-                    isSaving = true,
-                    message = null,
                     showSamplePicker = false,
                     showReplaceSheet = false,
                     pendingSampleId = null,
                     pendingUserPreviewPath = null,
                 )
             }
+        ) {
+            return
+        }
+        viewModelScope.launch {
             val prepared = repository.stageSampleAsset(option.assetPath)
             if (prepared == null) {
                 _uiState.update {
@@ -237,6 +250,26 @@ class HandReferenceViewModel @Inject constructor(
 
     fun consumeNavigateHome() {
         _uiState.update { it.copy(navigateHome = false, homeFlashMessage = null) }
+    }
+
+    /**
+     * Marca [HandReferenceUiState.isSaving] de forma síncrona para o segundo
+     * toque (double-tap no confirm) não disparar outro persist.
+     */
+    private fun beginSave(
+        transform: (HandReferenceUiState) -> HandReferenceUiState = { it },
+    ): Boolean {
+        var started = false
+        _uiState.update { current ->
+            if (current.isSaving) {
+                started = false
+                current
+            } else {
+                started = true
+                transform(current.copy(isSaving = true, message = null))
+            }
+        }
+        return started
     }
 
     private fun stageUserPhoto(path: String) {
