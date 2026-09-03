@@ -15,12 +15,15 @@ import br.com.unhasdequecor.domain.usecase.ObserveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.SaveHandReferenceUseCase
 import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 data class HandReferenceUiState(
@@ -56,6 +59,12 @@ class HandReferenceViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(HandReferenceUiState())
     val uiState: StateFlow<HandReferenceUiState> = _uiState.asStateFlow()
+
+    /**
+     * Confirmed persist must finish even if the user leaves the screen: teardown
+     * used to cancel the save and delete the staged JPEG mid-read.
+     */
+    private val persistInFlight = AtomicBoolean(false)
 
     init {
         viewModelScope.launch {
@@ -170,9 +179,14 @@ class HandReferenceViewModel @Inject constructor(
 
     fun confirmPendingUserPhoto() {
         val path = _uiState.value.pendingUserPreviewPath ?: return
+        if (!persistInFlight.compareAndSet(false, true)) return
+        _uiState.update { it.copy(isSaving = true, message = null) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, message = null) }
-            persistUser(path)
+            try {
+                withContext(NonCancellable) { persistUser(path) }
+            } finally {
+                persistInFlight.set(false)
+            }
         }
     }
 
@@ -187,7 +201,7 @@ class HandReferenceViewModel @Inject constructor(
 
     fun useSampleHand(sampleId: String) {
         val option = HandSampleCatalog.findById(sampleId) ?: return
-        viewModelScope.launch {
+        launchConfirmedPersist {
             _uiState.update {
                 it.copy(
                     isSaving = true,
@@ -206,7 +220,7 @@ class HandReferenceViewModel @Inject constructor(
                         message = messageFor(HandReferenceRejection.IO_ERROR),
                     )
                 }
-                return@launch
+                return@launchConfirmedPersist
             }
             when (val outcome = useSampleHandReference(option.id, prepared)) {
                 is HandReferenceSaveOutcome.Saved -> {
@@ -237,6 +251,17 @@ class HandReferenceViewModel @Inject constructor(
 
     fun consumeNavigateHome() {
         _uiState.update { it.copy(navigateHome = false, homeFlashMessage = null) }
+    }
+
+    private fun launchConfirmedPersist(block: suspend () -> Unit) {
+        if (!persistInFlight.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            try {
+                withContext(NonCancellable) { block() }
+            } finally {
+                persistInFlight.set(false)
+            }
+        }
     }
 
     private fun stageUserPhoto(path: String) {
@@ -285,6 +310,8 @@ class HandReferenceViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        repository.clearStagingCacheNow()
+        if (!persistInFlight.get()) {
+            repository.clearStagingCacheNow()
+        }
     }
 }

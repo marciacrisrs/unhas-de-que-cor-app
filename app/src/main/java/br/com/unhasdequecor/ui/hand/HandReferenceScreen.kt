@@ -3,6 +3,7 @@ package br.com.unhasdequecor.ui.hand
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,6 +36,10 @@ fun HandReferenceScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
     var cameraPermissionDenied by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = state.isSaving) {
+        // Persist is still writing the staged JPEG; ignore Back until it finishes.
+    }
 
     HandReferenceMessageEffects(
         message = state.message,
