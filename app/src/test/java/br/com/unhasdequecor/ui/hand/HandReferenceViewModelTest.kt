@@ -11,6 +11,7 @@ import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import br.com.unhasdequecor.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -97,6 +98,47 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.navigateHome).isTrue()
         assertThat(viewModel.uiState.value.homeFlashMessage).contains("Pele retinta")
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
+    }
+
+    @Test
+    fun `double tap confirm sample only persists once`() = runTest {
+        val viewModel = viewModel()
+        repository.saveGate = CompletableDeferred()
+
+        viewModel.openSamplePicker()
+        viewModel.selectPendingSample("retinta_vinho")
+        viewModel.confirmPendingSample()
+        viewModel.confirmPendingSample()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.isSaving).isTrue()
+
+        repository.saveGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
+        assertThat(viewModel.uiState.value.isSaving).isFalse()
+    }
+
+    @Test
+    fun `double tap confirm photo only persists once`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+
+        repository.saveGate = CompletableDeferred()
+        viewModel.confirmPendingUserPhoto()
+        viewModel.confirmPendingUserPhoto()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+
+        repository.saveGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
     }
 
     @Test
