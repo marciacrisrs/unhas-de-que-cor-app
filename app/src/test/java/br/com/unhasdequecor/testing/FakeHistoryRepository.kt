@@ -1,20 +1,41 @@
 package br.com.unhasdequecor.testing
 
 import br.com.unhasdequecor.domain.model.HistoryEntry
+import br.com.unhasdequecor.domain.model.RecommendationSource
 import br.com.unhasdequecor.domain.repository.HistoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 
 class FakeHistoryRepository : HistoryRepository {
     private val entries = MutableStateFlow<List<HistoryEntry>>(emptyList())
-    private val favorites = mutableSetOf<String>()
+    private val favorites = MutableStateFlow<Set<String>>(emptySet())
     private var nextId = 1L
 
-    override fun observeHistory(): Flow<List<HistoryEntry>> = entries
+    override fun observeHistory(): Flow<List<HistoryEntry>> = combine(entries, favorites) { list, favs ->
+        list.map { it.copy(isFavorite = it.colorId in favs) }
+    }
 
     override fun observeFavorites(): Flow<List<HistoryEntry>> =
-        entries.map { list -> list.filter { it.colorId in favorites }.distinctBy { it.colorId } }
+        combine(entries, favorites) { list, favs ->
+            val fromHistory = list.filter { it.colorId in favs }.distinctBy { it.colorId }
+                .map { it.copy(isFavorite = true) }
+            val historyIds = fromHistory.map { it.colorId }.toSet()
+            val orphans = favs.filter { it !in historyIds }.map { colorId ->
+                HistoryEntry(
+                    colorId = colorId,
+                    colorName = colorId,
+                    colorHex = 0L,
+                    tags = emptyList(),
+                    source = RecommendationSource.FOR_ME,
+                    occasion = null,
+                    mood = null,
+                    createdAtEpochMs = 0L,
+                    isFavorite = true,
+                )
+            }
+            fromHistory + orphans
+        }
 
     override suspend fun save(entry: HistoryEntry): Long {
         val key = entry.idempotencyKey
@@ -23,7 +44,7 @@ class FakeHistoryRepository : HistoryRepository {
             if (existing != null) return existing.id
         }
         val id = if (entry.id == 0L) nextId++ else entry.id
-        val saved = entry.copy(id = id, isFavorite = entry.colorId in favorites)
+        val saved = entry.copy(id = id, isFavorite = entry.colorId in favorites.value)
         entries.value = listOf(saved) + entries.value.filterNot { it.id == id }
         return id
     }
@@ -32,13 +53,13 @@ class FakeHistoryRepository : HistoryRepository {
         entries.value.firstOrNull { it.idempotencyKey == key }
 
     override suspend fun setFavorite(colorId: String, isFavorite: Boolean) {
-        if (isFavorite) favorites += colorId else favorites -= colorId
+        favorites.value = if (isFavorite) favorites.value + colorId else favorites.value - colorId
         entries.value = entries.value.map {
             if (it.colorId == colorId) it.copy(isFavorite = isFavorite) else it
         }
     }
 
-    override suspend fun isFavorite(colorId: String): Boolean = colorId in favorites
+    override suspend fun isFavorite(colorId: String): Boolean = colorId in favorites.value
 
     override suspend fun recentColorIds(limit: Int): Set<String> =
         entries.value.take(limit).map { it.colorId }.toSet()
