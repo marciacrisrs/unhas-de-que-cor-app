@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.ui.hand
 
+import androidx.lifecycle.ViewModelStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
@@ -63,6 +64,46 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.navigateHome).isTrue()
         assertThat(viewModel.uiState.value.homeFlashMessage).contains("sucesso")
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+    }
+
+    @Test
+    fun `leaving during confirm still persists the camera capture`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        repository.saveGate = gate
+        val store = ViewModelStore()
+        val viewModel = viewModel()
+        store.put("hand", viewModel)
+        advanceUntilIdle()
+
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+        viewModel.confirmPendingUserPhoto()
+        assertThat(viewModel.uiState.value.isSaving).isTrue()
+        assertThat(repository.lastSavedPath).isNull()
+
+        store.clear()
+        assertThat(repository.stagingCacheCleared).isFalse()
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(repository.lastSavedPath).isEqualTo("/tmp/capture.jpg")
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+    }
+
+    @Test
+    fun `onCleared without persist still wipes staging cache`() = runTest {
+        val store = ViewModelStore()
+        val viewModel = viewModel()
+        store.put("hand", viewModel)
+        advanceUntilIdle()
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+
+        store.clear()
+
+        assertThat(repository.stagingCacheCleared).isTrue()
+        assertThat(repository.lastSavedPath).isNull()
     }
 
     @Test
