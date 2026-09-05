@@ -17,4 +17,8 @@ class PreferencesRepositoryImpl @Inject constructor(
     override suspend fun updatePreferredStyles(styles: Set<NailStyle>) {
         dataSource.updatePreferredStyles(styles)
     }
+
+    override suspend fun togglePreferredStyle(style: NailStyle) {
+        dataSource.togglePreferredStyle(style)
+    }
 }

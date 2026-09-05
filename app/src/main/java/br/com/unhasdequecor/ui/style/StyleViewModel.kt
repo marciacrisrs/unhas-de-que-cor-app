@@ -42,12 +42,10 @@ class StyleViewModel @Inject constructor(
         )
 
     fun toggleStyle(style: NailStyle) {
-        val current = uiState.value.selectedStyles.toMutableSet()
-        if (!current.add(style)) {
-            current.remove(style)
-        }
         viewModelScope.launch {
-            updatePreferredStyles(current)
+            // Lê o conjunto persistido dentro do DataStore.edit — não o uiState,
+            // que pode estar stale (initialValue vazio ou toque anterior em voo).
+            updatePreferredStyles.toggle(style)
         }
     }
 }

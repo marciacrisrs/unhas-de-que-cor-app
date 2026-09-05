@@ -129,6 +129,24 @@ class DomainUseCasesTest {
     }
 
     @Test
+    fun `toggle preferred style keeps other styles`() = runTest {
+        val observe = ObservePreferencesUseCase(preferences)
+        val update = UpdatePreferredStylesUseCase(preferences)
+
+        observe().test {
+            assertThat(awaitItem().preferredStyles).containsExactly(NailStyle.MINIMALISTA)
+            update.toggle(NailStyle.ELEGANTE)
+            assertThat(awaitItem().preferredStyles).containsExactly(
+                NailStyle.MINIMALISTA,
+                NailStyle.ELEGANTE,
+            )
+            update.toggle(NailStyle.MINIMALISTA)
+            assertThat(awaitItem().preferredStyles).containsExactly(NailStyle.ELEGANTE)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `distinct color count reflects unique history colors`() = runTest {
         val first = TestColorCatalog.colors[0]
         val second = TestColorCatalog.colors[1]

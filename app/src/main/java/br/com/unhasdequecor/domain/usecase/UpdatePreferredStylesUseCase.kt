@@ -10,4 +10,8 @@ class UpdatePreferredStylesUseCase @Inject constructor(
     suspend operator fun invoke(styles: Set<NailStyle>) {
         preferencesRepository.updatePreferredStyles(styles)
     }
+
+    suspend fun toggle(style: NailStyle) {
+        preferencesRepository.togglePreferredStyle(style)
+    }
 }
