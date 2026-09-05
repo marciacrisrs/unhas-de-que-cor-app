@@ -10,6 +10,8 @@ interface HistoryRepository {
     fun observeHistory(): Flow<List<HistoryEntry>>
     fun observeFavorites(): Flow<List<HistoryEntry>>
     suspend fun save(entry: HistoryEntry): Long
+    /** Linha gravada para a sessão de Result; null se a chave ainda não foi persistida. */
+    suspend fun findByIdempotencyKey(key: String): HistoryEntry?
     suspend fun setFavorite(colorId: String, isFavorite: Boolean)
     suspend fun isFavorite(colorId: String): Boolean
     suspend fun recentColorIds(limit: Int = 8): Set<String>

@@ -53,6 +53,12 @@ class HistoryRepositoryImpl @Inject constructor(
         return historyDao.findIdByIdempotencyKey(key) ?: insertedId
     }
 
+    override suspend fun findByIdempotencyKey(key: String): HistoryEntry? {
+        val entity = historyDao.findByIdempotencyKey(key) ?: return null
+        val favorite = favoriteDao.isFavorite(entity.colorId)
+        return entity.toDomain().copy(isFavorite = favorite)
+    }
+
     override suspend fun setFavorite(colorId: String, isFavorite: Boolean) {
         if (isFavorite) {
             favoriteDao.upsert(

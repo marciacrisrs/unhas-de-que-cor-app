@@ -71,6 +71,38 @@ class HistoryRepositoryImplTest {
         coVerify(exactly = 0) { historyDao.findIdByIdempotencyKey(any()) }
     }
 
+    @Test
+    fun `findByIdempotencyKey maps persisted row and live favorite flag`() = runTest {
+        coEvery { historyDao.findByIdempotencyKey("session-abc") } returns HistoryEntity(
+            id = EXISTING_ID,
+            colorId = "romantico_rosa",
+            colorName = "Rosa",
+            colorHex = 1L,
+            tagsCsv = "ROMANTICO",
+            source = "FOR_ME",
+            occasion = null,
+            mood = null,
+            createdAtEpochMs = CREATED_AT_MS,
+            isFavorite = false,
+            idempotencyKey = "session-abc",
+        )
+        coEvery { favoriteDao.isFavorite("romantico_rosa") } returns true
+
+        val found = repository.findByIdempotencyKey("session-abc")
+
+        assertThat(found?.id).isEqualTo(EXISTING_ID)
+        assertThat(found?.colorId).isEqualTo("romantico_rosa")
+        assertThat(found?.isFavorite).isTrue()
+        assertThat(found?.idempotencyKey).isEqualTo("session-abc")
+    }
+
+    @Test
+    fun `findByIdempotencyKey returns null when missing`() = runTest {
+        coEvery { historyDao.findByIdempotencyKey("missing") } returns null
+
+        assertThat(repository.findByIdempotencyKey("missing")).isNull()
+    }
+
     private companion object {
         const val NOW_MS = 42L
         const val CREATED_AT_MS = 10L

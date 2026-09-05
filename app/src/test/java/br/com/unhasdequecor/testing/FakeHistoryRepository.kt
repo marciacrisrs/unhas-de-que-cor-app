@@ -28,6 +28,9 @@ class FakeHistoryRepository : HistoryRepository {
         return id
     }
 
+    override suspend fun findByIdempotencyKey(key: String): HistoryEntry? =
+        entries.value.firstOrNull { it.idempotencyKey == key }
+
     override suspend fun setFavorite(colorId: String, isFavorite: Boolean) {
         if (isFavorite) favorites += colorId else favorites -= colorId
         entries.value = entries.value.map {
