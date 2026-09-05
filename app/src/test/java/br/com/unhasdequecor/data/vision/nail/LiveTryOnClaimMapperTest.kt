@@ -14,7 +14,6 @@ class LiveTryOnClaimMapperTest {
             paintableNailCount = 5,
             fullQualityNailCount = 5,
             hasMappableAnchors = true,
-            paintedViaEllipse = false,
             failureReason = DetectionFailureReason.Generic,
         )
 
@@ -31,7 +30,6 @@ class LiveTryOnClaimMapperTest {
             paintableNailCount = 5,
             fullQualityNailCount = DetectionConfidenceFloor.MIN_MASKS_FOR_FULL,
             hasMappableAnchors = true,
-            paintedViaEllipse = false,
             failureReason = null,
         )
 
@@ -41,19 +39,17 @@ class LiveTryOnClaimMapperTest {
     }
 
     @Test
-    fun decide_whenFullPathPaintsViaEllipse_demotesToApproximate() {
+    fun decide_whenStrongWithoutMasks_hidesOverlayAndDoesNotClaimHand() {
         val decision = LiveTryOnClaimMapper.decide(
             reliability = TryOnReliability.STRONG,
-            paintableNailCount = 5,
-            fullQualityNailCount = DetectionConfidenceFloor.MIN_MASKS_FOR_FULL,
+            paintableNailCount = 0,
+            fullQualityNailCount = 0,
             hasMappableAnchors = true,
-            paintedViaEllipse = true,
             failureReason = DetectionFailureReason.Generic,
         )
 
-        assertThat(decision.showOverlay).isTrue()
-        assertThat(decision.claim).isEqualTo(TryOnPreviewClaim.APPROXIMATE)
-        assertThat(decision.reason).isEqualTo(DetectionFailureReason.Generic)
+        assertThat(decision.showOverlay).isFalse()
+        assertThat(decision.claim).isEqualTo(TryOnPreviewClaim.NOT_DETECTED)
         assertThat(TryOnPreviewLabels.contentDescription("Nude", decision.claim))
             .doesNotContain("sua mão")
     }
@@ -65,7 +61,6 @@ class LiveTryOnClaimMapperTest {
             paintableNailCount = 5,
             fullQualityNailCount = 2,
             hasMappableAnchors = true,
-            paintedViaEllipse = false,
             failureReason = DetectionFailureReason.Generic,
         )
 
@@ -80,7 +75,6 @@ class LiveTryOnClaimMapperTest {
             paintableNailCount = 3,
             fullQualityNailCount = 0,
             hasMappableAnchors = false,
-            paintedViaEllipse = false,
             failureReason = DetectionFailureReason.Generic,
         )
 
@@ -95,7 +89,6 @@ class LiveTryOnClaimMapperTest {
             paintableNailCount = 0,
             fullQualityNailCount = 0,
             hasMappableAnchors = false,
-            paintedViaEllipse = true,
             failureReason = DetectionFailureReason.Generic,
         )
 
@@ -110,7 +103,6 @@ class LiveTryOnClaimMapperTest {
             paintableNailCount = 5,
             fullQualityNailCount = 5,
             hasMappableAnchors = true,
-            paintedViaEllipse = false,
             failureReason = DetectionFailureReason.Generic,
         )
 

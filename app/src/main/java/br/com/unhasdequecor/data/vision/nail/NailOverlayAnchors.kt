@@ -82,8 +82,9 @@ object NailOverlayAnchors {
         sampleId != null && sampleId in MASK_SAMPLES
 
     /**
-     * Só amostras com máscara espacialmente crível (placa, não elipse genérica).
-     * Demais IDs no catálogo usam MediaPipe na foto da amostra até remask.
+     * Só `clara_vermelho` tem máscara espacialmente crível (placa, não elipse).
+     * Demais IDs no catálogo usam MediaPipe na foto da amostra. PNGs elipse foram
+     * removidos do APK para não voltarem a `MASK_SAMPLES` por engano.
      */
     private val MASK_SAMPLES = setOf(
         "clara_vermelho",

@@ -4,7 +4,7 @@ import br.com.unhasdequecor.data.vision.HandLandmarks
 
 /**
  * Interpreta um frame Live com o mesmo contrato de honestidade do STILL:
- * FULL só quando o plano de render é FULL e a tinta não veio de elipse.
+ * FULL só quando o plano de render é FULL (máscara de placa, nunca elipse).
  */
 data class LiveTryOnFrameDecision(
     val showOverlay: Boolean,
@@ -18,7 +18,6 @@ object LiveTryOnClaimMapper {
         paintableNailCount: Int,
         fullQualityNailCount: Int,
         hasMappableAnchors: Boolean,
-        paintedViaEllipse: Boolean,
         failureReason: DetectionFailureReason?,
     ): LiveTryOnFrameDecision {
         val plan = TryOnHandReliability.planRender(
@@ -34,18 +33,14 @@ object LiveTryOnClaimMapper {
                 reason = failureReason,
             )
             UserTryOnRenderMode.APPROXIMATE -> LiveTryOnFrameDecision(
-                showOverlay = true,
+                showOverlay = plan.useNailMasks,
                 claim = TryOnPreviewClaim.APPROXIMATE,
                 reason = failureReason,
             )
             UserTryOnRenderMode.FULL -> LiveTryOnFrameDecision(
                 showOverlay = true,
-                claim = if (paintedViaEllipse) {
-                    TryOnPreviewClaim.APPROXIMATE
-                } else {
-                    TryOnPreviewClaim.FULL_USER
-                },
-                reason = if (paintedViaEllipse) failureReason else null,
+                claim = TryOnPreviewClaim.FULL_USER,
+                reason = null,
             )
         }
     }

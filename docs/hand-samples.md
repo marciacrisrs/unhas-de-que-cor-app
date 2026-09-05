@@ -19,14 +19,15 @@ Máscaras: `app/src/main/assets/hand_nail_masks/`.
 ## Máscara calibrada
 
 Só IDs em `NailOverlayAnchors.MASK_SAMPLES` usam PNG de máscara.  
-Hoje: `clara_vermelho`. Demais amostras usam **MediaPipe** na foto (sem elipse que pinta pele).
+Hoje: `clara_vermelho`. Demais amostras usam **MediaPipe** na foto (sem elipse).  
+PNGs elipse das outras amostras foram **removidos** do APK.
 
-Para reativar uma máscara:
+Para adicionar uma máscara nova:
 
-1. Remask pixel-accurate (placa só, soft edge, cobertura ≤ 18%).
+1. Matte pixel-accurate (placa só, soft edge, cobertura ≤ 18%) — automação de cor **não** passou na revisão de unha.
 2. Regenerar âncoras pelos centróides.
 3. Incluir o id em `MASK_SAMPLES` + `HandSampleMaskAssetTest`.
-4. Revisar com `vision-tryon-reviewer`.
+4. Revisar com `human-nail-anatomy-reviewer` **e** `vision-tryon-reviewer`.
 
 ## Treino JVM (pele retinta)
 

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -236,60 +235,44 @@ private fun LiveCameraPane(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        LiveTryOnChrome(
-            colorName = state.colorName,
-            statusText = statusText,
-            onBack = onBack,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-    }
-}
-
-@Composable
-private fun LiveTryOnChrome(
-    colorName: String,
-    statusText: String,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = CHROME_SCRIM_ALPHA))
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = Color.White,
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 48.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = "Try-on ao vivo",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = colorName,
-                    color = Color.White.copy(alpha = 0.85f),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(4.dp)
+                .background(Color.Black.copy(alpha = CHROME_CHIP_ALPHA), MaterialTheme.shapes.medium),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Voltar",
+                tint = Color.White,
+            )
         }
-        Text(
-            text = statusText,
-            color = Color.White,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+                .background(Color.Black.copy(alpha = CHROME_CHIP_ALPHA), MaterialTheme.shapes.medium)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Try-on ao vivo",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = state.colorName,
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = statusText,
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 
@@ -420,4 +403,4 @@ internal fun orientLiveFrame(
     return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, false)
 }
 
-private const val CHROME_SCRIM_ALPHA = 0.45f
+private const val CHROME_CHIP_ALPHA = 0.42f

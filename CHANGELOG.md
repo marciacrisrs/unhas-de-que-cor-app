@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.13 — (versionCode 14)
+
+### Unha humana / honestidade
+- Foto e Live nunca pintam elipse/adesivo: sem máscara de placa, a prévia some e o rótulo não diz “na sua mão”
+- Máscaras elipse (`retinta_vinho`, `morena_nude`, `morena_clara_coral`, `media_rosa`, `retinta_polegar`) saíram do APK; só `clara_vermelho` permanece em `MASK_SAMPLES`
+- Chrome do Live em chips (não barra opaca cobrindo unhas)
+
 ## 1.0.12 — (versionCode 13)
 
 ### Correções

@@ -100,7 +100,6 @@ class LiveTryOnViewModelTest {
             nails = snapshot.nails,
             landmarks = snapshot.landmarks,
             debugEnabled = false,
-            paintedViaEllipse = false,
         )
         val viewModel = viewModel("festa_vermelha")
 
@@ -112,17 +111,19 @@ class LiveTryOnViewModelTest {
     }
 
     @Test
-    fun `ellipse paint on full path is labeled approximate`() {
+    fun `strong snapshot without full-quality nails is approximate mask paint`() {
         val frame = bitmap()
         val painted = bitmap()
-        val snapshot = strongSnapshot(frame)
+        val snapshot = strongSnapshot(frame).copy(
+            nails = listOf(strongSnapshot(frame).nails.first()),
+            reliability = TryOnReliability.STRONG,
+        )
         every { pipeline.detect(frame, stabilize = true) } returns snapshot
         every { pipeline.recolor(snapshot, any()) } returns NailTryOnResult(
             bitmap = painted,
             nails = snapshot.nails,
             landmarks = snapshot.landmarks,
             debugEnabled = false,
-            paintedViaEllipse = true,
         )
         val viewModel = viewModel("festa_vermelha")
 

@@ -291,7 +291,6 @@ class NailTryOnPipelineTest {
             Color.Red,
         )
         assertThat(result.bitmap).isSameInstanceAs(image)
-        assertThat(result.paintedViaEllipse).isFalse()
         verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
     }
 
@@ -319,7 +318,6 @@ class NailTryOnPipelineTest {
             Color.Red,
         )
         assertThat(result.bitmap).isSameInstanceAs(image)
-        assertThat(result.paintedViaEllipse).isFalse()
         verify(exactly = 0) { colorApplier.apply(any(), any(), any()) }
     }
 
@@ -359,7 +357,6 @@ class NailTryOnPipelineTest {
             Color.Red,
         )
         assertThat(result.bitmap).isSameInstanceAs(image)
-        assertThat(result.paintedViaEllipse).isFalse()
     }
 
     @Test

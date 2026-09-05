@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import br.com.unhasdequecor.data.local.hand.OrientedBitmapDecoder
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
-import br.com.unhasdequecor.data.vision.nail.DetectedNailPolishApplier
 import br.com.unhasdequecor.data.vision.nail.DetectionFailureDiagnostics
 import br.com.unhasdequecor.data.vision.nail.DetectionFailureReason
 import br.com.unhasdequecor.data.vision.nail.ImageLightingSampler
@@ -381,7 +380,7 @@ private fun paintPreview(
     val sampleId = assets.sampleId
     val calibratedMask = sampleId != null && assets.sampleMask != null
     return if (calibratedMask) {
-        paintSamplePreview(assets, polishColor, checkNotNull(sampleId))
+        paintSamplePreview(assets, polishColor)
     } else {
         paintUserPreview(assets, polishColor, pipeline)
     }
@@ -390,7 +389,6 @@ private fun paintPreview(
 private fun paintSamplePreview(
     assets: TryOnBaseAssets,
     polishColor: Color,
-    sampleId: String,
 ): TryOnPreviewData {
     val mask = assets.sampleMask
     if (mask != null) {
@@ -409,7 +407,7 @@ private fun paintSamplePreview(
     )
     return TryOnPreviewData(
         bitmap = display,
-        anchors = NailOverlayAnchors.forSample(sampleId),
+        anchors = emptyList(),
         mode = TryOnMode.APPROXIMATE,
     )
 }
@@ -450,8 +448,6 @@ private fun paintUserPreview(
                 polishColor = polishColor,
                 pipeline = pipeline,
                 plan = plan,
-                landmarks = landmarks,
-                mappedAnchors = mappedAnchors,
             )
     }
 }
@@ -500,22 +496,14 @@ private fun paintUserFull(
         candidate = result.bitmap,
         protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
     )
-    // Elipse sob máscara falha ≠ claim FULL (modo ≡ qualidade).
-    val mode = if (result.paintedViaEllipse) TryOnMode.APPROXIMATE else TryOnMode.DETECTED
-    val reason =
-        if (result.paintedViaEllipse) {
-            snapshot.failureReason ?: DetectionFailureReason.Generic
-        } else {
-            null
-        }
     return TryOnPreviewData(
         bitmap = painted,
         anchors = emptyList(),
-        mode = mode,
+        mode = TryOnMode.DETECTED,
         nails = result.nails,
         landmarks = result.landmarks,
         showDebug = result.debugEnabled,
-        failureReason = reason,
+        failureReason = null,
     )
 }
 
@@ -525,8 +513,6 @@ private fun paintUserApproximate(
     polishColor: Color,
     pipeline: NailTryOnPipeline,
     plan: UserTryOnRenderPlan,
-    landmarks: HandLandmarks?,
-    mappedAnchors: List<NailOverlayAnchor>?,
 ): TryOnPreviewData {
     if (plan.useNailMasks && snapshot.nails.isNotEmpty()) {
         return paintUserFull(snapshot, assets, polishColor, pipeline).copy(
@@ -534,40 +520,11 @@ private fun paintUserApproximate(
             failureReason = snapshot.failureReason,
         )
     }
-    val ellipsePainted =
-        if (plan.useEllipsePaint && landmarks != null && mappedAnchors != null) {
-            DetectedNailPolishApplier.apply(
-                source = snapshot.workingBitmap,
-                anchors = mappedAnchors,
-                polishColor = polishColor,
-            )
-        } else {
-            null
-        }
-    if (ellipsePainted != null) {
-        return TryOnPreviewData(
-            bitmap = ellipsePainted,
-            anchors = emptyList(),
-            mode = TryOnMode.APPROXIMATE,
-            landmarks = landmarks,
-            showDebug = pipeline.debugEnabled,
-            failureReason = snapshot.failureReason,
-        )
-    }
-    val canvasAnchors =
-        if (plan.useCanvasAnchors && mappedAnchors != null) mappedAnchors else emptyList()
-    val display = ownedPreviewBitmap(
-        candidate = snapshot.workingBitmap,
-        protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
-    )
-    return TryOnPreviewData(
-        bitmap = display,
-        anchors = canvasAnchors,
-        mode = TryOnMode.APPROXIMATE,
-        landmarks = landmarks,
+    return paintUserNotDetected(
+        assets = assets,
+        snapshot = snapshot,
         showDebug = pipeline.debugEnabled,
-        matchEllipsePlate = canvasAnchors.isNotEmpty(),
-        failureReason = snapshot.failureReason,
+        fallbackReason = snapshot.failureReason,
     )
 }
 
