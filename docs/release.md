@@ -106,7 +106,9 @@ continuam simbolicáveis via `mapping.txt`.
 
 Versão atual: ver `versionName` / `versionCode` em `app/build.gradle.kts`.
 
-No Windows, se o build falhar em `aapt2-…-windows.jar` com dependency verification, atualize o `gradle/verification-metadata.xml` (o CI Linux só gera o artefato linux por padrão). Use também `--no-configuration-cache` se o cache reclamar:
+No Windows, se o **Android Studio** falhar no sync com dezenas de `*-sources.jar` (configuration `detachedConfiguration2`), isso é o IDE pedindo sources — o XML já confia em `-sources`/`-javadoc`; os JARs executáveis continuam com sha256. Faça **File → Sync Project with Gradle Files**.
+
+Se o build falhar em `aapt2-…-windows.jar` com dependency verification, atualize o `gradle/verification-metadata.xml` (o CI Linux só gera o artefato linux por padrão). Use também `--no-configuration-cache` se o cache reclamar:
 
 ```bash
 gradlew :app:bundleRelease --no-configuration-cache

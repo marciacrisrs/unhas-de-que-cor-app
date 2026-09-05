@@ -3,6 +3,11 @@
    <configuration>
       <verify-metadata>true</verify-metadata>
       <verify-signatures>false</verify-signatures>
+      <!-- Android Studio baixa -sources/-javadoc no sync; não são executados. Binários continuam com sha256. -->
+      <trusted-artifacts>
+         <trust file=".*-sources[.]jar" regex="true"/>
+         <trust file=".*-javadoc[.]jar" regex="true"/>
+      </trusted-artifacts>
    </configuration>
    <components>
       <component group="androidx.activity" name="activity" version="1.11.0">
