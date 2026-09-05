@@ -15,7 +15,7 @@ Garantir que o try-on (“provar esmalte na mão”) seja **espacialmente críve
 ## Escopo neste app
 
 - Amostra de catálogo: `hand_samples/` + máscara `hand_nail_masks/` → `PolishMaskRecolorer`
-- Foto da usuária: MediaPipe Hand Landmarker → `NailLandmarkMapper` / `NailRoiEstimator` → segmentação / elipse → `DetectedNailPolishApplier` / `NailColorApplier`
+- Foto da usuária: MediaPipe Hand Landmarker → `NailLandmarkMapper` / `NailRoiEstimator` → segmentação → `NailColorApplier` (elipse **não** pinta foto real)
 - UI: `HandTryOnPreview` (modos, banner, Canvas de fallback)
 - Catálogo: `HandSampleCatalog` e layouts em `NailOverlayAnchors`
 
@@ -35,7 +35,7 @@ Fora do escopo exclusivo: tipografia Material, pipelines CI genéricos, listing 
 2. **Honestidade de falha** — sem landmarks: zero overlay estático (`DEFAULT` proibido na foto da usuária); rótulo = orientação / “mão não detectada”, nunca “prévia na sua mão”.
 3. **Calibração única** — constantes de centro, facing, thumb, overshoot e bias iguais (ou derivadas) entre `NailLandmarkMapper` e `NailRoiEstimator`; alterar uma exige a outra + testes.
 4. **Anatomia da âncora** — centro proximal à tip (não além dela); elipses cobrem a placa, não a pele dorsal nem a ponta do dedo além da borda livre.
-5. **Modo ≡ qualidade** — `MASK` / detecção com máscara ≠ elipse aproximada ≠ sem detecção; o texto/CD do preview deve refletir o modo real.
+5. **Modo ≡ qualidade** — `MASK` / detecção com máscara ≠ sem detecção; o texto/CD do preview deve refletir o modo real. Elipse em foto da usuária é **proibida**.
 6. **Máscaras de amostra** — só IDs em `MASK_SAMPLES` usam PNG; cada um deve ter máscara placa-precisa (não elipse genérica), passar recolor sem cobrir a imagem inteira, e âncoras coerentes. Amostras sem máscara calibrada usam MediaPipe na foto.
 7. **Diversidade** — mudanças de detecção/geometria não podem degradar só um tom de pele ou uma pose; preferir fixtures com ≥4 tons e ≥1 pose distinta (ex.: polegar erguido). Remask pendente não justifica reativar `MASK_SAMPLES` ruins.
 8. **Regressão espacial** — fixtures (landmarks sintéticos ou fotos de teste) com assert de âncoras dentro da placa; testes cobrindo o ramo “sem landmarks → sem Canvas de unha”.

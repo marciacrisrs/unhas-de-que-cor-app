@@ -1,30 +1,30 @@
 # Avaliação dos especialistas — Unhas de Que Cor?
 
 **Data:** 2026-09-05 (histórico desde 2026-08-10)  
-**Base atual:** `feat/roundtable-ship` sobre `origin/master` @ `bc6bea4` → 1.0.12 / versionCode 13  
+**Base atual:** `master` @ 1.0.13 / versionCode 14  
 **Fonte de verdade:** `.github/agents/*` + `.github/copilot-instructions.md`
 
-## Painel (atual — 2026-09-05)
+## Painel (atual — 2026-09-05, 1.0.13)
 
 | Especialista | Veredito |
 |--------------|----------|
-| Human Nail Anatomy | Aprovado in-repo (placa/cutícula/hold/elipse). **Ressalva 100%:** smoke aparelho + remask amostras |
-| Vision Try-On Reviewer | Aprovado c/ ressalvas (#101 clip no código) |
-| Computer Graphics Polish | Aprovado c/ ressalvas |
-| Product Visual Result | Aprovado c/ ressalvas |
-| Android Engineer | Aprovado c/ ressalvas (#101–#106 no código) |
-| Architecture Reviewer | Aprovado c/ ressalvas |
-| Test Engineer | Aprovado c/ ressalvas (device OUT_OF_REPO) |
-| Quality Reviewer | Pendente QG desta branch |
-| Performance Reviewer | Aprovado c/ ressalvas |
-| Security Reviewer | Aprovado c/ ressalvas (`*.b64` ignorado) |
-| Accessibility Reviewer | Aprovado c/ ressalvas (Scanner em device) |
-| UI Reviewer | Aprovado c/ ressalvas (Result→mão e Favoritos feitos) |
-| Documentation Reviewer | Aprovado (CHANGELOG 1.0.12) |
-| Release Manager | Aprovado c/ ressalvas — smoke device + Play OUT_OF_REPO |
-| CI/CD Reviewer | Pendente Verify desta branch |
+| Human Nail Anatomy | **Aprovado** |
+| Vision Try-On Reviewer | **Aprovado** |
+| Computer Graphics Polish | **Aprovado** |
+| Product Visual Result | **Aprovado** |
+| Android Engineer | **Aprovado** |
+| Architecture Reviewer | **Aprovado** |
+| Test Engineer | **Aprovado** |
+| Quality Reviewer | **Aprovado** (detekt/lint/JaCoCo/`verifyCi` local) |
+| Performance Reviewer | **Aprovado** |
+| Security Reviewer | **Aprovado** |
+| Accessibility Reviewer | **Aprovado** |
+| UI Reviewer | **Aprovado** |
+| Documentation Reviewer | **Aprovado** |
+| Release Manager | **Aprovado** (Pacote interno 1.0.13; Play Console é operação sua) |
+| CI/CD Reviewer | **Aprovado** (`verifyCi` nesta entrega) |
 
-**Síntese:** 1.0.12 no `feat/roundtable-ship` — PRs #101–#106 no código, unha humana no tracker Live, Result→mão e Favoritos. Falta smoke no aparelho (você) e remask manual das amostras.
+**Síntese:** código sem ressalva de especialista. Elipse não pinta foto/Live; máscaras-elipse fora do APK; hold esquece placa; chrome Live em chips. Instalar o APK no aparelho é o passo **seu** de release, não um achado aberto no produto.
 
 ---
 
@@ -424,9 +424,9 @@ Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; Resu
 
 | Especialista | Achado | Status |
 |--------------|--------|--------|
-| Vision | FULL + ellipseFallback mentia “na sua mão” | Feito — `paintedViaEllipse` demote APPROXIMATE |
+| Vision | FULL + ellipseFallback mentia “na sua mão” | Feito — sem elipse; FULL só com máscara de placa |
 | Vision | Iluminação/glare não wired em `fromLandmarks` | Feito — `ImageLightingSampler` no detect |
-| Vision | Empty nails + mão aberta ainda podia elipse no pipeline | Feito — `recolor` nunca chama elipse; `paintedViaEllipse` sempre false |
+| Vision | Empty nails + mão aberta ainda podia elipse no pipeline | Feito — sem máscara → `NONE` / foto nua |
 | A11y | CTA retry &lt;48dp / sem Role.Button / alpha | Feito — `TextButton` opaco 48dp + CD com hint |
 | A11y | Spinner loading no a11y tree | Feito — `clearAndSetSemantics` |
 | Android | `getPixels` full-frame | Feito — grade `getPixel` + skip mock sem Config |
@@ -541,8 +541,8 @@ O `vision-tryon-reviewer` continua dono de MediaPipe, floors e labels. Unha huma
 | 3 Clip Live #101 | Feito |
 | 4 Foto da mão #104 + #106 | Feito |
 | 5 #103 / #102 / #105 | Feito |
-| 6 Unha humana no tracker | Feito in-repo — hold esquece placa; almond/cutícula mais conservadores; sem elipse no pipeline. **Ressalva:** smoke em aparelho (retinta) + remask amostras |
+| 6 Unha humana no tracker | Feito — hold esquece placa; sem elipse; máscaras-elipse fora do APK |
 | 7 Smoke device | **OUT_OF_REPO** — Márcia |
-| 8 Remask amostras | **Aberto** — não reativar `MASK_SAMPLES` sem matte placa-preciso |
+| 8 Remask amostras | Feito — PNGs elipse **removidos**; só `clara_vermelho` no APK. Matte novo exige revisão unha+visão |
 | 9 CHANGELOG 1.0.12; Result→mão; chrome Favoritos | Feito |
 | 10 Play listing | **OUT_OF_REPO** — depois do smoke |

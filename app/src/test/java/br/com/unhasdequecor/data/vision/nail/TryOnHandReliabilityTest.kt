@@ -127,10 +127,12 @@ class TryOnHandReliabilityTest {
             )
         assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.APPROXIMATE)
         assertThat(plan.useNailMasks).isTrue()
+        assertThat(plan.useEllipsePaint).isFalse()
+        assertThat(plan.useCanvasAnchors).isFalse()
     }
 
     @Test
-    fun planRender_whenStrongWithoutMasks_ellipseIsApproximateNotFull() {
+    fun planRender_whenStrongWithoutMasks_isNoneNotEllipse() {
         val plan =
             TryOnHandReliability.planRender(
                 reliability = TryOnReliability.STRONG,
@@ -139,9 +141,10 @@ class TryOnHandReliabilityTest {
                 hasMappableAnchors = true,
             )
 
-        assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.APPROXIMATE)
-        assertThat(plan.useEllipsePaint).isTrue()
-        assertThat(plan.useCanvasAnchors).isTrue()
+        assertThat(plan.mode).isEqualTo(UserTryOnRenderMode.NONE)
+        assertThat(plan.useEllipsePaint).isFalse()
+        assertThat(plan.useCanvasAnchors).isFalse()
+        assertThat(plan.useNailMasks).isFalse()
     }
 
     @Test

@@ -1,4 +1,4 @@
-# Play Console — textos e assets (1.0.8)
+# Play Console — textos e assets (1.0.13)
 
 Use com [`docs/release.md`](release.md) e [`docs/privacy-policy.md`](privacy-policy.md).
 
@@ -36,16 +36,16 @@ Privacidade: o app é offline. Fotos e preferências ficam no dispositivo; a fot
 Não existe cor certa ou errada — existe a sugestão que combina com aquele momento.
 ```
 
-## O que há de novo (1.0.8)
+## O que há de novo (1.0.13)
 
 ```text
-Try-on mais confiável na sua foto:
-• Melhor detecção com flash, contraluz e luz fraca
+Try-on mais honesto na unha:
+• Esmalte só na placa detectada — sem adesivo/elipse na pele
+• Live: se a unha sair do quadro, a cor some em vez de pintar o dorso
 • Avisos claros quando a mão ou unha não são detectadas
-• Prévia honesta (completa ou aproximada)
 ```
 
-(Detalhe técnico: ver `CHANGELOG.md`. Versões anteriores: 1.0.0–1.0.7.)
+(Detalhe técnico: ver `CHANGELOG.md`. Versões anteriores: 1.0.0–1.0.12.)
 
 ## Classificação de conteúdo
 

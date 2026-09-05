@@ -137,7 +137,7 @@ class LiveTryOnViewModel @Inject constructor(
             releaseUnused(frame, snapshot, overlay = null)
             return
         }
-        val preview = decision(snapshot, paintedViaEllipse = false)
+        val preview = decision(snapshot)
         if (!preview.showOverlay) {
             publish(
                 overlay = null,
@@ -150,7 +150,7 @@ class LiveTryOnViewModel @Inject constructor(
             return
         }
         val result = pipeline.recolor(snapshot, _uiState.value.polishColor)
-        val painted = decision(snapshot, result.paintedViaEllipse)
+        val painted = decision(snapshot)
         val overlay = result.bitmap.takeIf { painted.showOverlay }
         publish(
             overlay = overlay,
@@ -164,13 +164,11 @@ class LiveTryOnViewModel @Inject constructor(
 
     private fun decision(
         snapshot: NailDetectionSnapshot,
-        paintedViaEllipse: Boolean,
     ) = LiveTryOnClaimMapper.decide(
         reliability = snapshot.reliability,
         paintableNailCount = DetectionConfidenceFloor.countPaintable(snapshot.nails),
         fullQualityNailCount = DetectionConfidenceFloor.countFullQuality(snapshot.nails),
         hasMappableAnchors = LiveTryOnClaimMapper.hasMappableAnchors(snapshot.landmarks),
-        paintedViaEllipse = paintedViaEllipse,
         failureReason = snapshot.failureReason,
     )
 

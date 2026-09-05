@@ -53,6 +53,22 @@ class HandSampleMaskAssetTest {
         }
     }
 
+    @Test
+    fun `uncalibrated samples have no mask png in assets`() {
+        val assetsRoot = resolveAssetsRoot()
+        val uncalibrated = listOf(
+            "media_rosa",
+            "morena_nude",
+            "retinta_vinho",
+            "retinta_polegar",
+            "morena_clara_coral",
+        )
+        for (id in uncalibrated) {
+            assertThat(NailOverlayAnchors.hasMaskAsset(id)).isFalse()
+            assertThat(File(assetsRoot, "hand_nail_masks/$id.png").exists()).isFalse()
+        }
+    }
+
     private fun resolveAssetsRoot(): File {
         val cwd = File(System.getProperty("user.dir")!!)
         val candidates = listOf(

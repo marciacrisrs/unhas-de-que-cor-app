@@ -7,7 +7,7 @@ import br.com.unhasdequecor.data.vision.HandLandmarks
  * Confiabilidade do try-on na **mão real** (foto da usuária).
  *
  * MediaPipe pode devolver landmarks fracos (limiar baixo / contraluz).
- * Esta camada evita rotular elipse frágil como “Prévia na sua mão”.
+ * Esta camada evita pintar elipse/adesivo e rotular isso como “Prévia na sua mão”.
  *
  * Pisos numéricos: [DetectionConfidenceFloor].
  */
@@ -23,7 +23,7 @@ enum class TryOnReliability {
 enum class UserTryOnRenderMode {
     /** Máscaras/recolor confiáveis → “Prévia na sua mão”. */
     FULL,
-    /** Elipse/âncoras ou detecção fraca → “Prévia aproximada”. */
+    /** Máscaras fracas → “Prévia aproximada” (nunca elipse). */
     APPROXIMATE,
     /** Sem landmarks utilizáveis → “Mão não detectada”, zero overlay. */
     NONE,
@@ -113,7 +113,7 @@ object TryOnHandReliability {
         reliability: TryOnReliability,
         paintableNailCount: Int,
         fullQualityOk: Boolean,
-        hasMappableAnchors: Boolean,
+        @Suppress("UNUSED_PARAMETER") hasMappableAnchors: Boolean,
     ): UserTryOnRenderPlan {
         val anyMask = paintableNailCount > 0
         return when (reliability) {
@@ -121,29 +121,23 @@ object TryOnHandReliability {
                 fullQualityOk -> UserTryOnRenderPlan(
                     mode = UserTryOnRenderMode.FULL,
                     useNailMasks = true,
-                    useEllipsePaint = true,
+                    useEllipsePaint = false,
                     useCanvasAnchors = false,
                 )
                 anyMask -> UserTryOnRenderPlan(
                     mode = UserTryOnRenderMode.APPROXIMATE,
                     useNailMasks = true,
-                    useEllipsePaint = true,
-                    useCanvasAnchors = !hasMappableAnchors,
-                )
-                hasMappableAnchors -> UserTryOnRenderPlan(
-                    mode = UserTryOnRenderMode.APPROXIMATE,
-                    useNailMasks = false,
-                    useEllipsePaint = true,
-                    useCanvasAnchors = true,
+                    useEllipsePaint = false,
+                    useCanvasAnchors = false,
                 )
                 else -> nonePlan()
             }
             TryOnReliability.WEAK -> when {
-                hasMappableAnchors || anyMask -> UserTryOnRenderPlan(
+                anyMask -> UserTryOnRenderPlan(
                     mode = UserTryOnRenderMode.APPROXIMATE,
-                    useNailMasks = anyMask,
-                    useEllipsePaint = true,
-                    useCanvasAnchors = hasMappableAnchors && !anyMask,
+                    useNailMasks = true,
+                    useEllipsePaint = false,
+                    useCanvasAnchors = false,
                 )
                 else -> nonePlan()
             }

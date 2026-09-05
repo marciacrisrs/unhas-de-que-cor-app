@@ -12,8 +12,6 @@ data class NailTryOnResult(
     val nails: List<DetectedNail>,
     val landmarks: HandLandmarks?,
     val debugEnabled: Boolean,
-    /** Sempre false: elipse não é placa; a UI trata APPROXIMATE por outros sinais. */
-    val paintedViaEllipse: Boolean = false,
 )
 
 data class NailDetectionSnapshot(
@@ -320,7 +318,6 @@ class NailTryOnPipeline @Inject constructor(
                 nails = emptyList(),
                 landmarks = snapshot.landmarks,
                 debugEnabled = debugEnabled,
-                paintedViaEllipse = false,
             )
         }
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
@@ -334,7 +331,6 @@ class NailTryOnPipeline @Inject constructor(
             nails = snapshot.nails,
             landmarks = snapshot.landmarks,
             debugEnabled = debugEnabled,
-            paintedViaEllipse = false,
         )
     }
 
