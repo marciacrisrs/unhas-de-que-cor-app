@@ -7,4 +7,5 @@ import kotlinx.coroutines.flow.Flow
 interface PreferencesRepository {
     fun observePreferences(): Flow<UserPreferences>
     suspend fun updatePreferredStyles(styles: Set<NailStyle>)
+    suspend fun togglePreferredStyle(style: NailStyle)
 }

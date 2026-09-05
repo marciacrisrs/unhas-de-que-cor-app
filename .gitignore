@@ -15,5 +15,7 @@
 local.properties
 *.jks
 *.keystore
+*.b64
+keystore.b64
 **/upload-keystore.jks
 **/release.keystore

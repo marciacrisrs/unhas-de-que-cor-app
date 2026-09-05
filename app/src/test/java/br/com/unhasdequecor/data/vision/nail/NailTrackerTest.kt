@@ -89,6 +89,38 @@ class NailTrackerTest {
     }
 
     @Test
+    fun `prediction larger than a third of the plate is dropped`() {
+        val tracker = NailTracker()
+        val first = nail(x = 100f, y = 100f, confidence = 0.9f)
+        val second = nail(x = 120f, y = 100f, confidence = 0.9f)
+        val low = nail(x = 121f, y = 100f, confidence = 0.2f)
+
+        tracker.stabilize(listOf(first))
+        tracker.stabilize(listOf(second))
+        val result = tracker.stabilize(listOf(low))
+
+        assertTrue(result.isEmpty())
+        assertFalse(tracker.lastPredictionReport.predictionApplied)
+        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
+    }
+
+    @Test
+    fun `translational prediction that would leave the plate is dropped`() {
+        val tracker = NailTracker()
+        val first = nail(x = 12f, y = 40f, confidence = 0.9f)
+        val second = nail(x = 2f, y = 40f, confidence = 0.9f)
+        val low = nail(x = 3f, y = 40f, confidence = 0.2f)
+
+        tracker.stabilize(listOf(first))
+        tracker.stabilize(listOf(second))
+        val result = tracker.stabilize(listOf(low))
+
+        assertTrue(result.isEmpty())
+        assertFalse(tracker.lastPredictionReport.predictionApplied)
+        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
+    }
+
+    @Test
     fun `low confidence rotation does not apply translational prediction`() {
         val tracker = NailTracker()
         val first = nail(x = 100f, y = 100f, rotation = 0f, confidence = 0.9f)
@@ -162,7 +194,7 @@ class NailTrackerTest {
     }
 
     @Test
-    fun `degenerate recovery geometry reuses last valid nail for two frames only`() {
+    fun `degenerate geometry is never painted even with a previous valid nail`() {
         val tracker = NailTracker()
         val valid = nail(x = 100f, y = 100f)
         val degenerate = nail(x = 102f, y = 102f, width = 7f, length = 69f)
@@ -170,11 +202,9 @@ class NailTrackerTest {
         tracker.stabilize(listOf(valid))
         val firstRecovery = tracker.stabilize(listOf(degenerate))
         val secondRecovery = tracker.stabilize(listOf(degenerate))
-        val rejected = tracker.stabilize(listOf(degenerate))
 
-        assertEquals(1, firstRecovery.size)
-        assertEquals(1, secondRecovery.size)
-        assertTrue(rejected.isEmpty())
+        assertTrue(firstRecovery.isEmpty())
+        assertTrue(secondRecovery.isEmpty())
         assertEquals(NailPredictionReason.GEOMETRY_REJECTED, tracker.lastPredictionReport.predictionReason)
         assertEquals(NailGeometryValidator.Reason.NAIL_DIMENSIONS_INVALID, tracker.lastPredictionReport.geometryReason)
     }
@@ -207,9 +237,8 @@ class NailTrackerTest {
         tracker.stabilize(listOf(valid))
         val result = tracker.stabilize(listOf(mismatched))
 
-        assertEquals(1, result.size)
-        assertEquals(valid.roi.bounds.left, result.single().roi.bounds.left)
-        assertEquals(NailPredictionReason.RECOVERY, tracker.lastPredictionReport.predictionReason)
+        assertTrue(result.isEmpty())
+        assertEquals(NailPredictionReason.GEOMETRY_REJECTED, tracker.lastPredictionReport.predictionReason)
         assertEquals(NailGeometryValidator.Reason.MASK_ROI_MISMATCH, tracker.lastPredictionReport.geometryReason)
     }
 
@@ -243,6 +272,29 @@ class NailTrackerTest {
         assertFalse(tracker.lastPredictionReport.predictionApplied)
     }
 
+    @Test
+    fun `empty frame forgets previous plate so the next nail is not blended`() {
+        val tracker = NailTracker()
+        tracker.stabilize(listOf(nail(x = 100f, y = 100f, confidence = 0.9f)))
+        tracker.stabilize(emptyList())
+        val next = nail(x = 200f, y = 200f, confidence = 0.5f)
+        val result = tracker.stabilize(listOf(next)).single()
+        assertEquals(200f, result.roi.axisToTip.x, 0.01f)
+        assertEquals(200f, result.roi.axisToTip.y, 0.01f)
+    }
+
+    @Test
+    fun `finger missing from the frame is forgotten`() {
+        val tracker = NailTracker()
+        tracker.stabilize(listOf(nail(x = 100f, y = 100f, finger = Finger.INDEX, confidence = 0.9f)))
+        tracker.stabilize(listOf(nail(x = 180f, y = 80f, finger = Finger.MIDDLE, confidence = 0.9f)))
+        val indexBack = nail(x = 200f, y = 200f, finger = Finger.INDEX, confidence = 0.5f)
+        val result = tracker.stabilize(listOf(indexBack)).single()
+        assertEquals(Finger.INDEX, result.finger)
+        assertEquals(200f, result.roi.axisToTip.x, 0.01f)
+        assertEquals(200f, result.roi.axisToTip.y, 0.01f)
+    }
+
     private fun nail(
         x: Float,
         y: Float,
@@ -256,9 +308,10 @@ class NailTrackerTest {
         maskWidth: Int = width.toInt(),
         maskHeight: Int = length.toInt(),
         confidence: Float = 0.9f,
+        finger: Finger = Finger.INDEX,
     ): DetectedNail {
         val roi = NailRoi(
-            finger = Finger.INDEX,
+            finger = finger,
             bounds = PixelRect(boundsX, boundsY, boundsX + width.toInt(), boundsY + length.toInt()),
             polygon = listOf(
                 PixelPoint(x, y),
@@ -280,7 +333,7 @@ class NailTrackerTest {
             originY = maskY,
         )
         return DetectedNail(
-            finger = Finger.INDEX,
+            finger = finger,
             roi = roi,
             mask = mask,
             confidence = confidence,

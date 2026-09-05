@@ -30,18 +30,14 @@ class NailColorApplier @Inject constructor() {
         var lumSum = 0f
         for (nail in nails) {
             if (nail.confidence < MIN_CONFIDENCE) continue
-            val mask = nail.mask
-            val rw = mask.width
-            val rh = mask.height
-            val buf = IntArray(rw * rh)
-            out.getPixels(buf, 0, rw, mask.originX, mask.originY, rw, rh)
-            for (i in buf.indices) {
-                val a = mask.alpha[i].toInt() and 0xFF
-                if (a < MIN_MASK_ALPHA) continue
-                val c = buf[i]
-                val coverage = a / FULL_ALPHA
-                lumSum += luminance(red(c), green(c), blue(c)) * coverage
-                weight += coverage
+            val window = visibleWindow(out, nail.mask)
+            if (window != null) {
+                val buf = readWindow(out, window)
+                forEachMaskedPixel(nail.mask, window, buf) { _, color, alpha ->
+                    val coverage = alpha / FULL_ALPHA
+                    lumSum += luminance(red(color), green(color), blue(color)) * coverage
+                    weight += coverage
+                }
             }
         }
         if (weight < MIN_WEIGHT) {
@@ -65,23 +61,82 @@ class NailColorApplier @Inject constructor() {
         tb: Int,
         meanLum: Float,
     ) {
-        val rw = mask.width
-        val rh = mask.height
-        val buf = IntArray(rw * rh)
-        out.getPixels(buf, 0, rw, mask.originX, mask.originY, rw, rh)
-        for (i in buf.indices) {
-            val a = mask.alpha[i].toInt() and 0xFF
-            if (a < MIN_MASK_ALPHA) continue
-            buf[i] = transformPixel(
-                srcArgb = buf[i],
-                maskAlpha = a,
+        val window = visibleWindow(out, mask) ?: return
+        val buf = readWindow(out, window)
+        forEachMaskedPixel(mask, window, buf) { index, color, alpha ->
+            buf[index] = transformPixel(
+                srcArgb = color,
+                maskAlpha = alpha,
                 targetR = tr,
                 targetG = tg,
                 targetB = tb,
                 meanLum = meanLum,
             )
         }
-        out.setPixels(buf, 0, rw, mask.originX, mask.originY, rw, rh)
+        out.setPixels(
+            buf,
+            0,
+            window.width,
+            window.left,
+            window.top,
+            window.width,
+            window.height,
+        )
+    }
+
+    /**
+     * O tracker Live pode deslocar a origem da máscara para fora do frame.
+     * [Bitmap.getPixels] lança se o retângulo sai dos limites — e o bitmap
+     * copiado vazava a cada frame.
+     */
+    private fun visibleWindow(bitmap: Bitmap, mask: NailMask): VisibleMaskWindow? {
+        val left = mask.originX.coerceAtLeast(0)
+        val top = mask.originY.coerceAtLeast(0)
+        val right = (mask.originX + mask.width).coerceAtMost(bitmap.width)
+        val bottom = (mask.originY + mask.height).coerceAtMost(bitmap.height)
+        val width = right - left
+        val height = bottom - top
+        if (width <= 0 || height <= 0) return null
+        return VisibleMaskWindow(
+            left = left,
+            top = top,
+            width = width,
+            height = height,
+            maskOffsetX = left - mask.originX,
+            maskOffsetY = top - mask.originY,
+        )
+    }
+
+    private fun readWindow(bitmap: Bitmap, window: VisibleMaskWindow): IntArray {
+        val buf = IntArray(window.pixelCount)
+        bitmap.getPixels(
+            buf,
+            0,
+            window.width,
+            window.left,
+            window.top,
+            window.width,
+            window.height,
+        )
+        return buf
+    }
+
+    private inline fun forEachMaskedPixel(
+        mask: NailMask,
+        window: VisibleMaskWindow,
+        buf: IntArray,
+        action: (index: Int, color: Int, alpha: Int) -> Unit,
+    ) {
+        for (row in 0 until window.height) {
+            val maskRow = (window.maskOffsetY + row) * mask.width + window.maskOffsetX
+            val bufRow = row * window.width
+            for (col in 0 until window.width) {
+                val alpha = mask.alpha[maskRow + col].toInt() and 0xFF
+                if (alpha < MIN_MASK_ALPHA) continue
+                val index = bufRow + col
+                action(index, buf[index], alpha)
+            }
+        }
     }
 
     companion object {
@@ -161,4 +216,15 @@ class NailColorApplier @Inject constructor() {
         private fun luminance(r: Int, g: Int, b: Int): Float =
             LUMA_R * r + LUMA_G * g + LUMA_B * b
     }
+}
+
+private data class VisibleMaskWindow(
+    val left: Int,
+    val top: Int,
+    val width: Int,
+    val height: Int,
+    val maskOffsetX: Int,
+    val maskOffsetY: Int,
+) {
+    val pixelCount: Int get() = width * height
 }

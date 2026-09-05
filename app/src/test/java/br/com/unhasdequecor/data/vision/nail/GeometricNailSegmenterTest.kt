@@ -179,6 +179,42 @@ class GeometricNailSegmenterTest {
         assertThat(segmenter.segment(image, roi)).isNull()
     }
 
+    @Test
+    fun `does not restore a full almond when the roi is only skin`() {
+        val rw = 48
+        val rh = 64
+        val skin = argb(210, 170, 150)
+        val pixels = IntArray(rw * rh) { skin }
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 120
+            every { height } returns 160
+            every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
+                val dest = firstArg<IntArray>()
+                System.arraycopy(pixels, 0, dest, 0, pixels.size)
+            }
+        }
+        val roi = NailRoi(
+            finger = Finger.INDEX,
+            bounds = PixelRect(left = 20, top = 20, right = 68, bottom = 84),
+            polygon = listOf(
+                PixelPoint(44f, 24f),
+                PixelPoint(62f, 44f),
+                PixelPoint(44f, 80f),
+                PixelPoint(26f, 44f),
+            ),
+            axisFromDip = PixelPoint(44f, 80f),
+            axisToTip = PixelPoint(44f, 24f),
+            lengthPx = 56f,
+            widthPx = 36f,
+            rotationDegrees = 0f,
+            geometricConfidence = 0.9f,
+        )
+        val mask = segmenter.segment(image, roi)
+        if (mask != null) {
+            assertThat(mask.filledRatio()).isLessThan(0.55f)
+        }
+    }
+
     private fun argb(r: Int, g: Int, b: Int): Int =
         (0xFF shl 24) or (r shl 16) or (g shl 8) or b
 }

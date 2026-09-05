@@ -31,6 +31,9 @@ interface HistoryDao {
     @Query("SELECT id FROM history WHERE idempotencyKey = :key LIMIT 1")
     suspend fun findIdByIdempotencyKey(key: String): Long?
 
+    @Query("SELECT * FROM history WHERE idempotencyKey = :key LIMIT 1")
+    suspend fun findByIdempotencyKey(key: String): HistoryEntity?
+
     @Query("UPDATE history SET isFavorite = :isFavorite WHERE colorId = :colorId")
     suspend fun updateFavoriteForColor(colorId: String, isFavorite: Boolean)
 

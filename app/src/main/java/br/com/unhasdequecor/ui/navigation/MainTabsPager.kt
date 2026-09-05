@@ -27,7 +27,6 @@ fun MainTabsPager(
     onOpenInspiration: (colorId: String) -> Unit,
     onOpenAbout: () -> Unit,
     onOpenResultFromHistory: (HistoryRowUi) -> Unit,
-    onSwipeBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HorizontalPager(
@@ -54,7 +53,6 @@ fun MainTabsPager(
             Routes.FAVORITES -> HistoryScreen(
                 onOpenResult = onOpenResultFromHistory,
                 mode = HistoryScreenMode.FAVORITES_ONLY,
-                onBack = onSwipeBackToHome,
                 viewModel = hiltViewModel(key = "tab_favorites"),
             )
             Routes.PROFILE -> ProfileScreen(

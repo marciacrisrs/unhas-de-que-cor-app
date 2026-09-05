@@ -16,9 +16,14 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class HandReferenceRepositoryImplTest {
 
@@ -97,7 +102,73 @@ class HandReferenceRepositoryImplTest {
         coVerify(exactly = 0) { preferences.save(any()) }
     }
 
+    @Test
+    fun `concurrent saves keep datastore path pointing at a live file`() = runTest {
+        val files = Collections.synchronizedSet(mutableSetOf<String>())
+        val stored = AtomicReference<HandReference?>(null)
+        val inFlight = AtomicInteger(0)
+        val maxInFlight = AtomicInteger(0)
+
+        every {
+            fileStore.persist(
+                sourceAbsolutePath = any(),
+                capturedAtEpochMs = any(),
+                source = any(),
+                sampleId = any(),
+            )
+        } answers {
+            val timestamp = invocation.args[1] as Long
+            val path = "/files/hand_reference/hand_$timestamp.jpg"
+            files += path
+            HandReferenceSaveOutcome.Saved(
+                HandReference(
+                    localPath = path,
+                    capturedAtEpochMs = timestamp,
+                    source = invocation.args[2] as HandReferenceSource,
+                    sampleId = invocation.args[3] as String?,
+                ),
+            )
+        }
+        coEvery { preferences.save(any()) } coAnswers {
+            val overlapping = inFlight.incrementAndGet()
+            maxInFlight.updateAndGet { current -> maxOf(current, overlapping) }
+            delay(PREFS_SAVE_OVERLAP_MS)
+            stored.set(firstArg())
+            inFlight.decrementAndGet()
+        }
+        every { fileStore.purgeObsoleteHandFiles(any()) } answers {
+            val keep = firstArg<String>()
+            files.removeAll { it != keep }
+        }
+        coEvery { fileStore.clearCaptureCache() } just runs
+
+        val first = async {
+            repository.save(
+                sourceAbsolutePath = "/tmp/one.jpg",
+                capturedAtEpochMs = FIRST_SAVE_MS,
+                source = HandReferenceSource.USER,
+            )
+        }
+        val second = async {
+            repository.save(
+                sourceAbsolutePath = "/tmp/two.jpg",
+                capturedAtEpochMs = SECOND_SAVE_MS,
+                source = HandReferenceSource.USER,
+            )
+        }
+        first.await()
+        second.await()
+
+        val kept = stored.get()
+        assertThat(kept).isNotNull()
+        assertThat(files).contains(kept!!.localPath)
+        assertThat(maxInFlight.get()).isEqualTo(1)
+    }
+
     private companion object {
         const val FIXED_NOW_MS = 1_720_000_000_123L
+        const val FIRST_SAVE_MS = 1_720_000_000_001L
+        const val SECOND_SAVE_MS = 1_720_000_000_002L
+        const val PREFS_SAVE_OVERLAP_MS = 40L
     }
 }

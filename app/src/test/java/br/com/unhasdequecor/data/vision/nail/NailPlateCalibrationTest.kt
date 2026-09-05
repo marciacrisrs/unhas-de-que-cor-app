@@ -197,6 +197,70 @@ class NailPlateCalibrationTest {
     }
 
     @Test
+    fun almondExtents_cuticleStopsBeforeEponychium() {
+        val plate = NailPlateCalibration.plateFromPixels(
+            finger = Finger.INDEX,
+            tipX = 100f,
+            tipY = 40f,
+            dipX = 100f,
+            dipY = 80f,
+            pipX = 100f,
+            pipY = 120f,
+            mcpX = 100f,
+            mcpY = 180f,
+        )
+        val almond = NailPlateCalibration.almondExtents(plate)
+        val cuticleLen = hypot(
+            (almond.tipX - almond.cuticleX).toDouble(),
+            (almond.tipY - almond.cuticleY).toDouble(),
+        ).toFloat()
+        assertThat(cuticleLen).isWithin(0.6f)
+            .of(plate.lengthPx * NailPlateCalibration.CUTICLE_BACK)
+        assertThat(cuticleLen).isLessThan(plate.lengthPx)
+    }
+
+    @Test
+    fun almondExtents_shortPlateIsSquovalNotStiletto() {
+        val shortPlate = NailPlateCalibration.plateFromPixels(
+            finger = Finger.INDEX,
+            tipX = 200f,
+            tipY = 200f,
+            dipX = 200f,
+            dipY = 206f,
+            pipX = 200f,
+            pipY = 320f,
+            mcpX = 200f,
+            mcpY = 420f,
+        )
+        val longPlate = NailPlateCalibration.plateFromPixels(
+            finger = Finger.MIDDLE,
+            tipX = 80f,
+            tipY = 40f,
+            dipX = 80f,
+            dipY = 100f,
+            pipX = 80f,
+            pipY = 150f,
+            mcpX = 80f,
+            mcpY = 220f,
+        )
+        assertThat(shortPlate.facing).isTrue()
+        val shortAlmond = NailPlateCalibration.almondExtents(shortPlate)
+        val longAlmond = NailPlateCalibration.almondExtents(longPlate)
+        val shortAspect = shortPlate.lengthPx / shortPlate.widthPx
+        val longAspect = longPlate.lengthPx / longPlate.widthPx
+        assertThat(shortAspect).isLessThan(NailPlateCalibration.SHORT_PLATE_ASPECT)
+        assertThat(longAspect).isAtLeast(NailPlateCalibration.SHORT_PLATE_ASPECT)
+        assertThat(shortAlmond.tipPointFactor)
+            .isEqualTo(NailPlateCalibration.SHORT_TIP_POINT_FACTOR)
+        assertThat(longAlmond.tipPointFactor)
+            .isEqualTo(NailPlateCalibration.TIP_POINT_FACTOR)
+        assertThat(shortAlmond.midHalfW / (shortPlate.widthPx * 0.5f))
+            .isWithin(0.02f).of(NailPlateCalibration.SHORT_MID_WIDTH_FACTOR)
+        assertThat(longAlmond.midHalfW / (longPlate.widthPx * 0.5f))
+            .isWithin(0.02f).of(NailPlateCalibration.MID_WIDTH_FACTOR)
+    }
+
+    @Test
     fun mapperAndRoi_shareCentersOnOpenHand() {
         val w = 800
         val h = 1200

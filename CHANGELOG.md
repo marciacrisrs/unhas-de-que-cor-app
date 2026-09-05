@@ -1,11 +1,35 @@
 # Changelog
 
-## Unreleased
+## 1.0.12 — (versionCode 13)
 
-### Try-on / visão
-- Entrada navegável **Try-on ao vivo** a partir do Resultado (câmera frontal + `stabilize=true`)
-- Rótulos honestos no Live (FULL / aproximada / mão não detectada); overlay some quando a detecção é rejeitada
-- CameraX no app (`camera-core` / `camera2` / `lifecycle` / `view`) com checksums no `verification-metadata.xml`
+### Correções
+- Live Try-On: recorte da máscara na borda do frame (sem crash/`getPixels` OOB)
+- Foto da mão: save serializado e persistência confirmada sobrevive se a tela for fechada
+- Resultado: a mesma sessão não sorteia outra cor após morte do processo
+- Favoritos: cores salvas pelo coração aparecem mesmo sem linha no histórico
+- Meu estilo: toques rápidos nos chips não perdem seleção
+
+### Unha humana / Live
+- Tracker esquece placa quando o dedo some; geometria inválida e predição fora do quadro desaparecem em vez de pintar pele
+- Almond mais estreito, cutícula mais curta, unha curta squoval; segmenter não restaura almond cheio na pele
+- Pipeline de foto não pinta elipse quando a máscara falha
+- Resultado → Minha mão volta ao Resultado (não à Home)
+- Aba Favoritos com chrome de aba (coração), distinto do Histórico
+
+### Qualidade
+- Especialista de anatomia da unha (`human-nail-anatomy-reviewer`) separado de visão e de render
+- `keystore.b64` ignorado no git
+
+## 1.0.11 — (versionCode 12)
+
+### Try-on
+- Entrada navegável de Live Try-On (câmera)
+- Crash ao sair do Live ou sem câmera frontal
+- Inferência Live mais barata; métricas de pipeline
+
+### Acessibilidade / release
+- Auditoria de a11y (chips 48dp, anúncio de loading/erro)
+- Checklist de release do MVP
 
 ## 1.0.8 — (versionCode 9)
 

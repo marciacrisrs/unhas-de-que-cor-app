@@ -101,6 +101,21 @@ class DomainUseCasesTest {
     }
 
     @Test
+    fun `observe favorites includes colors favorited without history`() = runTest {
+        history.setFavorite("dia_nude", true)
+
+        val useCase = ObserveHistoryUseCase(history)
+        useCase(favoritesOnly = true).test {
+            assertThat(awaitItem().single().colorId).isEqualTo("dia_nude")
+            cancelAndIgnoreRemainingEvents()
+        }
+        useCase(favoritesOnly = false).test {
+            assertThat(awaitItem()).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `observe and update preferences`() = runTest {
         val observe = ObservePreferencesUseCase(preferences)
         val update = UpdatePreferredStylesUseCase(preferences)
@@ -108,6 +123,24 @@ class DomainUseCasesTest {
         observe().test {
             assertThat(awaitItem().preferredStyles).containsExactly(NailStyle.MINIMALISTA)
             update(setOf(NailStyle.ELEGANTE))
+            assertThat(awaitItem().preferredStyles).containsExactly(NailStyle.ELEGANTE)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `toggle preferred style keeps other styles`() = runTest {
+        val observe = ObservePreferencesUseCase(preferences)
+        val update = UpdatePreferredStylesUseCase(preferences)
+
+        observe().test {
+            assertThat(awaitItem().preferredStyles).containsExactly(NailStyle.MINIMALISTA)
+            update.toggle(NailStyle.ELEGANTE)
+            assertThat(awaitItem().preferredStyles).containsExactly(
+                NailStyle.MINIMALISTA,
+                NailStyle.ELEGANTE,
+            )
+            update.toggle(NailStyle.MINIMALISTA)
             assertThat(awaitItem().preferredStyles).containsExactly(NailStyle.ELEGANTE)
             cancelAndIgnoreRemainingEvents()
         }

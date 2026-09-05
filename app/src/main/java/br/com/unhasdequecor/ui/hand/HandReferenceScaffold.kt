@@ -1,6 +1,8 @@
 package br.com.unhasdequecor.ui.hand
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -41,7 +44,10 @@ internal fun HandReferenceScaffold(
                     Text("Minha mão", style = MaterialTheme.typography.headlineSmall)
                 },
                 navigationIcon = {
-                    IconButton(onClick = actions.onBack) {
+                    IconButton(
+                        onClick = actions.onBack,
+                        enabled = !state.isSaving,
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
                 },
@@ -77,7 +83,12 @@ internal fun HandReferenceScaffold(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.28f)),
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.28f))
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                        onClick = { /* swallow taps so Back under the scrim is not reached */ },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()

@@ -12,7 +12,7 @@ data class NailTryOnResult(
     val nails: List<DetectedNail>,
     val landmarks: HandLandmarks?,
     val debugEnabled: Boolean,
-    /** True se a cor veio de elipse (não máscara) — UI não deve claim FULL. */
+    /** Sempre false: elipse não é placa; a UI trata APPROXIMATE por outros sinais. */
     val paintedViaEllipse: Boolean = false,
 )
 
@@ -324,50 +324,18 @@ class NailTryOnPipeline @Inject constructor(
             )
         }
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
-        val (painted, viaEllipse) = when {
-            paintableCount >= DetectionConfidenceFloor.MIN_PAINTABLE_FOR_MASK_PATH -> {
-                val maskPaint = colorApplier.apply(working, snapshot.nails, polishColor)
-                if (maskPaint != null) {
-                    maskPaint to false
-                } else {
-                    val ellipse = ellipseFallback(working, snapshot.landmarks, polishColor)
-                    (ellipse ?: working) to (ellipse != null)
-                }
-            }
-            snapshot.nails.isEmpty() -> working to false
-            else -> {
-                val maskPaint = colorApplier.apply(working, snapshot.nails, polishColor)
-                if (maskPaint != null) {
-                    maskPaint to false
-                } else {
-                    val ellipse = ellipseFallback(working, snapshot.landmarks, polishColor)
-                    (ellipse ?: working) to (ellipse != null)
-                }
-            }
+        val maskPaint = if (paintableCount > 0) {
+            colorApplier.apply(working, snapshot.nails, polishColor)
+        } else {
+            null
         }
         return NailTryOnResult(
-            bitmap = painted,
+            bitmap = maskPaint ?: working,
             nails = snapshot.nails,
             landmarks = snapshot.landmarks,
             debugEnabled = debugEnabled,
-            paintedViaEllipse = viaEllipse,
+            paintedViaEllipse = false,
         )
-    }
-
-    private fun ellipseFallback(
-        image: Bitmap,
-        landmarks: HandLandmarks?,
-        polishColor: Color,
-    ): Bitmap? {
-        if (landmarks == null) return null
-        val anchors = NailLandmarkMapper.fromNormalizedLandmarks(
-            landmarks = landmarks.points.map {
-                NailLandmarkMapper.NormalizedPoint(it.x, it.y)
-            },
-            imageWidth = landmarks.imageWidth,
-            imageHeight = landmarks.imageHeight,
-        ) ?: return null
-        return DetectedNailPolishApplier.apply(image, anchors, polishColor)
     }
 
     private fun segmentationConfidence(mask: NailMask, roi: NailRoi): Float {

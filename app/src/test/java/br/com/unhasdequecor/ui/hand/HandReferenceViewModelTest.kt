@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.ui.hand
 
+import androidx.lifecycle.ViewModelStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
@@ -11,6 +12,7 @@ import br.com.unhasdequecor.domain.usecase.UseSampleHandReferenceUseCase
 import br.com.unhasdequecor.testing.FakeHandReferenceRepository
 import br.com.unhasdequecor.testing.MainDispatcherRule
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -27,10 +29,12 @@ class HandReferenceViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val repository = FakeHandReferenceRepository()
+    private val captureJpg = File("/tmp/capture.jpg").absolutePath
+    private val hugeJpg = File("/tmp/huge.jpg").absolutePath
 
     @Before
     fun setUp() {
-        // Espelha UnhasDeQueCorApp.onCreate → ensureDefaultHandReference.
+        repository.resetForTests()
         runBlocking { repository.ensureDefaultSample() }
     }
 
@@ -51,7 +55,7 @@ class HandReferenceViewModelTest {
         viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/capture.jpg")
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo(captureJpg)
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
 
         viewModel.confirmPendingUserPhoto()
@@ -62,6 +66,46 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.navigateHome).isTrue()
         assertThat(viewModel.uiState.value.homeFlashMessage).contains("sucesso")
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+    }
+
+    @Test
+    fun `leaving during confirm still persists the camera capture`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        repository.saveGate = gate
+        val store = ViewModelStore()
+        val viewModel = viewModel()
+        store.put("hand", viewModel)
+        advanceUntilIdle()
+
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+        viewModel.confirmPendingUserPhoto()
+        assertThat(viewModel.uiState.value.isSaving).isTrue()
+        assertThat(repository.lastSavedPath).isNull()
+
+        store.clear()
+        assertThat(repository.stagingCacheCleared).isFalse()
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(repository.lastSavedPath).isEqualTo(captureJpg)
+        assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
+    }
+
+    @Test
+    fun `onCleared without persist still wipes staging cache`() = runTest {
+        val store = ViewModelStore()
+        val viewModel = viewModel()
+        store.put("hand", viewModel)
+        advanceUntilIdle()
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+
+        store.clear()
+
+        assertThat(repository.stagingCacheCleared).isTrue()
+        assertThat(repository.lastSavedPath).isNull()
     }
 
     @Test
@@ -97,6 +141,47 @@ class HandReferenceViewModelTest {
         assertThat(viewModel.uiState.value.navigateHome).isTrue()
         assertThat(viewModel.uiState.value.homeFlashMessage).contains("Pele retinta")
         assertThat(viewModel.uiState.value.showSamplePicker).isFalse()
+    }
+
+    @Test
+    fun `double tap confirm sample only persists once`() = runTest {
+        val viewModel = viewModel()
+        repository.saveGate = CompletableDeferred()
+
+        viewModel.openSamplePicker()
+        viewModel.selectPendingSample("retinta_vinho")
+        viewModel.confirmPendingSample()
+        viewModel.confirmPendingSample()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.isSaving).isTrue()
+
+        repository.saveGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
+        assertThat(viewModel.uiState.value.isSaving).isFalse()
+    }
+
+    @Test
+    fun `double tap confirm photo only persists once`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
+        advanceUntilIdle()
+
+        repository.saveGate = CompletableDeferred()
+        viewModel.confirmPendingUserPhoto()
+        viewModel.confirmPendingUserPhoto()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+
+        repository.saveGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(repository.saveCount).isEqualTo(1)
+        assertThat(viewModel.uiState.value.navigateHome).isTrue()
     }
 
     @Test
@@ -166,7 +251,7 @@ class HandReferenceViewModelTest {
         // Mantém a amostra padrão; a foto pendente fica para tentar de novo.
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
         assertThat(viewModel.uiState.value.message).contains("15 MB")
-        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/huge.jpg")
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo(hugeJpg)
     }
 
     @Test

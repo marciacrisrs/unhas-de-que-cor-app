@@ -5,6 +5,7 @@ import br.com.unhasdequecor.domain.model.HandReferenceRejection
 import br.com.unhasdequecor.domain.model.HandReferenceSaveOutcome
 import br.com.unhasdequecor.domain.model.HandReferenceSource
 import br.com.unhasdequecor.domain.repository.HandReferenceRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,8 @@ class FakeHandReferenceRepository(
     var lastSource: HandReferenceSource? = null
     var lastSampleId: String? = null
     var stagingCacheCleared: Boolean = false
+    var saveCount: Int = 0
+    var saveGate: CompletableDeferred<Unit>? = null
 
     override fun observe(): Flow<HandReference?> = state.asStateFlow()
 
@@ -28,6 +31,8 @@ class FakeHandReferenceRepository(
         source: HandReferenceSource,
         sampleId: String?,
     ): HandReferenceSaveOutcome {
+        saveCount += 1
+        saveGate?.await()
         lastSavedPath = sourceAbsolutePath
         lastSource = source
         lastSampleId = sampleId
@@ -87,5 +92,16 @@ class FakeHandReferenceRepository(
 
     fun reject(reason: HandReferenceRejection) {
         nextOutcome = HandReferenceSaveOutcome.Rejected(reason)
+    }
+
+    fun resetForTests() {
+        state.value = null
+        nextOutcome = null
+        lastSavedPath = null
+        lastSource = null
+        lastSampleId = null
+        stagingCacheCleared = false
+        saveCount = 0
+        saveGate = null
     }
 }
