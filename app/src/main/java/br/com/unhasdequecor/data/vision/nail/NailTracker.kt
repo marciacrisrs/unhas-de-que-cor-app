@@ -3,6 +3,7 @@ package br.com.unhasdequecor.data.vision.nail
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelRect
 import kotlin.math.abs
+import kotlin.math.hypot
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,7 +22,6 @@ import javax.inject.Singleton
 class NailTracker @Inject constructor() {
     private val previous = linkedMapOf<Finger, DetectedNail>()
     private val velocity = linkedMapOf<Finger, PixelPoint>()
-    private val invalidGeometryRecoveryFrames = linkedMapOf<Finger, Int>()
 
     @Volatile
     var lastPredictionReport: NailPredictionReport = NailPredictionReport.stable()
@@ -31,26 +31,35 @@ class NailTracker @Inject constructor() {
     fun reset() {
         previous.clear()
         velocity.clear()
-        invalidGeometryRecoveryFrames.clear()
         lastPredictionReport = NailPredictionReport.stable()
     }
 
     @Synchronized
     fun stabilize(current: List<DetectedNail>): List<DetectedNail> {
         if (current.isEmpty()) {
+            previous.clear()
+            velocity.clear()
             lastPredictionReport = NailPredictionReport.recovery()
             return emptyList()
         }
 
         var report = NailPredictionReport.stable()
         val out = ArrayList<DetectedNail>(current.size)
+        val seen = mutableSetOf<Finger>()
         for (nail in current) {
+            seen += nail.finger
             val result = stabilizeNail(nail)
             if (result.nail != null && DetectionConfidenceFloor.acceptsNail(result.nail.confidence)) {
                 out += result.nail
                 previous[nail.finger] = result.nail
             }
             report = result.report
+        }
+        for (finger in previous.keys.toList()) {
+            if (finger !in seen) {
+                previous.remove(finger)
+                velocity.remove(finger)
+            }
         }
         lastPredictionReport = report
         return out
@@ -59,10 +68,8 @@ class NailTracker @Inject constructor() {
     private fun stabilizeNail(nail: DetectedNail): StabilizedNail {
         val geometry = NailGeometryValidator.validate(nail)
         if (!geometry.valid) {
-            return recoverInvalidGeometry(nail, geometry.reason)
+            return rejectInvalidGeometry(nail.finger, geometry.reason)
         }
-
-        invalidGeometryRecoveryFrames.remove(nail.finger)
 
         val prev = previous[nail.finger]
             ?: return StabilizedNail(
@@ -80,34 +87,22 @@ class NailTracker @Inject constructor() {
         }
     }
 
-    private fun recoverInvalidGeometry(
-        nail: DetectedNail,
+    /**
+     * Geometria inválida não reutiliza a placa anterior: a mão já se moveu e
+     * pintar o último bitmap é esmalte no dorso / cutícula.
+     */
+    private fun rejectInvalidGeometry(
+        finger: Finger,
         reason: NailGeometryValidator.Reason,
     ): StabilizedNail {
-        val prev = previous[nail.finger]
-        val usedFrames = invalidGeometryRecoveryFrames[nail.finger] ?: 0
-        if (prev == null || usedFrames >= MAX_INVALID_GEOMETRY_RECOVERY_FRAMES) {
-            return StabilizedNail(
-                nail = null,
-                report = NailPredictionReport(
-                    predictionApplied = false,
-                    trans = PixelPoint(0f, 0f),
-                    predictionReason = NailPredictionReason.GEOMETRY_REJECTED,
-                    geometryReason = reason,
-                ),
-            )
-        }
-
-        invalidGeometryRecoveryFrames[nail.finger] = usedFrames + 1
-        val recovered = prev.copy(
-            confidence = prev.confidence * INVALID_RECOVERY_CONFIDENCE_DECAY,
-        )
+        previous.remove(finger)
+        velocity.remove(finger)
         return StabilizedNail(
-            nail = recovered,
+            nail = null,
             report = NailPredictionReport(
                 predictionApplied = false,
                 trans = PixelPoint(0f, 0f),
-                predictionReason = NailPredictionReason.RECOVERY,
+                predictionReason = NailPredictionReason.GEOMETRY_REJECTED,
                 geometryReason = reason,
             ),
         )
@@ -147,6 +142,18 @@ class NailTracker @Inject constructor() {
 
         val prediction = velocity[nail.finger] ?: motion.delta
         val predicted = translate(prev, prediction)
+        if (!predictionStaysOnPlate(prev, predicted, prediction)) {
+            previous.remove(nail.finger)
+            velocity.remove(nail.finger)
+            return StabilizedNail(
+                nail = null,
+                report = NailPredictionReport(
+                    predictionApplied = false,
+                    trans = prediction,
+                    predictionReason = NailPredictionReason.RECOVERY,
+                ),
+            )
+        }
         return StabilizedNail(
             nail = predicted.copy(confidence = prev.confidence * RECOVERY_CONFIDENCE_DECAY),
             report = NailPredictionReport(
@@ -155,6 +162,23 @@ class NailTracker @Inject constructor() {
                 predictionReason = NailPredictionReason.APPLIED,
             ),
         )
+    }
+
+    /**
+     * Predição só é placa se o deslocamento cabe no comprimento da unha e a
+     * máscara continua no quadro. Caso contrário o overlay some (não pinta pele).
+     */
+    private fun predictionStaysOnPlate(
+        prev: DetectedNail,
+        predicted: DetectedNail,
+        delta: PixelPoint,
+    ): Boolean {
+        val maxShift = prev.roi.lengthPx * MAX_HOLD_SHIFT_FRACTION
+        if (hypot(delta.x.toDouble(), delta.y.toDouble()) > maxShift) return false
+        val mask = predicted.mask
+        if (mask.originX < 0 || mask.originY < 0) return false
+        if (mask.width <= 0 || mask.height <= 0) return false
+        return NailGeometryValidator.validate(predicted).valid
     }
 
     private fun blendLowConfidence(
@@ -293,8 +317,8 @@ class NailTracker @Inject constructor() {
         const val SCALE_REJECTION_RATIO = 0.15f
         const val BLEND_ALPHA = 0.55f
         const val RECOVERY_CONFIDENCE_DECAY = 0.92f
-        const val INVALID_RECOVERY_CONFIDENCE_DECAY = 0.94f
-        const val MAX_INVALID_GEOMETRY_RECOVERY_FRAMES = 2
+        /** Fração do comprimento da placa: hold maior que isso já é dorso, não unha. */
+        const val MAX_HOLD_SHIFT_FRACTION = 0.30f
     }
 }
 

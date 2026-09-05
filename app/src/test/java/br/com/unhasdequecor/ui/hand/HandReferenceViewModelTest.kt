@@ -29,10 +29,12 @@ class HandReferenceViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val repository = FakeHandReferenceRepository()
+    private val captureJpg = File("/tmp/capture.jpg").absolutePath
+    private val hugeJpg = File("/tmp/huge.jpg").absolutePath
 
     @Before
     fun setUp() {
-        // Espelha UnhasDeQueCorApp.onCreate → ensureDefaultHandReference.
+        repository.resetForTests()
         runBlocking { repository.ensureDefaultSample() }
     }
 
@@ -53,7 +55,7 @@ class HandReferenceViewModelTest {
         viewModel.importFromCameraCapture(File("/tmp/capture.jpg"))
         advanceUntilIdle()
 
-        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/capture.jpg")
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo(captureJpg)
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
 
         viewModel.confirmPendingUserPhoto()
@@ -87,7 +89,7 @@ class HandReferenceViewModelTest {
         gate.complete(Unit)
         advanceUntilIdle()
 
-        assertThat(repository.lastSavedPath).isEqualTo("/tmp/capture.jpg")
+        assertThat(repository.lastSavedPath).isEqualTo(captureJpg)
         assertThat(repository.lastSource).isEqualTo(HandReferenceSource.USER)
     }
 
@@ -249,7 +251,7 @@ class HandReferenceViewModelTest {
         // Mantém a amostra padrão; a foto pendente fica para tentar de novo.
         assertThat(viewModel.uiState.value.reference?.source).isEqualTo(HandReferenceSource.SAMPLE)
         assertThat(viewModel.uiState.value.message).contains("15 MB")
-        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo("/tmp/huge.jpg")
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isEqualTo(hugeJpg)
     }
 
     @Test

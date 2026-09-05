@@ -16,7 +16,7 @@ import kotlin.math.sqrt
  * 1) rasteriza almond suave (distance field);
  * 2) remove pele óbvia na **borda** e na **cutícula** (miolo/tip preservados);
  * 3) reforça pixels com brilho/contraste típicos de placa;
- * 4) se o refinamento apagar demais, volta ao almond suave.
+ * 4) se o refinamento apagar demais, devolve null — almond cheio na pele não.
  *
  * Unhas naturais ≈ pele: trim agressivo no interior pintava buracos / nada.
  */
@@ -51,12 +51,8 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val trimmed = refineMask(pixels, softGeo, solidGeo, skin, axis, rw, rh)
 
         val kept = trimmed.count { (it.toInt() and 0xFF) >= MASK_SOLID }
-        val geoCount = softGeo.count { (it.toInt() and 0xFF) >= MASK_SOLID }.coerceAtLeast(1)
-        val alpha = if (kept.toFloat() / geoCount < MIN_KEEP_RATIO) {
-            softGeo
-        } else {
-            feather(binarize(trimmed), rw, rh, radius = FEATHER_RADIUS)
-        }
+        if (kept < MIN_ABSOLUTE_KEEP) return null
+        val alpha = feather(binarize(trimmed), rw, rh, radius = FEATHER_RADIUS)
 
         return NailMask(
             width = rw,
@@ -423,7 +419,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         const val RING_RADIUS = 3
         const val MASK_SOLID = 128
         const val BOOST_ALPHA = 200
-        const val MIN_KEEP_RATIO = 0.35f
+        const val MIN_ABSOLUTE_KEEP = 8
         const val FEATHER_RADIUS = 3
         const val CORE_FRACTION = 0.48f
         const val EDGE_SEARCH = 6

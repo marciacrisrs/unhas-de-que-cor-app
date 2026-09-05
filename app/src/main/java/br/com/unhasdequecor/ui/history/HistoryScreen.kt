@@ -32,6 +32,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,42 +71,18 @@ fun HistoryScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        if (onBack != null) {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(title, style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                },
-                actions = {
-                    NailPolishMark(
-                        modifier = Modifier.padding(end = 12.dp),
-                        markSize = 40.dp,
-                        decorative = true,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
-        }
+        HistoryChrome(
+            title = title,
+            subtitle = subtitle,
+            favorites = mode == HistoryScreenMode.FAVORITES_ONLY,
+            onBack = onBack,
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp),
         ) {
             if (onBack == null) {
-                HistoryHeader(title = title, subtitle = subtitle)
                 Spacer(modifier = Modifier.height(16.dp))
             } else {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -140,14 +117,78 @@ fun HistoryScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryChrome(
+    title: String,
+    subtitle: String,
+    favorites: Boolean,
+    onBack: (() -> Unit)?,
+) {
+    if (onBack != null) {
+        TopAppBar(
+            title = {
+                Column {
+                    Text(title, style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                }
+            },
+            actions = {
+                HistoryMark(favorites = favorites, size = 40.dp, endPadding = 12.dp)
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+            ),
+        )
+    } else {
+        HistoryHeader(title = title, subtitle = subtitle, favorites = favorites)
+    }
+}
+
+@Composable
+private fun HistoryMark(
+    favorites: Boolean,
+    size: Dp,
+    endPadding: Dp = 0.dp,
+) {
+    if (favorites) {
+        Icon(
+            Icons.Outlined.FavoriteBorder,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier
+                .padding(end = endPadding)
+                .size(size),
+        )
+    } else {
+        NailPolishMark(
+            modifier = Modifier.padding(end = endPadding),
+            markSize = size,
+            decorative = true,
+        )
+    }
+}
+
 @Composable
 private fun HistoryHeader(
     title: String,
     subtitle: String,
+    favorites: Boolean,
 ) {
     Spacer(modifier = Modifier.height(12.dp))
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -159,7 +200,7 @@ private fun HistoryHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        NailPolishMark(markSize = 44.dp, decorative = true)
+        HistoryMark(favorites = favorites, size = 44.dp)
     }
 }
 

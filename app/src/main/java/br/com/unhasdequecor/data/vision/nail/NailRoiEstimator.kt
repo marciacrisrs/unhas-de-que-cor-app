@@ -58,16 +58,16 @@ class NailRoiEstimator @Inject constructor() {
 
         val polygon = listOf(
             PixelPoint(
-                tipPt.x + px * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
-                tipPt.y + py * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
+                tipPt.x + px * tipHalfW * almond.tipPointFactor,
+                tipPt.y + py * tipHalfW * almond.tipPointFactor,
             ),
             PixelPoint(mid.x + px * midHalfW, mid.y + py * midHalfW),
             PixelPoint(cuticlePt.x + px * cuticleHalfW, cuticlePt.y + py * cuticleHalfW),
             PixelPoint(cuticlePt.x - px * cuticleHalfW, cuticlePt.y - py * cuticleHalfW),
             PixelPoint(mid.x - px * midHalfW, mid.y - py * midHalfW),
             PixelPoint(
-                tipPt.x - px * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
-                tipPt.y - py * tipHalfW * NailPlateCalibration.TIP_POINT_FACTOR,
+                tipPt.x - px * tipHalfW * almond.tipPointFactor,
+                tipPt.y - py * tipHalfW * almond.tipPointFactor,
             ),
         )
 

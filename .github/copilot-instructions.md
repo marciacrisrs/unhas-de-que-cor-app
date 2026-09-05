@@ -51,11 +51,12 @@ Especialistas disponíveis:
 - agents/documentation-reviewer.md
 - agents/release-manager.md
 - agents/cicd-reviewer.md
+- agents/human-nail-anatomy-reviewer.md
 - agents/vision-tryon-reviewer.md
 - agents/computer-graphics-polish-reviewer.md
 - agents/product-visual-result-reviewer.md
 
-Quando a alteração tocar `HandTryOnPreview`, `data/vision/nail/**`, máscaras `hand_nail_masks/`, amostras `hand_samples/` ou `HandSampleCatalog`, **consulte obrigatoriamente** `vision-tryon-reviewer` (especialista em unhas humanas das mãos + try-on).
+Quando a alteração tocar `HandTryOnPreview`, `data/vision/nail/**`, máscaras `hand_nail_masks/`, amostras `hand_samples/` ou `HandSampleCatalog`, **consulte obrigatoriamente** `human-nail-anatomy-reviewer` (placa ungueal: o que é unha vs pele) **e** `vision-tryon-reviewer` (detecção, floors, falha honesta).
 
 Quando a alteração tocar recolor/compositing (`PolishMaskRecolorer`, `NailColorApplier`, `DetectedNailPolishApplier`, Canvas de esmalte), consulte também `computer-graphics-polish-reviewer`.
 

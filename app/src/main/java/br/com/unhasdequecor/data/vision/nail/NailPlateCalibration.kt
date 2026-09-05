@@ -50,10 +50,17 @@ object NailPlateCalibration {
 
     /** Forma almond (ROI / segmentação). */
     const val TIP_WIDTH_FACTOR = 0.82f
-    const val MID_WIDTH_FACTOR = 1.12f
+    /** Meio da placa; >1.0 vaza para prega periungueal. */
+    const val MID_WIDTH_FACTOR = 1.04f
+    const val SHORT_MID_WIDTH_FACTOR = 1.00f
     const val CUTICLE_WIDTH_FACTOR = 0.86f
     const val TIP_POINT_FACTOR = 0.70f
-    const val CUTICLE_BACK = 0.90f
+    /** Unha curta/roída: ponta mais squoval, não stiletto. */
+    const val SHORT_TIP_POINT_FACTOR = 0.92f
+    /** Facing/thumb (~1.07–1.22) vs mão aberta (~1.32–1.47 = 1/widthScale). */
+    const val SHORT_PLATE_ASPECT = 1.28f
+    /** Fração do comprimento da ponta até a cutícula (não entra no eponíquio). */
+    const val CUTICLE_BACK = 0.88f
     const val MID_FORWARD = 0.20f
 
     data class FingerScale(val widthScale: Float, val lengthScale: Float)
@@ -90,6 +97,7 @@ object NailPlateCalibration {
         val cuticleHalfW: Float,
         val px: Float,
         val py: Float,
+        val tipPointFactor: Float,
     )
 
     fun scalesFor(finger: Finger): FingerScale = when (finger) {
@@ -237,12 +245,17 @@ object NailPlateCalibration {
         val py = ux
         val tipX = plate.tipX + ux * plate.overshootPx
         val tipY = plate.tipY + uy * plate.overshootPx
-        val cuticleX = tipX - ux * plate.lengthPx
-        val cuticleY = tipY - uy * plate.lengthPx
+        val plateLen = plate.lengthPx * CUTICLE_BACK
+        val cuticleX = tipX - ux * plateLen
+        val cuticleY = tipY - uy * plateLen
         val midT = 0.5f + MID_FORWARD * 0.5f
         val midX = cuticleX + (tipX - cuticleX) * midT
         val midY = cuticleY + (tipY - cuticleY) * midT
         val halfW = plate.widthPx * 0.5f
+        val aspect = plate.lengthPx / plate.widthPx.coerceAtLeast(1f)
+        val shortPlate = aspect < SHORT_PLATE_ASPECT
+        val midFactor = if (shortPlate) SHORT_MID_WIDTH_FACTOR else MID_WIDTH_FACTOR
+        val tipPoint = if (shortPlate) SHORT_TIP_POINT_FACTOR else TIP_POINT_FACTOR
         return AlmondExtents(
             tipX = tipX,
             tipY = tipY,
@@ -251,10 +264,11 @@ object NailPlateCalibration {
             midX = midX,
             midY = midY,
             tipHalfW = halfW * TIP_WIDTH_FACTOR,
-            midHalfW = halfW * MID_WIDTH_FACTOR,
+            midHalfW = halfW * midFactor,
             cuticleHalfW = halfW * CUTICLE_WIDTH_FACTOR,
             px = px,
             py = py,
+            tipPointFactor = tipPoint,
         )
     }
 }

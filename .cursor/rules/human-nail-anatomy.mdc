@@ -1,0 +1,15 @@
+---
+description: Anatomia da unha humana — placa vs pele, polegar, cutícula, diversidade
+globs: "**/data/vision/nail/**,**/hand_nail_masks/**,**/hand_samples/**,**/HandTryOnPreview.kt,**/NailOverlayAnchors.kt"
+alwaysApply: false
+---
+
+# Unha humana (mão)
+
+Antes de alterar geometria, máscara, ROI, segmenter, tracker live ou amostras, leia `.github/agents/human-nail-anatomy-reviewer.md`.
+
+- Pintar só a **placa ungueal**. Cutícula, pregas laterais, hiponíquio e polpa = P0.
+- Centro proximal à tip; polegar tem eixo próprio; pose A não usa layout da pose B.
+- Máscara incompleta > esmalte na pele. Hold live que desliza para o dorso deve sumir, não persistir.
+- `MASK_SAMPLES` só com remask placa-precisa; pele retinta é prioridade de treino.
+- Visão/labels: `vision-tryon-reviewer`. Look da tinta: `computer-graphics-polish-reviewer`.

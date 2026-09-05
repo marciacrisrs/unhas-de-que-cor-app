@@ -1,10 +1,34 @@
 # Avaliação dos especialistas — Unhas de Que Cor?
 
-**Data:** 2026-08-10 (follow-ups até 2026-08-12)  
-**Base inicial:** `master` @ `5a8663b`  
+**Data:** 2026-09-05 (histórico desde 2026-08-10)  
+**Base atual:** `feat/roundtable-ship` sobre `origin/master` @ `bc6bea4` → 1.0.12 / versionCode 13  
 **Fonte de verdade:** `.github/agents/*` + `.github/copilot-instructions.md`
 
-## Painel (atual — 2026-08-12f)
+## Painel (atual — 2026-09-05)
+
+| Especialista | Veredito |
+|--------------|----------|
+| Human Nail Anatomy | Aprovado in-repo (placa/cutícula/hold/elipse). **Ressalva 100%:** smoke aparelho + remask amostras |
+| Vision Try-On Reviewer | Aprovado c/ ressalvas (#101 clip no código) |
+| Computer Graphics Polish | Aprovado c/ ressalvas |
+| Product Visual Result | Aprovado c/ ressalvas |
+| Android Engineer | Aprovado c/ ressalvas (#101–#106 no código) |
+| Architecture Reviewer | Aprovado c/ ressalvas |
+| Test Engineer | Aprovado c/ ressalvas (device OUT_OF_REPO) |
+| Quality Reviewer | Pendente QG desta branch |
+| Performance Reviewer | Aprovado c/ ressalvas |
+| Security Reviewer | Aprovado c/ ressalvas (`*.b64` ignorado) |
+| Accessibility Reviewer | Aprovado c/ ressalvas (Scanner em device) |
+| UI Reviewer | Aprovado c/ ressalvas (Result→mão e Favoritos feitos) |
+| Documentation Reviewer | Aprovado (CHANGELOG 1.0.12) |
+| Release Manager | Aprovado c/ ressalvas — smoke device + Play OUT_OF_REPO |
+| CI/CD Reviewer | Pendente Verify desta branch |
+
+**Síntese:** 1.0.12 no `feat/roundtable-ship` — PRs #101–#106 no código, unha humana no tracker Live, Result→mão e Favoritos. Falta smoke no aparelho (você) e remask manual das amostras.
+
+---
+
+## Painel histórico (2026-08-12f)
 
 | Especialista | Veredito atualizado (12f) |
 |--------------|---------------------|
@@ -402,7 +426,7 @@ Backlog residual: smoke em device (luz frontal vs contraluz); A11y Scanner; Resu
 |--------------|--------|--------|
 | Vision | FULL + ellipseFallback mentia “na sua mão” | Feito — `paintedViaEllipse` demote APPROXIMATE |
 | Vision | Iluminação/glare não wired em `fromLandmarks` | Feito — `ImageLightingSampler` no detect |
-| Vision | Empty nails + mão aberta ainda podia elipse no pipeline | Feito — teste + `nails.isEmpty() → working` |
+| Vision | Empty nails + mão aberta ainda podia elipse no pipeline | Feito — `recolor` nunca chama elipse; `paintedViaEllipse` sempre false |
 | A11y | CTA retry &lt;48dp / sem Role.Button / alpha | Feito — `TextButton` opaco 48dp + CD com hint |
 | A11y | Spinner loading no a11y tree | Feito — `clearAndSetSemantics` |
 | Android | `getPixels` full-frame | Feito — grade `getPixel` + skip mock sem Config |
@@ -458,50 +482,67 @@ Implementação das sugestões dos especialistas gráficos/visuais, priorizando 
 
 ---
 
-## Follow-up — Entrada Live Try-On (2026-08-19)
+## Reavaliação 2026-09-05 — mesa completa + especialista de unha humana
 
-Pedido: verificar o estado do repositório e as issues faltantes, reunir os especialistas e implementar o próximo passo.
+**Base:** `origin/master` @ `bc6bea4` (1.0.11 / versionCode 12).  
+**Working tree:** `feat/live-try-on-entry` atrás do remote + ~70 arquivos locais não commitados (Live try-on).  
+**Issues GitHub:** **zero abertas** (P0.1–P0.9 #50–#88 fechadas). Trabalho vivo está em **PRs draft #101–#106** e no working tree.
 
-### Estado na reunião
+### Especialista novo
 
-`master` @ `809d9e1` (CameraX só no catálogo Gradle, sem tela). Issues abertas:
+| Agente | Papel |
+|--------|--------|
+| `human-nail-anatomy-reviewer` | Anatomia da unidade ungueal (placa vs cutícula/pele). Distinto de visão (detectar/falhar) e de CG (look da tinta). |
 
-| Issue | O que falta | In-repo agora? |
-|-------|-------------|----------------|
-| #53 Live no aparelho | Entrada de UI + matriz em device | UI sim; device **OUT_OF_REPO** |
-| #67 FPS/latência | Bloqueada pela #53 | Não mexer |
-| #55 A11y final | TalkBack/Scanner em device | Parcial (código já no master) |
-| #56 Release MVP | Depende de #53/#55/#67 + ops | Não |
-
-O PR draft **#95** tentou a entrada Live, mas o CI falhou (`verification-metadata` sem CameraX) e o diff truncava `ResultScreen` / `AppNavHost`. Esta passagem reimplementa a entrada a partir do `master`, sem essas regressões.
+O `vision-tryon-reviewer` continua dono de MediaPipe, floors e labels. Unha humana agora tem cadeira própria.
 
 ### Painel
 
-| Especialista | Veredito | Notas |
-|--------------|----------|-------|
-| Android Engineer | Aprovado c/ ressalvas | CameraX + permissão; ViewModel processa o frame |
-| Architecture Reviewer | Aprovado c/ ressalvas | Pipeline injetado no VM; UI não recebe `NailTryOnPipeline` |
-| Vision Try-On Reviewer | Aprovado c/ ressalvas | `stabilize=true`; overlay some em REJECTED; claim via `planRender` |
-| Computer Graphics | Aprovado | Recolor existente; sem blending novo |
-| Product Visual Result | Aprovado | CTA abaixo do herói still; try-on still continua dominante |
-| Performance Reviewer | Aprovado c/ ressalvas | `KEEP_ONLY_LATEST` + RGBA; **sem** fast path da #67 |
-| Accessibility Reviewer | Aprovado c/ ressalvas | LiveRegion + rótulos honestos; Scanner em device TBD |
-| UI Reviewer | Aprovado c/ ressalvas | CTA `SecondaryCtaButton`; chrome não cobre a placa |
-| Test Engineer | Aprovado c/ ressalvas | Mapper + ViewModel + rota; câmera Compose fora do JaCoCo |
-| Quality / CI/CD | Aprovado c/ ressalvas | Checksums CameraX; `verifyCi` |
-| Security Reviewer | Aprovado | CAMERA já no manifesto; feature opcional |
-| Documentation / Release | Aprovado c/ ressalvas | Sem bump de loja; #53 continua aberta até a matriz em device |
+| Especialista | Veredito | Achado principal |
+|--------------|----------|------------------|
+| Unha humana | Ressalvas / Bloqueio condicional no Live | Hold/predição que translada máscara pode pintar dorso; 5 máscaras de amostra fora de `MASK_SAMPLES` ainda ruins; só `clara_vermelho` calibrada |
+| Vision Try-On | Ressalvas | Pipeline STILL consolidado; Live WIP grande; clip off-frame (#101) ainda draft |
+| Computer Graphics | Ressalvas | Overlay live separado (`applyLiveOverlay`) ok em desenho; look/sheer não é o gargalo agora |
+| Product Visual | Aprovado c/ ressalvas | Result full-bleed já feito; Live é superfície nova — não pode virar debug HUD |
+| Android Engineer | Ressalvas | PRs de corrida (mão, estilo, Result) em draft; working tree desalinhado do `master` |
+| Architecture | Ressalvas | Live session + kinematics + publisher: volume alto; consolidar antes de mais features |
+| Test Engineer | Ressalvas | Suíte JVM densa no WIP; device ainda OUT_OF_REPO |
+| Quality / CI | Ressalvas | QG no `master` pós-#100; WIP local precisa `verifyCi` antes de PR |
+| Performance | Ressalvas | #67/#98 no master; não reabrir variantes N em falha no caminho Live |
+| Security | **P0** | `keystore.b64` estava untracked — gitignore `*.b64`; nunca commitar |
+| Accessibility | Ressalvas | #55 fechada in-repo; Scanner em device ainda da Márcia |
+| UI | Ressalvas | P2 Result→mão destino / chrome Favoritos abertos |
+| Docs | Ressalvas | CHANGELOG ainda em 1.0.8; app em 1.0.11; este painel estava em ago/13 |
+| Release Manager | Ressalvas | Smoke device + secrets Play = OUT_OF_REPO; não ampliar loja com Live instável |
 
-**Veredito global:** implementar a entrada Live agora para destravar a validação física da #53. Não otimizar FPS. Não fechar #53/#67/#55/#56 nesta passagem.
+**Veredito global:** MVP de recomendação + try-on **foto** está no `master`. O risco agora é **qualidade espacial do Live** + **bugs de persistência** (PRs draft) + **ops de loja**. Não abrir issue nova de feature até a ordem abaixo.
 
-### Implementação in-repo
+### Ordem acordada (não paralelizar P0)
 
-| Item | Status |
-|------|--------|
-| Dependências CameraX em `:app` + `verification-metadata.xml` | Feito |
-| Rota `live_try_on/{colorId}` + CTA no Resultado | Feito |
-| `ImageAnalysis` → `NailTryOnPipeline.detect/recolor` com `stabilize=true` | Feito |
-| Cor do catálogo (não hex hardcoded) | Feito |
-| Overlay limpo em REJECTED / plano NONE | Feito |
-| `resetTracking()` ao sair da sessão Live | Feito |
-| Testes `LiveTryOnClaimMapper` / `LiveTryOnViewModel` / rota | Feito |
+| Ordem | Pri | O quê | Dono |
+|-------|-----|--------|------|
+| 1 | P0 | Não commitar `keystore.b64`; secrets só no GitHub | Security / Márcia |
+| 2 | P0 | Sincronizar branch local com `origin/master` (Live entry já mergeado #96) | Android |
+| 3 | P0 | Crash Live off-frame — PR **#101** (ou equivalente já no working tree: `NailMask.fitsIn`) | Vision + Android |
+| 4 | P0 | Não perder foto da mão — PRs **#104** + **#106** | Android |
+| 5 | P1 | Cor idempotente + favorito órfão + chip de estilo — **#103**, **#102**, **#105** | Android / Test |
+| 6 | P1 | Revisar WIP Live com **unha humana** (placa vs pele no hold/predição) antes de mais FPS/HUD | Unha + Vision + Perf |
+| 7 | P1 | Smoke em aparelho (`docs/device-testing.md`) — pele retinta primeiro | Márcia / Release |
+| 8 | P2 | Remask amostras: `retinta_vinho` → `morena_nude` → `morena_clara_coral` → `media_rosa` → `retinta_polegar` | Unha + Vision |
+| 9 | P2 | CHANGELOG 1.0.11; Result→mão / chrome Favoritos | Docs / UI |
+| 10 | P2 | Listing + teste interno Play (só depois do smoke) | Release / Márcia |
+
+### Implementação 2026-09-05 (esta branch)
+
+| Ordem | Status |
+|-------|--------|
+| 1 Keystore fora do git | Feito (`.gitignore` `*.b64`) |
+| 2 Branch a partir de `origin/master` | Feito |
+| 3 Clip Live #101 | Feito |
+| 4 Foto da mão #104 + #106 | Feito |
+| 5 #103 / #102 / #105 | Feito |
+| 6 Unha humana no tracker | Feito in-repo — hold esquece placa; almond/cutícula mais conservadores; sem elipse no pipeline. **Ressalva:** smoke em aparelho (retinta) + remask amostras |
+| 7 Smoke device | **OUT_OF_REPO** — Márcia |
+| 8 Remask amostras | **Aberto** — não reativar `MASK_SAMPLES` sem matte placa-preciso |
+| 9 CHANGELOG 1.0.12; Result→mão; chrome Favoritos | Feito |
+| 10 Play listing | **OUT_OF_REPO** — depois do smoke |

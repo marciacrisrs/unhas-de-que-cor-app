@@ -93,4 +93,15 @@ class FakeHandReferenceRepository(
     fun reject(reason: HandReferenceRejection) {
         nextOutcome = HandReferenceSaveOutcome.Rejected(reason)
     }
+
+    fun resetForTests() {
+        state.value = null
+        nextOutcome = null
+        lastSavedPath = null
+        lastSource = null
+        lastSampleId = null
+        stagingCacheCleared = false
+        saveCount = 0
+        saveGate = null
+    }
 }

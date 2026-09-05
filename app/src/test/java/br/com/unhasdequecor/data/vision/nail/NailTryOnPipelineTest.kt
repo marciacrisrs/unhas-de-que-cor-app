@@ -324,6 +324,45 @@ class NailTryOnPipelineTest {
     }
 
     @Test
+    fun recolor_maskApplyFails_doesNotEllipsePaint() {
+        val image = mockk<Bitmap>(relaxed = true) {
+            every { width } returns 200
+            every { height } returns 300
+            every { isRecycled } returns false
+        }
+        val nail = DetectedNail(
+            finger = Finger.MIDDLE,
+            roi = sampleRoi(geometricConfidence = 0.9f),
+            mask = NailMask(
+                width = 20,
+                height = 40,
+                alpha = ByteArray(20 * 40) { 255.toByte() },
+                originX = 90,
+                originY = 40,
+            ),
+            confidence = 0.9f,
+        )
+        every { colorApplier.apply(any(), any(), any()) } returns null
+        val result = pipeline.recolor(
+            NailDetectionSnapshot(
+                workingBitmap = image,
+                nails = listOf(nail),
+                landmarks = HandLandmarks(
+                    points = openHandPoints(),
+                    imageWidth = 200,
+                    imageHeight = 300,
+                    presenceScore = 0.80f,
+                ),
+                ownsWorkingBitmap = false,
+                reliability = TryOnReliability.STRONG,
+            ),
+            Color.Red,
+        )
+        assertThat(result.bitmap).isSameInstanceAs(image)
+        assertThat(result.paintedViaEllipse).isFalse()
+    }
+
+    @Test
     fun detect_dropsRoiBelowFloor_setsBarrierRoiAndNoNailVisible() {
         val image = mockk<Bitmap>(relaxed = true) {
             every { width } returns 200

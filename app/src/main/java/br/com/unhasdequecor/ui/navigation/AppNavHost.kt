@@ -43,6 +43,15 @@ private fun NavController.openResultFromHistory(entry: HistoryRowUi) {
     )
 }
 
+private fun NavController.returnAfterHandSelected(flash: String?) {
+    val previousRoute = previousBackStackEntry?.destination?.route
+    if (previousRoute == Routes.RESULT) {
+        popBackStack()
+        return
+    }
+    returnHomeAfterHandSelected(flash)
+}
+
 private fun NavController.returnHomeAfterHandSelected(flash: String?) {
     runCatching { getBackStackEntry(Routes.MAIN) }
         .getOrNull()
@@ -153,7 +162,6 @@ private fun AppNavGraph(
                 },
                 onOpenAbout = { navController.navigate(Routes.ABOUT) },
                 onOpenResultFromHistory = navController::openResultFromHistory,
-                onSwipeBackToHome = { goToSwipeTab(Routes.HOME) },
             )
         }
         composable(Routes.CONTEXT) {
@@ -172,7 +180,7 @@ private fun AppNavGraph(
         composable(Routes.HAND_REFERENCE) {
             HandReferenceScreen(
                 onBack = { navController.popBackStack() },
-                onHandSelected = navController::returnHomeAfterHandSelected,
+                onHandSelected = navController::returnAfterHandSelected,
             )
         }
         composable(
