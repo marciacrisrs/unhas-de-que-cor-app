@@ -21,25 +21,31 @@ object NailPlateContour {
             cuticleCenter.x + ux * axisLength * CUTICLE_INSET,
             cuticleCenter.y + uy * axisLength * CUTICLE_INSET,
         )
-        val result = ArrayList<PixelPoint>(SIDE_SAMPLES * 4 + CAP_SAMPLES + 2)
+        val result = ArrayList<PixelPoint>(SIDE_SAMPLES * 4 + CAP_SAMPLES + CUTICLE_SAMPLES)
 
-        // Tip-left -> mid-right -> cuticle-right.
         addLine(result, polygon[TIP_LEFT], polygon[MID_RIGHT], SIDE_SAMPLES)
         addLine(result, polygon[MID_RIGHT], polygon[CUTICLE_RIGHT], SIDE_SAMPLES)
-        // Conservative shallow U at the cuticle: the control point moves toward the tip.
-        addQuadratic(result, polygon[CUTICLE_RIGHT], cuticleControl, polygon[CUTICLE_LEFT], CUTICLE_SAMPLES)
-        // Cuticle-left -> mid-left -> tip-right.
+        addQuadratic(
+            result,
+            polygon[CUTICLE_RIGHT],
+            cuticleControl,
+            polygon[CUTICLE_LEFT],
+            CUTICLE_SAMPLES,
+        )
         addLine(result, polygon[CUTICLE_LEFT], polygon[MID_LEFT], SIDE_SAMPLES)
         addLine(result, polygon[MID_LEFT], polygon[TIP_RIGHT], SIDE_SAMPLES)
-        // Rounded free edge: control point is the observed tip center, never beyond it.
         addQuadratic(result, polygon[TIP_RIGHT], tipCenter, polygon[TIP_LEFT], CAP_SAMPLES)
         return result
     }
 
-    private fun addLine(out: MutableList<PixelPoint>, from: PixelPoint, to: PixelPoint, samples: Int) {
+    private fun addLine(
+        out: MutableList<PixelPoint>,
+        from: PixelPoint,
+        to: PixelPoint,
+        samples: Int,
+    ) {
         for (i in 0 until samples) {
-            val t = i.toFloat() / samples
-            out += interpolate(from, to, t)
+            out += interpolate(from, to, i.toFloat() / samples)
         }
     }
 
@@ -67,7 +73,7 @@ object NailPlateContour {
         )
 
     private fun midpoint(a: PixelPoint, b: PixelPoint): PixelPoint =
-        PixelPoint((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f)
+        PixelPoint((a.x + b.x) * HALF, (a.y + b.y) * HALF)
 
     private const val ALMOND_POINTS = 6
     private const val TIP_LEFT = 0
@@ -80,4 +86,5 @@ object NailPlateContour {
     private const val CAP_SAMPLES = 10
     private const val CUTICLE_SAMPLES = 6
     private const val CUTICLE_INSET = 0.055f
+    private const val HALF = 0.5f
 }
