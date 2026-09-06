@@ -27,9 +27,10 @@ object NailPlateCalibration {
     const val THUMB_CENTER = 0.78f
 
     /**
-     * Fração do comprimento tip–referência empurrando a borda livre além da tip landmark.
+     * Não extrapolar a tip landmark: a ponta do dedo não é uma borda livre da
+     * placa conhecida. A máscara deve terminar no ponto observado ou antes.
      */
-    const val TIP_OVERSHOOT = 0.02f
+    const val TIP_OVERSHOOT = 0f
 
     const val MIN_NAIL_LEN_PX = 14f
     const val MAX_NAIL_LEN_PX = 160f
@@ -50,9 +51,9 @@ object NailPlateCalibration {
 
     /** Forma almond (ROI / segmentação). */
     const val TIP_WIDTH_FACTOR = 0.82f
-    /** Meio da placa; >1.0 vaza para prega periungueal. */
-    const val MID_WIDTH_FACTOR = 1.04f
-    const val SHORT_MID_WIDTH_FACTOR = 1.00f
+    /** Mantido abaixo da largura estimada da placa para evitar spill periungueal. */
+    const val MID_WIDTH_FACTOR = 0.94f
+    const val SHORT_MID_WIDTH_FACTOR = 0.94f
     const val CUTICLE_WIDTH_FACTOR = 0.86f
     const val TIP_POINT_FACTOR = 0.70f
     /** Unha curta/roída: ponta mais squoval, não stiletto. */

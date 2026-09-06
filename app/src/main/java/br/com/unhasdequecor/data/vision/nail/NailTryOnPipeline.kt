@@ -231,7 +231,11 @@ class NailTryOnPipeline @Inject constructor(
                 droppedByRoi += 1
                 return@mapNotNull null
             }
-            val mask = segmenter.segment(working, roi) ?: return@mapNotNull null
+            val rawMask = segmenter.segment(working, roi) ?: return@mapNotNull null
+            val mask = NailPlateMaskBoundaryGuard.clamp(rawMask, roi)
+            if (mask.filledRatio() < MIN_POST_GUARD_FILL) {
+                return@mapNotNull null
+            }
             val segScore = segmentationConfidence(mask, roi)
             val confidence = (GEO_WEIGHT * roi.geometricConfidence + SEG_WEIGHT * segScore)
                 .coerceIn(0f, 1f)
@@ -360,6 +364,7 @@ class NailTryOnPipeline @Inject constructor(
         const val SCORE_HIGH = 0.92f
         const val SCORE_MID = 0.75f
         const val SCORE_LOW = 0.50f
+        const val MIN_POST_GUARD_FILL = 0.02f
         const val NANOS_PER_MILLISECOND = 1_000_000f
         val COVERAGE_GOOD = 0.25f..1.4f
         val COVERAGE_OK = 0.14f..1.6f

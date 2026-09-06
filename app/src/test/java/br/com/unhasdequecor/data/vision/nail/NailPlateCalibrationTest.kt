@@ -152,7 +152,7 @@ class NailPlateCalibrationTest {
     }
 
     @Test
-    fun almondExtents_facing_tipPastLandmarkByOvershootOnly() {
+    fun almondExtents_facing_tipNeverPassesLandmarkTip() {
         val tipY = 354f
         val plate = NailPlateCalibration.plateFromPixels(
             finger = Finger.MIDDLE,
@@ -167,13 +167,12 @@ class NailPlateCalibrationTest {
         )
         val almond = NailPlateCalibration.almondExtents(plate)
         val pastTip = tipY - almond.tipY // tip aponta para Y menor
-        assertThat(pastTip).isGreaterThan(0f)
-        assertThat(pastTip).isAtMost(plate.lengthPx * 0.06f)
-        assertThat(pastTip).isWithin(0.5f).of(plate.overshootPx)
+        assertThat(pastTip).isWithin(0.001f).of(0f)
+        assertThat(plate.overshootPx).isEqualTo(0f)
     }
 
     @Test
-    fun almondExtents_thumb_tipAtOrBeyondLandmarkTip() {
+    fun almondExtents_thumb_tipNeverPassesLandmarkTip() {
         val hand = openHand(800, 1200)
         val tip = ImageCoordinates.toPixel(hand.point(Finger.THUMB.tipIndex), 800, 1200)
         val dip = ImageCoordinates.toPixel(hand.point(Finger.THUMB.dipIndex), 800, 1200)
@@ -192,8 +191,8 @@ class NailPlateCalibrationTest {
         )
         val almond = NailPlateCalibration.almondExtents(plate)
         val along = (almond.tipX - tip.x) * plate.ux + (almond.tipY - tip.y) * plate.uy
-        assertThat(along).isAtLeast(0f)
-        assertThat(along).isWithin(0.5f).of(plate.overshootPx)
+        assertThat(along).isWithin(0.001f).of(0f)
+        assertThat(plate.overshootPx).isEqualTo(0f)
     }
 
     @Test
@@ -350,15 +349,14 @@ class NailPlateCalibrationTest {
     }
 
     @Test
-    fun plateTipOfAlmond_isSlightlyPastLandmarkTip() {
+    fun plateTipOfAlmond_neverPastLandmarkTip() {
         val hand = openHand(800, 1200)
         val roi = NailRoiEstimator().estimate(hand, Finger.INDEX)!!
         val tipLandmark = ImageCoordinates.toPixel(hand.point(Finger.INDEX.tipIndex), 800, 1200)
         val almondTip = mid(roi.polygon[0], roi.polygon[5])
         val toAlmond = (almondTip.x - tipLandmark.x) * roi.uxApprox() +
             (almondTip.y - tipLandmark.y) * roi.uyApprox()
-        assertThat(toAlmond).isGreaterThan(0f)
-        assertThat(toAlmond).isAtMost(roi.lengthPx * 0.06f)
+        assertThat(toAlmond).isWithin(0.001f).of(0f)
     }
 
     private fun mid(
