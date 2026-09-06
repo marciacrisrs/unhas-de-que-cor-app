@@ -9,7 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Estima ROI + polígono almond da unha a partir de MCP/PIP/DIP/TIP.
+ * Estima ROI + contorno da placa da unha a partir de MCP/PIP/DIP/TIP.
  *
  * Geometria da placa alinhada ao [NailLandmarkMapper] via [NailPlateCalibration].
  * Polegar usa eixo MCP→TIP (sem DIP distinto no MediaPipe).
@@ -44,32 +44,7 @@ class NailRoiEstimator @Inject constructor() {
         val tipDip = ImageCoordinates.distancePx(tip, dip)
         val tipPip = ImageCoordinates.distancePx(tip, pip)
         val tipMcp = ImageCoordinates.distancePx(tip, mcp)
-
-        val almond = NailPlateCalibration.almondExtents(plate)
-        val tipHalfW = almond.tipHalfW
-        val midHalfW = almond.midHalfW
-        val cuticleHalfW = almond.cuticleHalfW
-        val px = almond.px
-        val py = almond.py
-
-        val tipPt = PixelPoint(almond.tipX, almond.tipY)
-        val cuticlePt = PixelPoint(almond.cuticleX, almond.cuticleY)
-        val mid = PixelPoint(almond.midX, almond.midY)
-
-        val polygon = listOf(
-            PixelPoint(
-                tipPt.x + px * tipHalfW * almond.tipPointFactor,
-                tipPt.y + py * tipHalfW * almond.tipPointFactor,
-            ),
-            PixelPoint(mid.x + px * midHalfW, mid.y + py * midHalfW),
-            PixelPoint(cuticlePt.x + px * cuticleHalfW, cuticlePt.y + py * cuticleHalfW),
-            PixelPoint(cuticlePt.x - px * cuticleHalfW, cuticlePt.y - py * cuticleHalfW),
-            PixelPoint(mid.x - px * midHalfW, mid.y - py * midHalfW),
-            PixelPoint(
-                tipPt.x - px * tipHalfW * almond.tipPointFactor,
-                tipPt.y - py * tipHalfW * almond.tipPointFactor,
-            ),
-        )
+        val polygon = NailPlateContour.build(plate)
 
         val nailLen = plate.lengthPx
         val nailWidth = plate.widthPx
@@ -140,7 +115,6 @@ class NailRoiEstimator @Inject constructor() {
             aspect in 0.9f..2.8f -> 0.75f
             else -> 0.4f
         }
-        // sizeScore usa comprimento pré-coerce (coerceIn inflava placa colapsada).
         val sizeScore = when {
             rawLengthPx in 16f..140f -> 1f
             rawLengthPx in 10f..180f -> 0.65f
