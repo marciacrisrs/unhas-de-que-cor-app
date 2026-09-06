@@ -36,14 +36,19 @@ class CurvedNailSegmenter @Inject constructor(
         return raw.copy(alpha = alpha)
     }
 
-    private fun contains(x: Float, y: Float, polygon: List<ImageCoordinates.PixelPoint>): Boolean {
+    private fun contains(
+        x: Float,
+        y: Float,
+        polygon: List<ImageCoordinates.PixelPoint>,
+    ): Boolean {
         var inside = false
         var j = polygon.lastIndex
         for (i in polygon.indices) {
             val a = polygon[i]
             val b = polygon[j]
+            val denominator = (b.y - a.y).takeIf { kotlin.math.abs(it) > EPSILON } ?: EPSILON
             val crosses = ((a.y > y) != (b.y > y)) &&
-                (x < (b.x - a.x) * (y - a.y) / ((b.y - a.y).takeIf { kotlin.math.abs(it) > EPSILON } ?: EPSILON) + a.x)
+                (x < (b.x - a.x) * (y - a.y) / denominator + a.x)
             if (crosses) inside = !inside
             j = i
         }
