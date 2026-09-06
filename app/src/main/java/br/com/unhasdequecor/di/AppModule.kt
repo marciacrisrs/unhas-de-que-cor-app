@@ -35,6 +35,7 @@ private val Context.dataStore by preferencesDataStore(name = "unhas_preferences"
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
@@ -42,23 +43,59 @@ object DatabaseModule {
             .addMigrations(*DatabaseMigrations.ALL)
             .build()
 
-    @Provides fun provideHistoryDao(database: AppDatabase): HistoryDao = database.historyDao()
-    @Provides fun provideFavoriteDao(database: AppDatabase): FavoriteDao = database.favoriteDao()
+    @Provides
+    fun provideHistoryDao(database: AppDatabase): HistoryDao = database.historyDao()
+
+    @Provides
+    fun provideFavoriteDao(database: AppDatabase): FavoriteDao = database.favoriteDao()
 
     @Provides
     @Singleton
-    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> = context.dataStore
+    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        context.dataStore
 
-    @Provides @Singleton fun provideClock(): Clock = Clock { System.currentTimeMillis() }
+    @Provides
+    @Singleton
+    fun provideClock(): Clock = Clock { System.currentTimeMillis() }
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 interface RepositoryModule {
-    @Binds @Singleton fun bindColorCatalogRepository(impl: ColorCatalogRepositoryImpl): ColorCatalogRepository
-    @Binds @Singleton fun bindHistoryRepository(impl: HistoryRepositoryImpl): HistoryRepository
-    @Binds @Singleton fun bindPreferencesRepository(impl: PreferencesRepositoryImpl): PreferencesRepository
-    @Binds @Singleton fun bindHandReferenceRepository(impl: HandReferenceRepositoryImpl): HandReferenceRepository
-    @Binds @Singleton fun bindHandLandmarkProcessor(impl: MediaPipeHandNailDetector): HandLandmarkProcessor
-    @Binds @Singleton fun bindNailSegmenter(impl: CurvedNailSegmenter): NailSegmenter
+
+    @Binds
+    @Singleton
+    fun bindColorCatalogRepository(
+        impl: ColorCatalogRepositoryImpl,
+    ): ColorCatalogRepository
+
+    @Binds
+    @Singleton
+    fun bindHistoryRepository(
+        impl: HistoryRepositoryImpl,
+    ): HistoryRepository
+
+    @Binds
+    @Singleton
+    fun bindPreferencesRepository(
+        impl: PreferencesRepositoryImpl,
+    ): PreferencesRepository
+
+    @Binds
+    @Singleton
+    fun bindHandReferenceRepository(
+        impl: HandReferenceRepositoryImpl,
+    ): HandReferenceRepository
+
+    @Binds
+    @Singleton
+    fun bindHandLandmarkProcessor(
+        impl: MediaPipeHandNailDetector,
+    ): HandLandmarkProcessor
+
+    @Binds
+    @Singleton
+    fun bindNailSegmenter(
+        impl: CurvedNailSegmenter,
+    ): NailSegmenter
 }
