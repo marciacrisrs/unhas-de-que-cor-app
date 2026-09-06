@@ -1,74 +1,83 @@
 package br.com.unhasdequecor.data.vision.nail
 
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
-import kotlin.math.sin
+import kotlin.math.hypot
 
-/** Builds a dense, conservative contour that follows the visible nail plate. */
+/**
+ * Converts the six anatomical almond anchors into a dense curved contour for rasterization.
+ * The landmark-derived anchors remain the source of truth; this only removes polygonal/flat edges.
+ */
 object NailPlateContour {
-    fun build(plate: NailPlateCalibration.PlateGeometry): List<PixelPoint> {
-        val extents = NailPlateCalibration.almondExtents(plate)
-        val halfWidth = plate.widthPx * 0.5f
-        val aspect = plate.lengthPx / plate.widthPx.coerceAtLeast(1f)
-        val short = aspect < NailPlateCalibration.SHORT_PLATE_ASPECT
-        val sideEnd = if (short) SHORT_SIDE_END else LONG_SIDE_END
-        val sideTipWidth = if (short) SHORT_TIP_WIDTH else LONG_TIP_WIDTH
-        val cuticleWidth = CUTICLE_WIDTH
-        val points = ArrayList<PixelPoint>(SAMPLES * 2 + CAP_SAMPLES + 2)
+    fun densify(polygon: List<PixelPoint>): List<PixelPoint> {
+        if (polygon.size != ALMOND_POINTS) return polygon
+        val tipCenter = midpoint(polygon[TIP_LEFT], polygon[TIP_RIGHT])
+        val cuticleCenter = midpoint(polygon[CUTICLE_RIGHT], polygon[CUTICLE_LEFT])
+        val axisX = tipCenter.x - cuticleCenter.x
+        val axisY = tipCenter.y - cuticleCenter.y
+        val axisLength = hypot(axisX.toDouble(), axisY.toDouble()).toFloat().coerceAtLeast(1f)
+        val ux = axisX / axisLength
+        val uy = axisY / axisLength
+        val cuticleControl = PixelPoint(
+            cuticleCenter.x + ux * axisLength * CUTICLE_INSET,
+            cuticleCenter.y + uy * axisLength * CUTICLE_INSET,
+        )
+        val result = ArrayList<PixelPoint>(SIDE_SAMPLES * 4 + CAP_SAMPLES + 2)
 
-        // Positive side: cuticle -> near the free edge.
-        for (i in 0..SAMPLES) {
-            val s = sideEnd * i.toFloat() / SAMPLES
-            points += sidePoint(extents, halfWidth, s, true, short, cuticleWidth, sideTipWidth)
+        // Tip-left -> mid-right -> cuticle-right.
+        addLine(result, polygon[TIP_LEFT], polygon[MID_RIGHT], SIDE_SAMPLES)
+        addLine(result, polygon[MID_RIGHT], polygon[CUTICLE_RIGHT], SIDE_SAMPLES)
+        // Conservative shallow U at the cuticle: the control point moves toward the tip.
+        addQuadratic(result, polygon[CUTICLE_RIGHT], cuticleControl, polygon[CUTICLE_LEFT], CUTICLE_SAMPLES)
+        // Cuticle-left -> mid-left -> tip-right.
+        addLine(result, polygon[CUTICLE_LEFT], polygon[MID_LEFT], SIDE_SAMPLES)
+        addLine(result, polygon[MID_LEFT], polygon[TIP_RIGHT], SIDE_SAMPLES)
+        // Rounded free edge: control point is the observed tip center, never beyond it.
+        addQuadratic(result, polygon[TIP_RIGHT], tipCenter, polygon[TIP_LEFT], CAP_SAMPLES)
+        return result
+    }
+
+    private fun addLine(out: MutableList<PixelPoint>, from: PixelPoint, to: PixelPoint, samples: Int) {
+        for (i in 0 until samples) {
+            val t = i.toFloat() / samples
+            out += interpolate(from, to, t)
         }
+    }
 
-        // Rounded free edge: quadratic Bezier, with the tip landmark as the outermost point.
-        val left = points.last()
-        val tip = PixelPoint(extents.tipX, extents.tipY)
-        val right = sidePoint(extents, halfWidth, sideEnd, false, short, cuticleWidth, sideTipWidth)
-        for (i in 1..CAP_SAMPLES) {
-            val t = i.toFloat() / CAP_SAMPLES
+    private fun addQuadratic(
+        out: MutableList<PixelPoint>,
+        from: PixelPoint,
+        control: PixelPoint,
+        to: PixelPoint,
+        samples: Int,
+    ) {
+        for (i in 0 until samples) {
+            val t = i.toFloat() / samples
             val oneMinus = 1f - t
-            val x = oneMinus * oneMinus * left.x + 2f * oneMinus * t * tip.x + t * t * right.x
-            val y = oneMinus * oneMinus * left.y + 2f * oneMinus * t * tip.y + t * t * right.y
-            points += PixelPoint(x, y)
+            out += PixelPoint(
+                oneMinus * oneMinus * from.x + 2f * oneMinus * t * control.x + t * t * to.x,
+                oneMinus * oneMinus * from.y + 2f * oneMinus * t * control.y + t * t * to.y,
+            )
         }
-
-        // Negative side: free edge -> cuticle.
-        for (i in SAMPLES downTo 0) {
-            val s = sideEnd * i.toFloat() / SAMPLES
-            points += sidePoint(extents, halfWidth, s, false, short, cuticleWidth, sideTipWidth)
-        }
-        return points
     }
 
-    private fun sidePoint(
-        extents: NailPlateCalibration.AlmondExtents,
-        halfWidth: Float,
-        s: Float,
-        positive: Boolean,
-        short: Boolean,
-        cuticleWidth: Float,
-        tipWidth: Float,
-    ): PixelPoint {
-        val cx = extents.cuticleX + (extents.tipX - extents.cuticleX) * s
-        val cy = extents.cuticleY + (extents.tipY - extents.cuticleY) * s
-        val body = sin(Math.PI * s).toFloat().coerceAtLeast(0f)
-        val base = cuticleWidth + (tipWidth - cuticleWidth) * s
-        val bulge = if (short) SHORT_BULGE else LONG_BULGE
-        val width = halfWidth * (base + bulge * body).coerceIn(MIN_WIDTH, MAX_WIDTH)
-        val sign = if (positive) 1f else -1f
-        return PixelPoint(cx + extents.px * width * sign, cy + extents.py * width * sign)
-    }
+    private fun interpolate(from: PixelPoint, to: PixelPoint, t: Float): PixelPoint =
+        PixelPoint(
+            from.x + (to.x - from.x) * t,
+            from.y + (to.y - from.y) * t,
+        )
 
-    private const val SAMPLES = 16
-    private const val CAP_SAMPLES = 8
-    private const val SHORT_SIDE_END = 0.84f
-    private const val LONG_SIDE_END = 0.88f
-    private const val SHORT_TIP_WIDTH = 0.76f
-    private const val LONG_TIP_WIDTH = 0.60f
-    private const val CUTICLE_WIDTH = 0.76f
-    private const val SHORT_BULGE = 0.035f
-    private const val LONG_BULGE = 0.055f
-    private const val MIN_WIDTH = 0.68f
-    private const val MAX_WIDTH = 0.84f
+    private fun midpoint(a: PixelPoint, b: PixelPoint): PixelPoint =
+        PixelPoint((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f)
+
+    private const val ALMOND_POINTS = 6
+    private const val TIP_LEFT = 0
+    private const val MID_RIGHT = 1
+    private const val CUTICLE_RIGHT = 2
+    private const val CUTICLE_LEFT = 3
+    private const val MID_LEFT = 4
+    private const val TIP_RIGHT = 5
+    private const val SIDE_SAMPLES = 4
+    private const val CAP_SAMPLES = 10
+    private const val CUTICLE_SAMPLES = 6
+    private const val CUTICLE_INSET = 0.055f
 }
