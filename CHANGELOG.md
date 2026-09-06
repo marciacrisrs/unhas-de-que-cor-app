@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Try-on / unha humana
+- Calibração da placa não extrapola a tip landmark; a ponta do esmalte termina no limite observado da unha
+- Largura do centro do almond ficou conservadora para reduzir spill nas pregas periungueais
+- Nova barreira final recorta qualquer alpha do feather que tenha escapado do polígono anatômico antes do recolor
+- Testes de regressão cobrem ponta da placa e alpha fora da placa
+
 ## 1.0.13 — (versionCode 14)
 
 ### Unha humana / honestidade
