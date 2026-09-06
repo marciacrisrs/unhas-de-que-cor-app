@@ -5,13 +5,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.hypot
-import kotlin.math.roundToInt
 
 /**
  * Produces the plate mask from the calibrated contour without color-gating the nail interior.
  * Natural nails can be nearly the same RGB as skin; using color as a hard gate creates the
- * broken white patches seen in the live preview. Geometry is the primary boundary and the
- * boundary guard remains the final skin-safety net.
+ * broken patches seen in the live preview. Geometry is the primary boundary and the existing
+ * NailPlateMaskBoundaryGuard remains the final skin-safety net.
  */
 @Singleton
 class GeometryFirstNailSegmenter @Inject constructor() : NailSegmenter {
@@ -34,7 +33,6 @@ class GeometryFirstNailSegmenter @Inject constructor() : NailSegmenter {
             }
         }
 
-        // A tiny feather gives a painted, photographic edge without changing the geometry.
         val feathered = feather(alpha, width, height)
         val filled = feathered.count { (it.toInt() and 0xFF) >= 160 }
         if (filled < MIN_FILLED_PIXELS) return null
