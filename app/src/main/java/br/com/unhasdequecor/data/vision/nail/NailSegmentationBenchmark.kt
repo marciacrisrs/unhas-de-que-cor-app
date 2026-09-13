@@ -1,6 +1,5 @@
 package br.com.unhasdequecor.data.vision.nail
 
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 /** Objective metrics used to decide whether a nail segmentation candidate is good enough. */
@@ -102,7 +101,7 @@ object NailSegmentationBenchmark {
                         }
                     }
                 }
-                if (boundary) points += Point(x, y)
+                if (boundary) points += Point(x.toFloat(), y.toFloat())
             }
         }
         return points
