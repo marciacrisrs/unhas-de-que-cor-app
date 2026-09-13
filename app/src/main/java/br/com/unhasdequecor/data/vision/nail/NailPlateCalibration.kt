@@ -7,9 +7,8 @@ import kotlin.math.hypot
 object NailPlateCalibration {
     const val SHORT_TIP_DIP_PX = 16f
     const val FACING_TIP_DIP_RATIO = 0.35f
-    const val FACING_LENGTH_SCALE = 0.88f
-    // First real-hand diagnostic showed the facing plates were consistently too narrow.
-    const val FACING_WIDTH_SCALE = 0.50f
+    const val FACING_LENGTH_SCALE = 0.96f
+    const val FACING_WIDTH_SCALE = 0.60f
     const val THUMB_LENGTH_SCALE = 0.44f
     const val CENTER_ALONG = 0.72f
     const val FACING_CENTER = 0.82f
@@ -33,10 +32,9 @@ object NailPlateCalibration {
     const val TIP_POINT_FACTOR = 0.66f
     const val SHORT_TIP_POINT_FACTOR = 0.72f
     const val SHORT_PLATE_ASPECT = 1.28f
-    // The previous value stopped the inferred plate too far toward the tip.
-    // Keep a small proximal allowance; the final mask guard still prevents
-    // painting outside the generated anatomical polygon.
-    const val CUTICLE_BACK = 1.10f
+    // Give the proximal plate enough room to reach the visible cuticle.
+    // The final mask is still constrained by the generated anatomical contour.
+    const val CUTICLE_BACK = 1.18f
     const val MID_FORWARD = 0.20f
 
     data class FingerScale(val widthScale: Float, val lengthScale: Float)
@@ -92,16 +90,14 @@ object NailPlateCalibration {
     private const val USABLE_LENGTH_MIN_FACTOR = 0.85f
     private const val CUTICLE_PROXIMAL_EXTENSION = 0.18f
     private const val THUMB_WIDTH_SCALE = 0.82f
-    // Calibrated from the first real-hand diagnostic: the non-thumb plates
-    // were consistently narrower than the visible nail plate.
-    private const val INDEX_WIDTH_SCALE = 0.74f
-    private const val INDEX_LENGTH_SCALE = 0.80f
-    private const val MIDDLE_WIDTH_SCALE = 0.76f
-    private const val MIDDLE_LENGTH_SCALE = 0.82f
-    private const val RING_WIDTH_SCALE = 0.74f
-    private const val RING_LENGTH_SCALE = 0.80f
-    private const val PINKY_WIDTH_SCALE = 0.72f
-    private const val PINKY_LENGTH_SCALE = 0.76f
+    private const val INDEX_WIDTH_SCALE = 0.80f
+    private const val INDEX_LENGTH_SCALE = 0.86f
+    private const val MIDDLE_WIDTH_SCALE = 0.82f
+    private const val MIDDLE_LENGTH_SCALE = 0.88f
+    private const val RING_WIDTH_SCALE = 0.80f
+    private const val RING_LENGTH_SCALE = 0.86f
+    private const val PINKY_WIDTH_SCALE = 0.78f
+    private const val PINKY_LENGTH_SCALE = 0.82f
 
     fun facingTipDipThresholdPx(tipPipPx: Float): Float =
         maxOf(SHORT_TIP_DIP_PX * FACING_TIP_DIP_ABS_FLOOR, tipPipPx * FACING_TIP_DIP_RATIO)
