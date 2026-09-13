@@ -13,6 +13,7 @@ import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -46,8 +47,22 @@ class TfliteNailPlateSegmenter @Inject constructor(
 
         val inputHeight = inputShape[1]
         val inputWidth = inputShape[2]
-        val inputBitmap = cropWithContext(image, bounds, CONTEXT_FACTOR)
-        val inputBuffer = encodeInput(inputBitmap, inputWidth, inputHeight, input.dataType(), input.quantizationParams())
+        val roiRect = Rect(bounds.left, bounds.top, bounds.right, bounds.bottom)
+        val contextRect = expandedBounds(roiRect, image)
+        val inputBitmap = Bitmap.createBitmap(
+            image,
+            contextRect.left,
+            contextRect.top,
+            contextRect.width(),
+            contextRect.height(),
+        )
+        val inputBuffer = encodeInput(
+            source = inputBitmap,
+            width = inputWidth,
+            height = inputHeight,
+            dataType = input.dataType(),
+            quantization = input.quantizationParams(),
+        )
         val outputBuffer = ByteBuffer.allocateDirect(output.numBytes()).order(ByteOrder.nativeOrder())
 
         synchronized(lock) {
@@ -57,49 +72,45 @@ class TfliteNailPlateSegmenter @Inject constructor(
         }
 
         outputBuffer.rewind()
-        val probability = decodeOutput(outputBuffer, output)
-        if (probability == null) return null
-
-        val modelMask = Bitmap.createBitmap(inputWidth, inputHeight, Bitmap.Config.ARGB_8888)
-        val pixels = IntArray(inputWidth * inputHeight)
-        for (i in pixels.indices) {
-            val alpha = (probability[i] * 255f).roundToInt().coerceIn(0, 255)
-            pixels[i] = alpha shl 24 or 0x00FFFFFF
+        val probability = decodeOutput(outputBuffer, output) ?: run {
+            inputBitmap.recycle()
+            return null
         }
-        modelMask.setPixels(pixels, 0, inputWidth, 0, 0, inputWidth, inputHeight)
-
+        val modelMask = probabilityToBitmap(probability, inputWidth, inputHeight)
         val fullMask = projectMaskToRoi(
             modelMask = modelMask,
-            contextBounds = expandedBounds(bounds, image),
-            roiBounds = bounds,
+            contextBounds = contextRect,
+            roiBounds = roiRect,
         )
         modelMask.recycle()
         inputBitmap.recycle()
 
+        val midpoint = PixelPoint(
+            x = (roi.axisFromDip.x + roi.axisToTip.x) * 0.5f,
+            y = (roi.axisFromDip.y + roi.axisToTip.y) * 0.5f,
+        )
         val cleaned = keepNailComponent(
             alpha = fullMask,
-            width = bounds.width(),
-            height = bounds.height(),
-            seed = roi.axisMidpoint,
-            originX = bounds.left,
-            originY = bounds.top,
+            width = roiRect.width(),
+            height = roiRect.height(),
+            seed = midpoint,
+            originX = roiRect.left,
+            originY = roiRect.top,
         ) ?: return null
 
-        val polygon = buildBoundaryPolygon(
-            alpha = cleaned,
-            width = bounds.width(),
-            height = bounds.height(),
-            originX = bounds.left,
-            originY = bounds.top,
-        )
-
         return NailMask(
-            width = bounds.width(),
-            height = bounds.height(),
+            width = roiRect.width(),
+            height = roiRect.height(),
             alpha = cleaned,
-            originX = bounds.left,
-            originY = bounds.top,
-            boundaryPolygon = polygon,
+            originX = roiRect.left,
+            originY = roiRect.top,
+            boundaryPolygon = buildBoundaryPolygon(
+                alpha = cleaned,
+                width = roiRect.width(),
+                height = roiRect.height(),
+                originX = roiRect.left,
+                originY = roiRect.top,
+            ),
         )
     }
 
@@ -107,12 +118,9 @@ class TfliteNailPlateSegmenter @Inject constructor(
         synchronized(lock) {
             interpreter?.let { return it }
             return runCatching {
-                val mapped = loadModel()
                 Interpreter(
-                    mapped,
-                    Interpreter.Options().apply {
-                        setNumThreads(INFERENCE_THREADS)
-                    },
+                    loadModel(),
+                    Interpreter.Options().apply { setNumThreads(INFERENCE_THREADS) },
                 ).also { interpreter = it }
             }.getOrNull()
         }
@@ -140,30 +148,21 @@ class TfliteNailPlateSegmenter @Inject constructor(
         val pixels = IntArray(width * height)
         scaled.getPixels(pixels, 0, width, 0, 0, width, height)
         scaled.recycle()
-
-        val bytesPerElement = when (dataType) {
-            DataType.FLOAT32 -> 4
-            DataType.UINT8, DataType.INT8 -> 1
-            else -> error("Unsupported TFLite input type: $dataType")
-        }
+        val bytesPerElement = if (dataType == DataType.FLOAT32) 4 else 1
         val buffer = ByteBuffer.allocateDirect(width * height * CHANNELS * bytesPerElement)
             .order(ByteOrder.nativeOrder())
         for (pixel in pixels) {
-            val channels = intArrayOf(
-                pixel shr 16 and 0xFF,
-                pixel shr 8 and 0xFF,
-                pixel and 0xFF,
-            )
+            val channels = intArrayOf(pixel shr 16 and 0xFF, pixel shr 8 and 0xFF, pixel and 0xFF)
             for (channel in channels) {
                 when (dataType) {
                     DataType.FLOAT32 -> buffer.putFloat(channel / 255f)
                     DataType.UINT8 -> buffer.put(channel.toByte())
                     DataType.INT8 -> {
                         val scale = quantization.scale.takeIf { it > 0f } ?: 1f
-                        val zero = quantization.zeroPoint
-                        buffer.put((channel / 255f / scale + zero).roundToInt().coerceIn(-128, 127).toByte())
+                        buffer.put((channel / 255f / scale + quantization.zeroPoint)
+                            .roundToInt().coerceIn(-128, 127).toByte())
                     }
-                    else -> Unit
+                    else -> error("Unsupported TFLite input type: $dataType")
                 }
             }
         }
@@ -176,14 +175,14 @@ class TfliteNailPlateSegmenter @Inject constructor(
     ): FloatArray? {
         val shape = tensor.shape()
         if (shape.size != 4) return null
+        val channels: Int
         val height: Int
         val width: Int
-        val channels: Int
-        if (shape[3] <= 4) {
+        if (shape[3] <= MAX_SEGMENT_CHANNELS) {
             height = shape[1]
             width = shape[2]
             channels = shape[3]
-        } else if (shape[1] <= 4) {
+        } else if (shape[1] <= MAX_SEGMENT_CHANNELS) {
             channels = shape[1]
             height = shape[2]
             width = shape[3]
@@ -196,65 +195,57 @@ class TfliteNailPlateSegmenter @Inject constructor(
         val dataType = tensor.dataType()
         val quantization = tensor.quantizationParams()
         val positiveChannel = if (channels == 1) 0 else channels - 1
-        for (i in values.indices) {
-            var value = readValue(buffer, dataType, quantization)
-            if (channels > 1) {
-                repeat(positiveChannel) { readValue(buffer, dataType, quantization) }
-                value = readValue(buffer, dataType, quantization)
-                if (channels > positiveChannel + 1) {
-                    repeat(channels - positiveChannel - 1) { readValue(buffer, dataType, quantization) }
-                }
+        for (index in values.indices) {
+            var selected = 0f
+            for (channel in 0 until channels) {
+                val value = readValue(buffer, dataType, quantization)
+                if (channel == positiveChannel) selected = value
             }
-            values[i] = normalizeProbability(value)
+            values[index] = normalizeProbability(selected)
         }
-        return if (channels == 1) values else values
+        return values
     }
 
     private fun readValue(
         buffer: ByteBuffer,
         dataType: DataType,
         quantization: org.tensorflow.lite.Tensor.QuantizationParams,
-    ): Float = when (dataType) {
-        DataType.FLOAT32 -> buffer.float
-        DataType.UINT8 -> (buffer.get().toInt() and 0xFF).toFloat()
-        DataType.INT8 -> buffer.get().toFloat()
-        else -> 0f
-    }.let { raw ->
-        when (dataType) {
+    ): Float {
+        val raw = when (dataType) {
+            DataType.FLOAT32 -> buffer.float
+            DataType.UINT8 -> (buffer.get().toInt() and 0xFF).toFloat()
+            DataType.INT8 -> buffer.get().toFloat()
+            else -> return 0f
+        }
+        return when (dataType) {
             DataType.FLOAT32 -> raw
             DataType.UINT8, DataType.INT8 -> raw * quantization.scale + quantization.zeroPoint
             else -> raw
         }
     }
 
-    private fun normalizeProbability(value: Float): Float {
-        return if (value in 0f..1f) {
-            value
-        } else if (value > 0f) {
-            1f / (1f + kotlin.math.exp(-value))
-        } else {
-            0f
+    private fun normalizeProbability(value: Float): Float = when {
+        value in 0f..1f -> value
+        value > 0f -> 1f / (1f + exp(-value))
+        else -> 0f
+    }
+
+    private fun probabilityToBitmap(probability: FloatArray, width: Int, height: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(width * height)
+        for (i in pixels.indices) {
+            val alpha = (probability[i] * 255f).roundToInt().coerceIn(0, 255)
+            pixels[i] = alpha shl 24 or 0x00FFFFFF
         }
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return bitmap
     }
 
-    private fun cropWithContext(image: Bitmap, bounds: Rect, factor: Float): Bitmap {
-        val expanded = expandedBounds(bounds, image, factor)
-        return Bitmap.createBitmap(
-            image,
-            expanded.left,
-            expanded.top,
-            expanded.width(),
-            expanded.height(),
-        )
-    }
-
-    private fun expandedBounds(bounds: Rect, image: Bitmap, factor: Float = CONTEXT_FACTOR): Rect {
-        val centerX = bounds.centerX()
-        val centerY = bounds.centerY()
-        val width = max(bounds.width(), (bounds.width() * factor).roundToInt())
-        val height = max(bounds.height(), (bounds.height() * factor).roundToInt())
-        val left = (centerX - width / 2).coerceIn(0, max(0, image.width - width))
-        val top = (centerY - height / 2).coerceIn(0, max(0, image.height - height))
+    private fun expandedBounds(bounds: Rect, image: Bitmap): Rect {
+        val width = max(bounds.width(), (bounds.width() * CONTEXT_FACTOR).roundToInt())
+        val height = max(bounds.height(), (bounds.height() * CONTEXT_FACTOR).roundToInt())
+        val left = (bounds.centerX() - width / 2).coerceIn(0, max(0, image.width - width))
+        val top = (bounds.centerY() - height / 2).coerceIn(0, max(0, image.height - height))
         return Rect(
             left,
             top,
@@ -291,13 +282,15 @@ class TfliteNailPlateSegmenter @Inject constructor(
         originX: Int,
         originY: Int,
     ): ByteArray? {
-        val threshold = MODEL_THRESHOLD
-        val binary = BooleanArray(alpha.size) { (alpha[it].toInt() and 0xFF) >= threshold }
+        val binary = BooleanArray(alpha.size) {
+            (alpha[it].toInt() and 0xFF) >= MODEL_THRESHOLD
+        }
         val seedX = (seed.x - originX).roundToInt().coerceIn(0, width - 1)
         val seedY = (seed.y - originY).roundToInt().coerceIn(0, height - 1)
         val visited = BooleanArray(binary.size)
-        val components = ArrayList<IntArray>()
         val queue = IntArray(binary.size)
+        var best: IntArray? = null
+        var bestContainsSeed = false
 
         for (start in binary.indices) {
             if (!binary[start] || visited[start]) continue
@@ -306,9 +299,11 @@ class TfliteNailPlateSegmenter @Inject constructor(
             queue[tail++] = start
             visited[start] = true
             val points = ArrayList<Int>()
+            var containsSeed = false
             while (head < tail) {
                 val current = queue[head++]
                 points += current
+                containsSeed = containsSeed || current == seedY * width + seedX
                 val x = current % width
                 val y = current / width
                 for (neighbor in neighbors(x, y, width, height)) {
@@ -318,19 +313,16 @@ class TfliteNailPlateSegmenter @Inject constructor(
                     }
                 }
             }
-            components += points.toIntArray()
+            if (containsSeed || best == null || (!bestContainsSeed && points.size > best!!.size)) {
+                best = points.toIntArray()
+                bestContainsSeed = containsSeed
+            }
         }
-        if (components.isEmpty()) return null
 
-        val seedIndex = seedY * width + seedX
-        val selected = components.firstOrNull { seedIndex in it }
-            ?: components.maxBy { it.size }
+        val selected = best ?: return null
         if (selected.size < MIN_COMPONENT_PIXELS) return null
-
         val result = ByteArray(alpha.size)
-        for (index in selected) {
-            result[index] = alpha[index]
-        }
+        for (index in selected) result[index] = alpha[index]
         return result
     }
 
@@ -351,7 +343,7 @@ class TfliteNailPlateSegmenter @Inject constructor(
         originX: Int,
         originY: Int,
     ): List<PixelPoint>? {
-        val rows = ArrayList<Pair<Int, Int>>()
+        val rows = ArrayList<Triple<Int, Int, Int>>()
         for (y in 0 until height) {
             var minX = width
             var maxX = -1
@@ -361,25 +353,26 @@ class TfliteNailPlateSegmenter @Inject constructor(
                     maxX = max(maxX, x)
                 }
             }
-            if (maxX >= minX) rows += minX to maxX
+            if (maxX >= minX) rows += Triple(y, minX, maxX)
         }
         if (rows.size < MIN_BOUNDARY_ROWS) return null
 
         val polygon = ArrayList<PixelPoint>(rows.size * 2)
         rows.forEachIndexed { index, row ->
             if (index % BOUNDARY_STEP == 0) {
-                polygon += PixelPoint(row.first + originX, rows[index].let { it.first } + originY)
+                polygon += PixelPoint(row.second + originX, row.first + originY)
             }
         }
-        for (index in rows.indices.reversed()) {
+        rows.indices.reversed().forEach { index ->
             if (index % BOUNDARY_STEP == 0) {
-                polygon += PixelPoint(rows[index].second + originX, rows[index].let { it.first } + originY)
+                val row = rows[index]
+                polygon += PixelPoint(row.third + originX, row.first + originY)
             }
         }
         return polygon.takeIf { it.size >= 3 }
     }
 
-    private fun validBounds(bounds: Rect, image: Bitmap): Boolean =
+    private fun validBounds(bounds: ImageCoordinates.PixelRect, image: Bitmap): Boolean =
         bounds.left >= 0 && bounds.top >= 0 &&
             bounds.right <= image.width && bounds.bottom <= image.height
 
@@ -400,5 +393,6 @@ class TfliteNailPlateSegmenter @Inject constructor(
         const val MIN_COMPONENT_PIXELS = 12
         const val MIN_BOUNDARY_ROWS = 4
         const val BOUNDARY_STEP = 2
+        const val MAX_SEGMENT_CHANNELS = 4
     }
 }
