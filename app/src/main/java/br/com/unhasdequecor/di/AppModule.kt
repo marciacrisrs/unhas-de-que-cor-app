@@ -15,7 +15,7 @@ import br.com.unhasdequecor.data.repository.HistoryRepositoryImpl
 import br.com.unhasdequecor.data.repository.PreferencesRepositoryImpl
 import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.MediaPipeHandNailDetector
-import br.com.unhasdequecor.data.vision.nail.EvidenceNailSegmenter
+import br.com.unhasdequecor.data.vision.nail.AdaptiveNailSegmenter
 import br.com.unhasdequecor.data.vision.nail.NailSegmenter
 import br.com.unhasdequecor.domain.repository.ColorCatalogRepository
 import br.com.unhasdequecor.domain.repository.HandReferenceRepository
@@ -38,7 +38,7 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "unhas_de_que_cor.db")
+        Room.databaseBuilder(context, AppDatabase::class.java, "unhas-de-que-cor.db")
             .addMigrations(*DatabaseMigrations.ALL)
             .build()
 
@@ -62,5 +62,5 @@ interface RepositoryModule {
     @Binds @Singleton fun bindPreferencesRepository(impl: PreferencesRepositoryImpl): PreferencesRepository
     @Binds @Singleton fun bindHandReferenceRepository(impl: HandReferenceRepositoryImpl): HandReferenceRepository
     @Binds @Singleton fun bindHandLandmarkProcessor(impl: MediaPipeHandNailDetector): HandLandmarkProcessor
-    @Binds @Singleton fun bindNailSegmenter(impl: EvidenceNailSegmenter): NailSegmenter
+    @Binds @Singleton fun bindNailSegmenter(impl: AdaptiveNailSegmenter): NailSegmenter
 }
