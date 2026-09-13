@@ -14,12 +14,14 @@ import kotlin.math.sqrt
  * Segmentação guiada por geometria + evidência da própria imagem.
  *
  * MediaPipe continua fornecendo o prior anatômico, mas o contorno final não é
- * mais aceito cegamente como uma unha sintética. Cada ponto do contorno é
- * refinado procurando a transição real placa/pele dentro de uma faixa segura.
- * Se a imagem não tiver evidência suficiente, mantém o contorno geométrico.
+ * mais aceito cegamente como uma unha sintética. O refinador procura primeiro
+ * a base/cutícula, depois laterais e tip, e só aceita uma placa globalmente
+ * coerente. Se a imagem não tiver evidência suficiente, mantém o prior seguro.
  */
 @Singleton
 class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
+
+    private val contourRefiner = NailContourRefiner()
 
     override fun segment(image: Bitmap, roi: NailRoi): NailMask? {
         val bounds = roi.bounds
@@ -36,8 +38,24 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val geometric = roi.polygon.map { p ->
             PixelPoint(p.x - bounds.left, p.y - bounds.top)
         }
-        val refined = refineContour(pixels, rw, rh, geometric)
-        val contour = refined ?: geometric
+        val axisFromBase = PixelPoint(
+            roi.axisFromDip.x - bounds.left,
+            roi.axisFromDip.y - bounds.top,
+        )
+        val axisToTip = PixelPoint(
+            roi.axisToTip.x - bounds.left,
+            roi.axisToTip.y - bounds.top,
+        )
+        val refined = contourRefiner.refine(
+            pixels = pixels,
+            width = rw,
+            height = rh,
+            geometric = geometric,
+            axisFromBase = axisFromBase,
+            axisToTip = axisToTip,
+            nominalWidth = roi.widthPx,
+        )
+        val contour = refined?.polygon ?: geometric
 
         val solid = ByteArray(rw * rh)
         rasterizePolygon(contour, rw, rh, solid)
@@ -57,7 +75,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         )
     }
 
-    /** Refina cada ponto da borda na normal aproximada da geometria. */
+    /** Legacy local contour fallback retained for compatibility with tests/tools. */
     private fun refineContour(
         pixels: IntArray,
         width: Int,
@@ -65,15 +83,12 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         polygon: List<PixelPoint>,
     ): List<PixelPoint>? {
         if (polygon.size < 6) return null
-
         val centroid = polygon.fold(PixelPoint(0f, 0f)) { acc, p ->
             PixelPoint(acc.x + p.x, acc.y + p.y)
         }.let { PixelPoint(it.x / polygon.size, it.y / polygon.size) }
-
         val candidates = ArrayList<PixelPoint>(polygon.size)
         var evidenceSum = 0f
         var movedCount = 0
-
         for (point in polygon) {
             val vx = point.x - centroid.x
             val vy = point.y - centroid.y
@@ -82,14 +97,10 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
                 candidates += point
                 continue
             }
-
             val nx = vx / length
             val ny = vy / length
             var bestScore = Float.NEGATIVE_INFINITY
             var bestOffset = 0f
-
-            // A borda geométrica pode estar significativamente para dentro da
-            // placa real. Procuramos além dela antes de desistir da evidência.
             for (offset in -SEARCH_INWARD..SEARCH_OUTWARD) {
                 val cx = point.x + nx * offset
                 val cy = point.y + ny * offset
@@ -99,7 +110,6 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
                     bestOffset = offset.toFloat()
                 }
             }
-
             if (bestScore < MIN_EDGE_SCORE) {
                 candidates += point
             } else {
@@ -109,16 +119,11 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
                 if (abs(shift) >= MIN_MEANINGFUL_SHIFT) movedCount++
             }
         }
-
         val averageEvidence = evidenceSum / polygon.size.coerceAtLeast(1)
-        if (movedCount < polygon.size * MIN_MOVED_FRACTION ||
-            averageEvidence < MIN_AVERAGE_EVIDENCE
-        ) return null
-
+        if (movedCount < polygon.size * MIN_MOVED_FRACTION || averageEvidence < MIN_AVERAGE_EVIDENCE) return null
         return smoothClosedContour(candidates)
     }
 
-    /** Contraste entre amostras dentro/fora da borda candidata. */
     private fun boundaryScore(
         pixels: IntArray,
         width: Int,
@@ -128,39 +133,19 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         nx: Float,
         ny: Float,
     ): Float {
-        val inner = sampleColor(
-            pixels,
-            width,
-            height,
-            cx - nx * SAMPLE_DISTANCE,
-            cy - ny * SAMPLE_DISTANCE,
-        ) ?: return Float.NEGATIVE_INFINITY
-        val outer = sampleColor(
-            pixels,
-            width,
-            height,
-            cx + nx * SAMPLE_DISTANCE,
-            cy + ny * SAMPLE_DISTANCE,
-        ) ?: return Float.NEGATIVE_INFINITY
-        val center = sampleColor(pixels, width, height, cx, cy)
+        val inner = sampleColor(pixels, width, height, cx - nx * SAMPLE_DISTANCE, cy - ny * SAMPLE_DISTANCE)
             ?: return Float.NEGATIVE_INFINITY
-
+        val outer = sampleColor(pixels, width, height, cx + nx * SAMPLE_DISTANCE, cy + ny * SAMPLE_DISTANCE)
+            ?: return Float.NEGATIVE_INFINITY
+        val center = sampleColor(pixels, width, height, cx, cy) ?: return Float.NEGATIVE_INFINITY
         val contrast = colorDistance(inner, outer) / COLOR_DISTANCE_SCALE
         val innerDelta = colorDistance(center, inner) / COLOR_DISTANCE_SCALE
         val outerDelta = colorDistance(center, outer) / COLOR_DISTANCE_SCALE
         val transition = min(innerDelta, outerDelta)
-
-        return (contrast * CONTRAST_WEIGHT + transition * TRANSITION_WEIGHT)
-            .coerceIn(0f, 4f)
+        return (contrast * CONTRAST_WEIGHT + transition * TRANSITION_WEIGHT).coerceIn(0f, 4f)
     }
 
-    private fun sampleColor(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        x: Float,
-        y: Float,
-    ): Int? {
+    private fun sampleColor(pixels: IntArray, width: Int, height: Int, x: Float, y: Float): Int? {
         val ix = x.roundToInt()
         val iy = y.roundToInt()
         if (ix !in 0 until width || iy !in 0 until height) return null
@@ -187,18 +172,11 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         }
     }
 
-    private fun rasterizePolygon(
-        poly: List<PixelPoint>,
-        width: Int,
-        height: Int,
-        out: ByteArray,
-    ) {
+    private fun rasterizePolygon(poly: List<PixelPoint>, width: Int, height: Int, out: ByteArray) {
         if (poly.size < 3) return
         for (y in 0 until height) {
             for (x in 0 until width) {
-                if (pointInPolygon(x + 0.5f, y + 0.5f, poly)) {
-                    out[y * width + x] = 255.toByte()
-                }
+                if (pointInPolygon(x + 0.5f, y + 0.5f, poly)) out[y * width + x] = 255.toByte()
             }
         }
     }
@@ -231,15 +209,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         return out
     }
 
-    private fun featherAlpha(
-        src: ByteArray,
-        width: Int,
-        height: Int,
-        x: Int,
-        y: Int,
-        radius: Int,
-        r2: Int,
-    ): Byte {
+    private fun featherAlpha(src: ByteArray, width: Int, height: Int, x: Int, y: Int, radius: Int, r2: Int): Byte {
         val i = y * width + x
         if ((src[i].toInt() and 0xFF) >= MASK_SOLID) return 255.toByte()
         val best = nearestSolidDistanceSq(src, width, height, x, y, radius)
@@ -248,14 +218,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         return (t.coerceIn(0f, 1f) * 255f).roundToInt().toByte()
     }
 
-    private fun nearestSolidDistanceSq(
-        src: ByteArray,
-        width: Int,
-        height: Int,
-        x: Int,
-        y: Int,
-        radius: Int,
-    ): Int {
+    private fun nearestSolidDistanceSq(src: ByteArray, width: Int, height: Int, x: Int, y: Int, radius: Int): Int {
         var best = Int.MAX_VALUE
         for (dy in -radius..radius) {
             for (dx in -radius..radius) {
