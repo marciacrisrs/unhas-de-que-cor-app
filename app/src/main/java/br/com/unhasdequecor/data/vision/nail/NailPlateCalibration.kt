@@ -32,7 +32,10 @@ object NailPlateCalibration {
     const val TIP_POINT_FACTOR = 0.66f
     const val SHORT_TIP_POINT_FACTOR = 0.72f
     const val SHORT_PLATE_ASPECT = 1.28f
-    const val CUTICLE_BACK = 0.98f
+    // The previous value stopped the inferred plate too far toward the tip.
+    // Keep a small proximal allowance; the final mask guard still prevents
+    // painting outside the generated anatomical polygon.
+    const val CUTICLE_BACK = 1.10f
     const val MID_FORWARD = 0.20f
 
     data class FingerScale(val widthScale: Float, val lengthScale: Float)
@@ -88,13 +91,15 @@ object NailPlateCalibration {
     private const val USABLE_LENGTH_MIN_FACTOR = 0.85f
     private const val CUTICLE_PROXIMAL_EXTENSION = 0.18f
     private const val THUMB_WIDTH_SCALE = 0.82f
-    private const val INDEX_WIDTH_SCALE = 0.68f
+    // Calibrated from the first real-hand diagnostic: the non-thumb plates
+    // were consistently narrower than the visible nail plate.
+    private const val INDEX_WIDTH_SCALE = 0.74f
     private const val INDEX_LENGTH_SCALE = 0.80f
-    private const val MIDDLE_WIDTH_SCALE = 0.70f
+    private const val MIDDLE_WIDTH_SCALE = 0.76f
     private const val MIDDLE_LENGTH_SCALE = 0.82f
-    private const val RING_WIDTH_SCALE = 0.68f
+    private const val RING_WIDTH_SCALE = 0.74f
     private const val RING_LENGTH_SCALE = 0.80f
-    private const val PINKY_WIDTH_SCALE = 0.66f
+    private const val PINKY_WIDTH_SCALE = 0.72f
     private const val PINKY_LENGTH_SCALE = 0.76f
 
     fun facingTipDipThresholdPx(tipPipPx: Float): Float =
@@ -176,7 +181,7 @@ object NailPlateCalibration {
         val widthPx = if (facing) {
             (tipPip * FACING_WIDTH_SCALE).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
         } else {
-            (lengthPx * scales.widthScale).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
+            (lengthPx * scales.widthScale).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_MAX_PX)
         }
 
         val dirX = tipX - axisStartX
@@ -245,3 +250,5 @@ object NailPlateCalibration {
         )
     }
 }
+
+private const val MAX_NAIL_WID_MAX_PX = 110f
