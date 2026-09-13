@@ -175,7 +175,7 @@ tasks.register("downloadNailSegmentationModel") {
     doLast {
         if (!nailModelAsset.asFile.exists()) {
             nailModelAsset.asFile.parentFile.mkdirs()
-            java.net.URI(nailModelUrl).toURL().openStream().use { input ->
+            uri(nailModelUrl).toURL().openStream().use { input ->
                 nailModelAsset.asFile.outputStream().use { output -> input.copyTo(output) }
             }
         }
