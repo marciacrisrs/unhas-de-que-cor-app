@@ -2,10 +2,13 @@ package br.com.unhasdequecor.data.vision.nail
 
 import android.graphics.Bitmap
 
-/** Completes a conservative learned seed using axis-aware plate evidence. */
+/** Completes the learned seed with an image-guided, globally coherent contour. */
 class NailPlateBoundaryRefiner {
     private val delegate = StrictNailPlateBoundaryRefiner()
+    private val contourSpecialist = NailContourEdgeSpecialist()
 
     fun refine(image: Bitmap, roi: NailRoi, seedMask: NailMask): NailMask? =
-        delegate.refine(image, roi, seedMask)
+        delegate.refine(image, roi, seedMask)?.let { completed ->
+            contourSpecialist.refine(image, roi, completed)
+        }
 }
