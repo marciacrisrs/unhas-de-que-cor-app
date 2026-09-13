@@ -20,3 +20,4 @@ local.properties
 keystore.b64
 **/upload-keystore.jks
 **/release.keystore
+app/src/main/assets/nail_segmentation_mobilenet_v2.tflite
