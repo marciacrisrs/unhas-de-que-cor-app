@@ -79,16 +79,7 @@ class StrictNailPlateBoundaryRefiner {
         return Extent(minT, maxT, halfS)
     }
 
-    private fun grow(
-        p: IntArray,
-        seed: BooleanArray,
-        nail: M,
-        skin: M?,
-        env: Env,
-        extent: Extent,
-        w: Int,
-        h: Int,
-    ): ByteArray {
+    private fun grow(p: IntArray, seed: BooleanArray, nail: M, skin: M?, env: Env, extent: Extent, w: Int, h: Int): ByteArray {
         val out = ByteArray(p.size)
         val seen = BooleanArray(p.size)
         val q = IntArray(p.size)
@@ -111,7 +102,6 @@ class StrictNailPlateBoundaryRefiner {
                 val ny = n / w
                 val (t, s) = env.coordinates(nx.toFloat(), ny.toFloat())
                 if (!env.contains(nx.toFloat(), ny.toFloat())) continue
-
                 val nf = feature(p[n])
                 val ns = skin?.let { similarity(nf, it) } ?: 0f
                 val nm = similarity(nf, nail)
@@ -119,7 +109,6 @@ class StrictNailPlateBoundaryRefiner {
                 val distal = t > extent.maxT + 0.5f
                 val lateral = abs(s) > extent.halfS + 0.5f
                 val proximal = t < extent.minT - 0.5f
-
                 val threshold = when {
                     distal -> TIP_GROW_THRESHOLD
                     lateral -> SIDE_GROW_THRESHOLD
@@ -144,10 +133,7 @@ class StrictNailPlateBoundaryRefiner {
                     proximal -> BASE_MIN_NAIL_SKIN_MARGIN
                     else -> NORMAL_MIN_NAIL_SKIN_MARGIN
                 }
-
-                if (score >= threshold && nm >= minSimilarity &&
-                    (skin == null || ns <= maxSkin || nm - ns >= margin)
-                ) {
+                if (score >= threshold && nm >= minSimilarity && (skin == null || ns <= maxSkin || nm - ns >= margin)) {
                     out[n] = 255.toByte()
                     q[tail++] = n
                 }
@@ -166,14 +152,21 @@ class StrictNailPlateBoundaryRefiner {
                 out[i] = 0
                 continue
             }
+            // Similarity rejection is applied only on the actual boundary.
+            // Carving interior pixels was creating the triangular notches seen
+            // on otherwise correctly covered nail plates.
+            if (!isBoundaryPixel(out, x, y, w, h)) continue
             val nm = similarity(feature(p[i]), nail)
             val ns = skin?.let { similarity(feature(p[i]), it) } ?: 0f
-            if (nm < FINAL_MIN_NAIL_SIMILARITY ||
-                (skin != null && ns > FINAL_MAX_SKIN_SIMILARITY && nm - ns < FINAL_NAIL_SKIN_MARGIN)
-            ) out[i] = 0
+            if (nm < FINAL_MIN_NAIL_SIMILARITY || (skin != null && ns > FINAL_MAX_SKIN_SIMILARITY && nm - ns < FINAL_NAIL_SKIN_MARGIN)) {
+                out[i] = 0
+            }
         }
         return connectedToSeed(out, seed, w, h)
     }
+
+    private fun isBoundaryPixel(mask: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
+        neighbors(x, y, w, h).any { (mask[it].toInt() and 255) == 0 }
 
     private fun connectedToSeed(mask: ByteArray, seed: BooleanArray, w: Int, h: Int): ByteArray {
         val out = ByteArray(mask.size)
@@ -239,11 +232,7 @@ class StrictNailPlateBoundaryRefiner {
     }
 
     private fun similarity(a: F, m: M): Float {
-        val rgb = kotlin.math.sqrt(
-            ((a.r - m.f.r) * (a.r - m.f.r) +
-                (a.g - m.f.g) * (a.g - m.f.g) +
-                (a.b - m.f.b) * (a.b - m.f.b)).toDouble(),
-        ).toFloat() / 1.732f
+        val rgb = kotlin.math.sqrt(((a.r - m.f.r) * (a.r - m.f.r) + (a.g - m.f.g) * (a.g - m.f.g) + (a.b - m.f.b) * (a.b - m.f.b)).toDouble()).toFloat() / 1.732f
         return (1f - (rgb * .58f + abs(a.y - m.f.y) * .27f + abs(a.s - m.f.s) * .15f)).coerceIn(0f, 1f)
     }
 
@@ -259,12 +248,6 @@ class StrictNailPlateBoundaryRefiner {
             if (right >= left) rows += Triple(y, left, right)
         }
         if (rows.size < 4) return null
-
-        // The binary mask is pixel-accurate enough for coverage, but taking
-        // every raw row edge makes the boundary polygon inherit a staircase.
-        // Smooth the left/right profiles independently by one light 3-point
-        // pass. This only changes the drawable contour representation; the
-        // actual alpha mask remains untouched and therefore cannot gain spill.
         val leftProfile = smoothProfile(rows.map { it.second.toFloat() })
         val rightProfile = smoothProfile(rows.map { it.third.toFloat() })
         val out = ArrayList<ImageCoordinates.PixelPoint>(rows.size * 2)
@@ -280,9 +263,7 @@ class StrictNailPlateBoundaryRefiner {
     private fun smoothProfile(values: List<Float>): FloatArray {
         if (values.size < 3) return values.toFloatArray()
         val out = values.toFloatArray()
-        for (i in 1 until values.lastIndex) {
-            out[i] = (values[i - 1] + values[i] * 2f + values[i + 1]) * .25f
-        }
+        for (i in 1 until values.lastIndex) out[i] = (values[i - 1] + values[i] * 2f + values[i + 1]) * .25f
         return out
     }
 
