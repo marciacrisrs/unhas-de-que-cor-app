@@ -349,8 +349,13 @@ class NailContourRefiner {
         py: Float,
     ): List<PixelPoint> {
         val contour = ArrayList<PixelPoint>(left.size + right.size + 10)
+
+        // Both side curves are sampled from cuticle (t≈0) toward tip (t≈1).
+        // Walk the contour clockwise: proximal-left -> distal-left -> tip cap
+        // -> distal-right -> proximal-right. The previous implementation
+        // reversed the left curve, causing the polygon to fold across itself.
         contour += cuticle.left
-        contour += left.reversed()
+        contour += left
         contour += tip.left
 
         // Rounded distal cap. The midpoint is intentionally used instead of a
@@ -366,7 +371,7 @@ class NailContourRefiner {
             contour += PixelPoint(x, y)
         }
         contour += tip.right
-        contour += right
+        contour += right.reversed()
         contour += cuticle.right
         return contour
     }
@@ -463,6 +468,7 @@ class NailContourRefiner {
         const val CUTICLE_WEIGHT = 0.45f
         const val SIDE_WEIGHT = 0.35f
         const val TIP_WEIGHT = 0.20f
+        const val SAMPLE_DISTANCE = 2f
         val SIDE_T_SAMPLES = listOf(0.08f, 0.22f, 0.38f, 0.54f, 0.70f, 0.84f, 0.95f)
     }
 }
