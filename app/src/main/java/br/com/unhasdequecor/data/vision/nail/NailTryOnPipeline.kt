@@ -324,6 +324,17 @@ class NailTryOnPipeline @Inject constructor(
                 debugEnabled = debugEnabled,
             )
         }
+        // Etapa 1 do diagnóstico: quando o overlay de debug está ligado,
+        // devolvemos a foto sem recolor. O NailDebugOverlay mostra a NailMask
+        // efetiva por cima, isolando o problema de segmentação do render.
+        if (debugEnabled) {
+            return NailTryOnResult(
+                bitmap = working,
+                nails = snapshot.nails,
+                landmarks = snapshot.landmarks,
+                debugEnabled = true,
+            )
+        }
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
         val maskPaint = if (paintableCount > 0) {
             colorApplier.apply(working, snapshot.nails, polishColor)
