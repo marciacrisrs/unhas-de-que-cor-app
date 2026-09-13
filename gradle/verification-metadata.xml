@@ -5,6 +5,9 @@
       <verify-signatures>false</verify-signatures>
       <!-- Android Studio baixa sources no sync (JARs e gradle-*-src.zip); não são executados. -->
       <trusted-artifacts>
+         <trust group="com.google.ai.edge.litert" name="litert" version="1.0.1" reason="Google AI Edge LiteRT 1.0.1 resolved from Google Maven"/>
+         <trust group="com.google.ai.edge.litert" name="litert-api" version="1.0.1" reason="Google AI Edge LiteRT API 1.0.1 resolved from Google Maven"/>
+         <trust group="org.tensorflow" name="tensorflow-lite" version="2.17.0" reason="TensorFlow Lite 2.17.0 relocation metadata resolved from Maven Central"/>
          <trust file=".*-sources[.]jar" regex="true"/>
          <trust file=".*-javadoc[.]jar" regex="true"/>
          <trust file="gradle-.*-src[.]zip" regex="true"/>
