@@ -8,8 +8,11 @@ import javax.inject.Singleton
 import kotlin.math.pow
 
 /**
- * Aplica cor de esmalte só nos pixels da [NailMask], preservando luminância/brilho.
- * Núcleo de pixel compartilhado com [PolishMaskRecolorer.polishPixel].
+ * Renderiza esmalte preservando a iluminação de cada unha individualmente.
+ *
+ * A segmentação decide onde pintar; este componente decide como a tinta se
+ * comporta sobre aquela superfície: mantém variação de luminância, preserva
+ * highlights e evita que uma unha clara/escura contamine o cálculo das demais.
  */
 @Singleton
 class NailColorApplier @Inject constructor() {
@@ -26,31 +29,32 @@ class NailColorApplier @Inject constructor() {
         val tg = green(target)
         val tb = blue(target)
 
-        var weight = 0f
-        var lumSum = 0f
+        var painted = false
         for (nail in nails) {
             if (nail.confidence < MIN_CONFIDENCE) continue
-            val window = visibleWindow(out, nail.mask)
-            if (window != null) {
-                val buf = readWindow(out, window)
-                forEachMaskedPixel(nail.mask, window, buf) { _, color, alpha ->
-                    val coverage = alpha / FULL_ALPHA
-                    lumSum += luminance(red(color), green(color), blue(color)) * coverage
-                    weight += coverage
-                }
-            }
+            val meanLum = meanMaskedLuminance(out, nail.mask)
+            if (meanLum < MIN_MEAN_LUMINANCE) continue
+            paintNail(out, nail.mask, tr, tg, tb, meanLum)
+            painted = true
         }
-        if (weight < MIN_WEIGHT) {
+        if (!painted) {
             if (!out.isRecycled) out.recycle()
             return null
         }
-        val meanLum = (lumSum / weight).coerceAtLeast(1f)
-
-        for (nail in nails) {
-            if (nail.confidence < MIN_CONFIDENCE) continue
-            paintNail(out, nail.mask, tr, tg, tb, meanLum)
-        }
         return out
+    }
+
+    private fun meanMaskedLuminance(bitmap: Bitmap, mask: NailMask): Float {
+        val window = visibleWindow(bitmap, mask) ?: return 0f
+        val buf = readWindow(bitmap, window)
+        var sum = 0f
+        var weight = 0f
+        forEachMaskedPixel(mask, window, buf) { _, color, alpha ->
+            val coverage = alpha / FULL_ALPHA
+            sum += luminance(red(color), green(color), blue(color)) * coverage
+            weight += coverage
+        }
+        return if (weight >= MIN_WEIGHT) sum / weight else 0f
     }
 
     private fun paintNail(
@@ -86,8 +90,7 @@ class NailColorApplier @Inject constructor() {
 
     /**
      * O tracker Live pode deslocar a origem da máscara para fora do frame.
-     * [Bitmap.getPixels] lança se o retângulo sai dos limites — e o bitmap
-     * copiado vazava a cada frame.
+     * [Bitmap.getPixels] lança se o retângulo sai dos limites.
      */
     private fun visibleWindow(bitmap: Bitmap, mask: NailMask): VisibleMaskWindow? {
         val left = mask.originX.coerceAtLeast(0)
@@ -143,24 +146,21 @@ class NailColorApplier @Inject constructor() {
         const val MIN_CONFIDENCE = DetectionConfidenceFloor.NAIL_COMBINED_MIN
         private const val MIN_MASK_ALPHA = 16
         private const val MIN_WEIGHT = 8f
+        private const val MIN_MEAN_LUMINANCE = 4f
         private const val FULL_ALPHA = 255f
-        private const val SHADE_MIN = 0.42f
-        private const val SHADE_MAX = 1.65f
-        private const val SPECULAR_LUMA_START = 188f
-        private const val SPECULAR_LUMA_RANGE = 67f
-        private const val SPECULAR_REL_START = 1.12f
-        private const val SPECULAR_REL_RANGE = 0.55f
-        private const val SPECULAR_REL_WEIGHT = 0.75f
-        private const val BLEND_GAMMA = 0.85f
-        private const val VIVID_AMOUNT = 0.12f
+        private const val SHADE_MIN = 0.40f
+        private const val SHADE_MAX = 1.72f
+        private const val SPECULAR_LUMA_START = 184f
+        private const val SPECULAR_LUMA_RANGE = 71f
+        private const val SPECULAR_REL_START = 1.10f
+        private const val SPECULAR_REL_RANGE = 0.58f
+        private const val SPECULAR_REL_WEIGHT = 0.78f
+        private const val BLEND_GAMMA = 0.82f
+        private const val VIVID_AMOUNT = 0.10f
         private const val LUMA_R = 0.299f
         private const val LUMA_G = 0.587f
         private const val LUMA_B = 0.114f
 
-        /**
-         * Transformação pura (testável sem Bitmap):
-         * maskAlpha baixo → pixel inalterado; caso contrário, recolor com luminância.
-         */
         fun transformPixel(
             srcArgb: Int,
             maskAlpha: Int,
@@ -190,7 +190,6 @@ class NailColorApplier @Inject constructor() {
                 ng = mix(ng, 255, specular)
                 nb = mix(nb, 255, specular)
             }
-            // Mesmo “punch” das máscaras de amostra (PolishMaskRecolorer.vividize).
             nr = mix(nr, targetR, VIVID_AMOUNT)
             ng = mix(ng, targetG, VIVID_AMOUNT)
             nb = mix(nb, targetB, VIVID_AMOUNT)
