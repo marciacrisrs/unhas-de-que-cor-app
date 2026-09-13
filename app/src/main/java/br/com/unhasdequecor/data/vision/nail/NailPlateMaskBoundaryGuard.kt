@@ -3,17 +3,17 @@ package br.com.unhasdequecor.data.vision.nail
 /**
  * Final spatial safety barrier between segmentation and recolor.
  *
- * The geometric segmenter intentionally feathers the ROI edge. Feathering is
- * useful visually, but it can create non-zero alpha just outside the polygon.
- * Recolor must never turn that anti-aliasing fringe into paint on skin, so the
- * final mask is clipped back to the anatomical nail-plate polygon.
+ * The segmenter may refine the anatomical prior from image evidence. When a
+ * refined boundary is present on the mask, that boundary is the safety fence;
+ * otherwise we fall back to the original ROI polygon for legacy masks.
  */
 object NailPlateMaskBoundaryGuard {
 
     fun clamp(mask: NailMask, roi: NailRoi): NailMask {
         if (mask.alpha.none { (it.toInt() and ALPHA_MASK) != 0 }) return mask
 
-        val polygon = roi.polygon.map { point ->
+        val sourcePolygon = mask.boundaryPolygon ?: roi.polygon
+        val polygon = sourcePolygon.map { point ->
             ImageCoordinates.PixelPoint(
                 x = point.x - mask.originX,
                 y = point.y - mask.originY,
