@@ -38,6 +38,29 @@ class NailContourRegularizerTest {
         assertThat(result.alpha[35 * width + 13].toInt() and 255).isEqualTo(255)
     }
 
+    @Test
+    fun `boundary polygon stays aligned with mask origin and plate extent`() {
+        val width = 40
+        val height = 70
+        val alpha = ByteArray(width * height)
+        for (y in 10 until 60) for (x in 13..26) alpha[y * width + x] = 255.toByte()
+
+        val mask = NailMask(
+            width = width,
+            height = height,
+            alpha = alpha,
+            originX = 100,
+            originY = 200,
+        )
+        val result = regularizer.regularize(roi(), mask)
+        val polygon = result.boundaryPolygon!!
+
+        assertThat(polygon.minOf { it.x }).isGreaterThan(108f)
+        assertThat(polygon.maxOf { it.x }).isLessThan(130f)
+        assertThat(polygon.minOf { it.y }).isGreaterThan(208f)
+        assertThat(polygon.maxOf { it.y }).isLessThan(260f)
+    }
+
     private fun roi() = NailRoi(
         finger = Finger.MIDDLE,
         bounds = PixelRect(5, 5, 35, 65),
