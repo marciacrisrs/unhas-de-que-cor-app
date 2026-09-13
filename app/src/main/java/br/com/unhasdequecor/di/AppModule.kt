@@ -15,8 +15,8 @@ import br.com.unhasdequecor.data.repository.HistoryRepositoryImpl
 import br.com.unhasdequecor.data.repository.PreferencesRepositoryImpl
 import br.com.unhasdequecor.data.vision.HandLandmarkProcessor
 import br.com.unhasdequecor.data.vision.MediaPipeHandNailDetector
-import br.com.unhasdequecor.data.vision.nail.AdaptiveNailSegmenter
 import br.com.unhasdequecor.data.vision.nail.NailSegmenter
+import br.com.unhasdequecor.data.vision.nail.PaintAwareNailSegmenter
 import br.com.unhasdequecor.domain.repository.ColorCatalogRepository
 import br.com.unhasdequecor.domain.repository.HandReferenceRepository
 import br.com.unhasdequecor.domain.repository.HistoryRepository
@@ -62,5 +62,5 @@ interface RepositoryModule {
     @Binds @Singleton fun bindPreferencesRepository(impl: PreferencesRepositoryImpl): PreferencesRepository
     @Binds @Singleton fun bindHandReferenceRepository(impl: HandReferenceRepositoryImpl): HandReferenceRepository
     @Binds @Singleton fun bindHandLandmarkProcessor(impl: MediaPipeHandNailDetector): HandLandmarkProcessor
-    @Binds @Singleton fun bindNailSegmenter(impl: AdaptiveNailSegmenter): NailSegmenter
+    @Binds @Singleton fun bindNailSegmenter(impl: PaintAwareNailSegmenter): NailSegmenter
 }
