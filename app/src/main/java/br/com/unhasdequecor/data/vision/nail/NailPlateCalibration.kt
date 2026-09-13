@@ -9,10 +9,10 @@ object NailPlateCalibration {
     const val FACING_TIP_DIP_RATIO = 0.35f
     const val FACING_LENGTH_SCALE = 0.96f
     const val FACING_WIDTH_SCALE = 0.60f
-    const val THUMB_LENGTH_SCALE = 0.92f
+    const val THUMB_LENGTH_SCALE = 0.75f
     const val CENTER_ALONG = 0.72f
     const val FACING_CENTER = 0.82f
-    const val THUMB_CENTER = 0.78f
+    const val THUMB_CENTER = 0.70f
     const val TIP_OVERSHOOT = 0f
     const val MIN_NAIL_LEN_PX = 14f
     const val MAX_NAIL_LEN_PX = 160f
@@ -106,7 +106,8 @@ object NailPlateCalibration {
         val rawAxisLength: Float
         when {
             thumbMode -> {
-                // MCP→tip is finger length. For the thumb nail, use the visible DIP→tip plate span.
+                // DIP is a proximal anchor, not the cuticle itself. Keep the inferred thumb plate
+                // centered toward the tip so the proximal contour does not paint the thumb skin.
                 axisStartX = dipX
                 axisStartY = dipY
                 rawAxisLength = tipDip
