@@ -117,6 +117,17 @@ class NailContourRefiner {
         val right: SidePoint?,
     )
 
+    private data class ColorFeature(
+        val luma: Float,
+        val saturation: Float,
+    )
+
+    /**
+     * Detects the proximal nail plate boundary as a 2D evidence line.
+     * The landmark only defines where to search; it is not treated as the cuticle.
+     * A candidate must have a consistent transition across the nail width and
+     * a reasonably coherent region on the distal/nail side of that transition.
+     */
     private fun detectCuticle(
         pixels: IntArray,
         width: Int,
@@ -133,40 +144,58 @@ class NailContourRefiner {
 
         for (offset in CUTICLE_SCAN_MIN..CUTICLE_SCAN_MAX) {
             val center = PixelPoint(base.x + ux * offset, base.y + uy * offset)
-            var total = 0f
-            var positive = 0
-            var samples = 0
+            val transitions = ArrayList<Float>(CUTICLE_LATERAL_SAMPLES)
+            val distalFeatures = ArrayList<ColorFeature>(CUTICLE_LATERAL_SAMPLES)
+            val proximalFeatures = ArrayList<ColorFeature>(CUTICLE_LATERAL_SAMPLES)
 
             for (i in 0 until CUTICLE_LATERAL_SAMPLES) {
-                val lateral = ((i.toFloat() / (CUTICLE_LATERAL_SAMPLES - 1)) * 2f - 1f) * halfWidth * 0.82f
+                val lateral = ((i.toFloat() / (CUTICLE_LATERAL_SAMPLES - 1)) * 2f - 1f) * halfWidth * 0.84f
                 val x = center.x + px * lateral
                 val y = center.y + py * lateral
-                val proximal = sampleColor(
-                    pixels, width, height,
-                    x - ux * SAMPLE_DISTANCE,
-                    y - uy * SAMPLE_DISTANCE,
+
+                val proximal = averageFeature(
+                    sampleColor(pixels, width, height, x - ux * CUTICLE_NEAR_DISTANCE, y - uy * CUTICLE_NEAR_DISTANCE),
+                    sampleColor(pixels, width, height, x - ux * CUTICLE_FAR_DISTANCE, y - uy * CUTICLE_FAR_DISTANCE),
                 ) ?: continue
-                val distal = sampleColor(
-                    pixels, width, height,
-                    x + ux * SAMPLE_DISTANCE,
-                    y + uy * SAMPLE_DISTANCE,
+                val distal = averageFeature(
+                    sampleColor(pixels, width, height, x + ux * CUTICLE_NEAR_DISTANCE, y + uy * CUTICLE_NEAR_DISTANCE),
+                    sampleColor(pixels, width, height, x + ux * CUTICLE_FAR_DISTANCE, y + uy * CUTICLE_FAR_DISTANCE),
                 ) ?: continue
-                val contrast = normalizedDistance(proximal, distal)
-                total += contrast
-                if (contrast >= MIN_LINE_CONTRAST) positive++
-                samples++
+
+                transitions += featureDistance(proximal, distal)
+                proximalFeatures += proximal
+                distalFeatures += distal
             }
 
-            if (samples < CUTICLE_LATERAL_SAMPLES * 0.7f) continue
-            val mean = total / samples
-            val continuity = positive.toFloat() / samples
-            val score = mean * CONTRAST_WEIGHT + continuity * CONTINUITY_WEIGHT
+            if (transitions.size < CUTICLE_LATERAL_SAMPLES * 0.7f) continue
 
-            if (continuity >= MIN_CUTICLE_CONTINUITY && score > bestScore) {
+            val meanTransition = transitions.average().toFloat()
+            val continuity = transitions.count { it >= MIN_LINE_CONTRAST }.toFloat() / transitions.size
+            val distalCoherence = featureCoherence(distalFeatures)
+            val proximalCoherence = featureCoherence(proximalFeatures)
+
+            // A real cuticle is a line across the plate, not a single strong pixel edge.
+            val score = (
+                meanTransition * CUTICLE_TRANSITION_WEIGHT +
+                    continuity * CUTICLE_CONTINUITY_WEIGHT +
+                    distalCoherence * CUTICLE_DISTAL_COHERENCE_WEIGHT +
+                    proximalCoherence * CUTICLE_PROXIMAL_COHERENCE_WEIGHT
+                )
+
+            if (continuity >= MIN_CUTICLE_CONTINUITY &&
+                meanTransition >= MIN_CUTICLE_MEAN_TRANSITION &&
+                score > bestScore
+            ) {
                 bestScore = score
                 val left = PixelPoint(center.x - px * halfWidth, center.y - py * halfWidth)
                 val right = PixelPoint(center.x + px * halfWidth, center.y + py * halfWidth)
-                best = Boundary(center, left, right, halfWidth, score.coerceIn(0f, 1f))
+                best = Boundary(
+                    center = center,
+                    left = left,
+                    right = right,
+                    halfWidth = halfWidth,
+                    confidence = score.coerceIn(0f, 1f),
+                )
             }
         }
         return best
@@ -188,9 +217,7 @@ class NailContourRefiner {
 
         for (offset in TIP_SCAN_MIN..TIP_SCAN_MAX) {
             val center = PixelPoint(tip.x + ux * offset, tip.y + uy * offset)
-            val evidence = lineContrast(
-                pixels, width, height, center, ux, uy, halfWidth,
-            )
+            val evidence = lineContrast(pixels, width, height, center, ux, uy, halfWidth)
             if (evidence.score > bestScore && evidence.continuity >= MIN_TIP_CONTINUITY) {
                 bestScore = evidence.score
                 val tipHalf = estimateTipHalfWidth(pixels, width, height, center, px, py, halfWidth)
@@ -223,7 +250,6 @@ class NailContourRefiner {
             val lateral = side * (expectedHalf + delta)
             val boundaryX = center.x + px * lateral
             val boundaryY = center.y + py * lateral
-
             val inside = sampleColor(
                 pixels, width, height,
                 center.x + px * (lateral - side * SAMPLE_DISTANCE),
@@ -234,7 +260,6 @@ class NailContourRefiner {
                 boundaryX + px * side * SAMPLE_DISTANCE,
                 boundaryY + py * side * SAMPLE_DISTANCE,
             ) ?: continue
-
             val score = normalizedDistance(inside, outside)
             if (score > bestScore) {
                 bestScore = score
@@ -242,9 +267,8 @@ class NailContourRefiner {
             }
         }
 
-        return bestPoint?.let {
-            SidePoint(it, bestScore.coerceIn(0f, 1f))
-        }?.takeIf { it.confidence >= MIN_SIDE_POINT_CONFIDENCE }
+        return bestPoint?.let { SidePoint(it, bestScore.coerceIn(0f, 1f)) }
+            ?.takeIf { it.confidence >= MIN_SIDE_POINT_CONFIDENCE }
     }
 
     private data class LineEvidence(val score: Float, val continuity: Float)
@@ -261,7 +285,6 @@ class NailContourRefiner {
         var total = 0f
         var positive = 0
         var samples = 0
-
         for (i in 0 until TIP_LATERAL_SAMPLES) {
             val lateral = ((i.toFloat() / (TIP_LATERAL_SAMPLES - 1)) * 2f - 1f) * halfWidth * 0.82f
             val x = center.x + (-uy) * lateral
@@ -273,14 +296,10 @@ class NailContourRefiner {
             if (contrast >= MIN_LINE_CONTRAST) positive++
             samples++
         }
-
         if (samples == 0) return LineEvidence(0f, 0f)
         val mean = total / samples
         val continuity = positive.toFloat() / samples
-        return LineEvidence(
-            mean * CONTRAST_WEIGHT + continuity * CONTINUITY_WEIGHT,
-            continuity,
-        )
+        return LineEvidence(mean * CONTRAST_WEIGHT + continuity * CONTINUITY_WEIGHT, continuity)
     }
 
     private fun estimateTipHalfWidth(
@@ -308,7 +327,6 @@ class NailContourRefiner {
         return best.coerceIn(nominal * 0.65f, nominal * 1.15f)
     }
 
-    /** Builds one simple, non-self-intersecting contour around the plate. */
     private fun buildContour(
         cuticle: Boundary,
         tip: Boundary,
@@ -320,13 +338,9 @@ class NailContourRefiner {
         py: Float,
     ): List<PixelPoint> {
         val contour = ArrayList<PixelPoint>(left.size + right.size + 10)
-
-        // Samples are ordered proximal -> distal. Walk the left side toward the tip,
-        // then the rounded distal cap, then return along the right side.
         contour += cuticle.left
         contour += left
         contour += tip.left
-
         val capHalf = tip.halfWidth
         for (i in 1 until TIP_CAP_SAMPLES) {
             val t = i.toFloat() / TIP_CAP_SAMPLES
@@ -336,7 +350,6 @@ class NailContourRefiner {
                 tip.center.y + uy * (cos(angle).toFloat() * capHalf * 0.45f) + py * (sin(angle).toFloat() * capHalf),
             )
         }
-
         contour += tip.right
         contour += right.reversed()
         contour += cuticle.right
@@ -351,7 +364,6 @@ class NailContourRefiner {
         nominalHalf: Float,
     ): Boolean {
         if (contour.size < 8) return false
-
         val geometricCenter = averagePoint(geometric)
         val contourCenter = averagePoint(contour)
         val drift = hypot(
@@ -369,10 +381,7 @@ class NailContourRefiner {
     private fun averagePoint(points: List<PixelPoint>): PixelPoint {
         var x = 0f
         var y = 0f
-        points.forEach {
-            x += it.x
-            y += it.y
-        }
+        points.forEach { x += it.x; y += it.y }
         return PixelPoint(x / points.size, y / points.size)
     }
 
@@ -392,40 +401,76 @@ class NailContourRefiner {
     private fun lerpPoint(a: PixelPoint, b: PixelPoint, t: Float): PixelPoint =
         PixelPoint(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
 
-    private fun lerpFloat(a: Float, b: Float, t: Float): Float =
-        a + (b - a) * t
+    private fun lerpFloat(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
-    private fun sampleColor(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        x: Float,
-        y: Float,
-    ): Int? {
+    private fun sampleColor(pixels: IntArray, width: Int, height: Int, x: Float, y: Float): Int? {
         val ix = x.roundToInt()
         val iy = y.roundToInt()
         if (ix !in 0 until width || iy !in 0 until height) return null
         return pixels[iy * width + ix]
     }
 
+    private fun averageFeature(a: Int?, b: Int?): ColorFeature? {
+        if (a == null || b == null) return null
+        val fa = feature(a)
+        val fb = feature(b)
+        return ColorFeature((fa.luma + fb.luma) * 0.5f, (fa.saturation + fb.saturation) * 0.5f)
+    }
+
+    private fun feature(color: Int): ColorFeature {
+        val r = ((color shr 16) and 0xFF) / 255f
+        val g = ((color shr 8) and 0xFF) / 255f
+        val b = (color and 0xFF) / 255f
+        val maxC = max(r, max(g, b))
+        val minC = min(r, min(g, b))
+        return ColorFeature(
+            luma = 0.2126f * r + 0.7152f * g + 0.0722f * b,
+            saturation = maxC - minC,
+        )
+    }
+
+    private fun featureDistance(a: ColorFeature, b: ColorFeature): Float {
+        val dl = abs(a.luma - b.luma)
+        val ds = abs(a.saturation - b.saturation)
+        return (dl * 0.72f + ds * 0.28f).coerceIn(0f, 1f)
+    }
+
+    private fun featureCoherence(features: List<ColorFeature>): Float {
+        if (features.size < 2) return 0f
+        var total = 0f
+        var count = 0
+        for (i in 0 until features.lastIndex) {
+            total += featureDistance(features[i], features[i + 1])
+            count++
+        }
+        val variation = total / count.coerceAtLeast(1)
+        return (1f - variation * COHERENCE_SCALE).coerceIn(0f, 1f)
+    }
+
     private fun normalizedDistance(a: Int, b: Int): Float {
         val dr = ((a shr 16) and 0xFF) - ((b shr 16) and 0xFF)
         val dg = ((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)
         val db = (a and 0xFF) - (b and 0xFF)
-        return (sqrt((dr * dr + dg * dg + db * db).toFloat()) / COLOR_DISTANCE_SCALE)
-            .coerceIn(0f, 1f)
+        return (sqrt((dr * dr + dg * dg + db * db).toFloat()) / COLOR_DISTANCE_SCALE).coerceIn(0f, 1f)
     }
 
     private companion object {
         const val MIN_AXIS_LENGTH = 6f
         const val MIN_HALF_WIDTH = 5f
         const val MAX_HALF_WIDTH = 55f
-        const val CUTICLE_SCAN_MIN = -18
-        const val CUTICLE_SCAN_MAX = 22
+        const val CUTICLE_SCAN_MIN = -24
+        const val CUTICLE_SCAN_MAX = 28
         const val CUTICLE_LATERAL_SAMPLES = 11
-        const val MIN_LINE_CONTRAST = 0.10f
-        const val MIN_CUTICLE_CONTINUITY = 0.55f
-        const val MIN_CUTICLE_CONFIDENCE = 0.16f
+        const val CUTICLE_NEAR_DISTANCE = 4f
+        const val CUTICLE_FAR_DISTANCE = 9f
+        const val MIN_LINE_CONTRAST = 0.045f
+        const val MIN_CUTICLE_MEAN_TRANSITION = 0.055f
+        const val MIN_CUTICLE_CONTINUITY = 0.45f
+        const val MIN_CUTICLE_CONFIDENCE = 0.10f
+        const val CUTICLE_TRANSITION_WEIGHT = 0.55f
+        const val CUTICLE_CONTINUITY_WEIGHT = 0.25f
+        const val CUTICLE_DISTAL_COHERENCE_WEIGHT = 0.15f
+        const val CUTICLE_PROXIMAL_COHERENCE_WEIGHT = 0.05f
         const val TIP_SCAN_MIN = -8
         const val TIP_SCAN_MAX = 16
         const val TIP_LATERAL_SAMPLES = 9
@@ -442,6 +487,7 @@ class NailContourRefiner {
         const val TIP_CAP_SAMPLES = 8
         const val SAMPLE_DISTANCE = 3f
         const val COLOR_DISTANCE_SCALE = 80f
+        const val COHERENCE_SCALE = 2.5f
         const val CONTRAST_WEIGHT = 0.70f
         const val CONTINUITY_WEIGHT = 0.30f
         const val CUTICLE_WEIGHT = 0.45f
