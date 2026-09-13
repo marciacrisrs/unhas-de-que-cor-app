@@ -2,7 +2,7 @@ package br.com.unhasdequecor.data.vision.nail
 
 import android.graphics.Bitmap
 
-/** Conservative facade for the learned mask with bounded anatomical completion. */
+/** Completes a conservative learned seed using axis-aware plate evidence. */
 class NailPlateBoundaryRefiner {
     private val delegate = StrictNailPlateBoundaryRefiner()
 
