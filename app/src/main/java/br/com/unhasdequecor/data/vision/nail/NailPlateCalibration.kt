@@ -8,7 +8,7 @@ object NailPlateCalibration {
     const val SHORT_TIP_DIP_PX = 16f
     const val FACING_TIP_DIP_RATIO = 0.35f
     const val FACING_LENGTH_SCALE = 0.96f
-    const val FACING_WIDTH_SCALE = 0.60f
+    const val FACING_WIDTH_SCALE = 0.66f
     const val THUMB_LENGTH_SCALE = 0.75f
     const val CENTER_ALONG = 0.72f
     const val FACING_CENTER = 0.82f
@@ -25,15 +25,15 @@ object NailPlateCalibration {
     const val ELLIPSE_RY_FACTOR = 0.50f
     const val ELLIPSE_CENTER_Y_BIAS = 0.03f
     const val ELLIPSE_OPAQUE_STOP = 0.76f
-    const val TIP_WIDTH_FACTOR = 0.78f
-    const val MID_WIDTH_FACTOR = 0.86f
-    const val SHORT_MID_WIDTH_FACTOR = 0.86f
-    const val CUTICLE_WIDTH_FACTOR = 0.76f
-    const val TIP_POINT_FACTOR = 0.66f
-    const val SHORT_TIP_POINT_FACTOR = 0.72f
+    const val TIP_WIDTH_FACTOR = 0.88f
+    const val MID_WIDTH_FACTOR = 0.96f
+    const val SHORT_MID_WIDTH_FACTOR = 0.94f
+    const val CUTICLE_WIDTH_FACTOR = 0.90f
+    const val TIP_POINT_FACTOR = 0.58f
+    const val SHORT_TIP_POINT_FACTOR = 0.64f
     const val SHORT_PLATE_ASPECT = 1.28f
-    const val CUTICLE_BACK = 0.98f
-    const val MID_FORWARD = 0.20f
+    const val CUTICLE_BACK = 1.02f
+    const val MID_FORWARD = 0.16f
 
     data class FingerScale(val widthScale: Float, val lengthScale: Float)
     data class PlateGeometry(
@@ -64,16 +64,16 @@ object NailPlateCalibration {
 
     private const val FACING_TIP_DIP_ABS_FLOOR = 0.5f
     private const val USABLE_LENGTH_MIN_FACTOR = 0.85f
-    private const val CUTICLE_PROXIMAL_EXTENSION = 0.18f
-    private const val THUMB_WIDTH_SCALE = 0.82f
-    private const val INDEX_WIDTH_SCALE = 0.80f
-    private const val INDEX_LENGTH_SCALE = 0.86f
-    private const val MIDDLE_WIDTH_SCALE = 0.82f
-    private const val MIDDLE_LENGTH_SCALE = 0.88f
-    private const val RING_WIDTH_SCALE = 0.80f
-    private const val RING_LENGTH_SCALE = 0.86f
-    private const val PINKY_WIDTH_SCALE = 0.78f
-    private const val PINKY_LENGTH_SCALE = 0.82f
+    private const val CUTICLE_PROXIMAL_EXTENSION = 0.22f
+    private const val THUMB_WIDTH_SCALE = 0.88f
+    private const val INDEX_WIDTH_SCALE = 0.88f
+    private const val INDEX_LENGTH_SCALE = 0.94f
+    private const val MIDDLE_WIDTH_SCALE = 0.90f
+    private const val MIDDLE_LENGTH_SCALE = 0.96f
+    private const val RING_WIDTH_SCALE = 0.88f
+    private const val RING_LENGTH_SCALE = 0.94f
+    private const val PINKY_WIDTH_SCALE = 0.86f
+    private const val PINKY_LENGTH_SCALE = 0.90f
 
     fun facingTipDipThresholdPx(tipPipPx: Float): Float =
         maxOf(SHORT_TIP_DIP_PX * FACING_TIP_DIP_ABS_FLOOR, tipPipPx * FACING_TIP_DIP_RATIO)
