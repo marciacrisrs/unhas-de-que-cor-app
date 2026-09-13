@@ -19,7 +19,6 @@ android {
         versionName = "1.0.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Overlay de landmarks/ROI/máscara no try-on. Ative com -PdebugNailOverlay=true
         buildConfigField(
             "boolean",
             "DEBUG_NAIL_OVERLAY",
@@ -31,13 +30,11 @@ android {
         create("release") {
             val rawStorePath = (project.findProperty("RELEASE_STORE_FILE") as String?)
                 ?: System.getenv("RELEASE_STORE_FILE")
-            // Trim + tira aspas “inteligentes”/normais (comum no Windows ao colar path).
             val storeFilePath = rawStorePath
                 ?.trim()
                 ?.trim('"', '\'', '\u201C', '\u201D', '\u2018', '\u2019')
                 ?.takeIf { it.isNotBlank() }
             if (storeFilePath != null) {
-                // rootProject.file: absoluto fica absoluto; relativo à raiz do repo (não :app).
                 storeFile = rootProject.file(storeFilePath)
                 storePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
                     ?: System.getenv("RELEASE_STORE_PASSWORD")
@@ -60,8 +57,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // MediaPipe (.so) → Play pede símbolos nativos p/ crashes/ANRs.
-            // SYMBOL_TABLE: nomes de função (suficiente; FULL estoura tamanho fácil).
             ndk {
                 debugSymbolLevel = "SYMBOL_TABLE"
             }
@@ -69,7 +64,6 @@ android {
             signingConfig = if (releaseSigning.storeFile != null) {
                 releaseSigning
             } else {
-                // CI/local sem keystore: assina com debug (ver docs/release.md).
                 signingConfigs.getByName("debug")
             }
         }
@@ -89,6 +83,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    androidResources {
+        noCompress += "tflite"
     }
 
     packaging {
@@ -148,6 +146,7 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.tensorflow.lite)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
@@ -168,13 +167,31 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
+val nailModelAsset = layout.projectDirectory.file("src/main/assets/nail_segmentation_mobilenet_v2.tflite")
+val nailModelUrl = "https://raw.githubusercontent.com/ferrikrisdiantoro/nail-color-studio/main/256_Nail_Segmentation_MobileNetV2.tflite"
+
+tasks.register("downloadNailSegmentationModel") {
+    outputs.file(nailModelAsset)
+    doLast {
+        if (!nailModelAsset.asFile.exists()) {
+            nailModelAsset.asFile.parentFile.mkdirs()
+            java.net.URI(nailModelUrl).toURL().openStream().use { input ->
+                nailModelAsset.asFile.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("downloadNailSegmentationModel")
+}
+
 tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     jvmTarget.set("17")
     exclude("**/build/**")
     reports {
         html.required.set(true)
         sarif.required.set(true)
-        // Checkstyle XML → sonar.kotlin.detekt.reportPaths
         checkstyle.required.set(true)
         markdown.required.set(true)
     }
@@ -193,7 +210,6 @@ val domainCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/domain/**",
 )
 
-/** Pacotes/classes com testes unitários estáveis — relatório Sonar. */
 val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/domain/**",
     "**/br/com/unhasdequecor/data/catalog/**",
@@ -218,10 +234,10 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/data/vision/nail/DetectionFailureDiagnostics*",
     "**/br/com/unhasdequecor/data/vision/nail/TryOnPreviewLabels*",
     "**/br/com/unhasdequecor/data/vision/nail/LiveTryOnClaimMapper*",
-    "**/br/com/unhasdequecor/data/vision/HandInferenceEnhancer*",
-    "**/br/com/unhasdequecor/data/vision/HandLandmarkQuality*",
-    "**/br/com/unhasdequecor/data/vision/HandPresenceScoring*",
-    "**/br/com/unhasdequecor/data/vision/HandLandmarks*",
+    "**/br/com/unhasdequecor/data/vision/nail/HandInferenceEnhancer*",
+    "**/br/com/unhasdequecor/data/vision/nail/HandLandmarkQuality*",
+    "**/br/com/unhasdequecor/data/vision/nail/HandPresenceScoring*",
+    "**/br/com/unhasdequecor/data/vision/nail/HandLandmarks*",
     "**/br/com/unhasdequecor/data/repository/HistoryRepositoryImpl*",
     "**/br/com/unhasdequecor/ui/history/HistoryViewModel*",
     "**/br/com/unhasdequecor/ui/result/ResultViewModel*",
@@ -260,7 +276,6 @@ val jacocoExcludes = listOf(
 
 fun Project.jacocoClassDirectories(includes: List<String>): FileCollection {
     val buildDirPath = layout.buildDirectory.get().asFile
-    // AGP 9 (built-in Kotlin compiler): classes live under intermediates/, not tmp/kotlin-classes.
     val kotlinTree = fileTree(
         buildDirPath.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"),
     ) {
@@ -292,13 +307,11 @@ tasks.register<JacocoReport>("jacocoDomainReport") {
     group = "verification"
     description = "Gera relatório JaCoCo focado no pacote domain."
     dependsOn("testDebugUnitTest")
-
     reports {
         xml.required.set(true)
         html.required.set(true)
         csv.required.set(false)
     }
-
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(domainClassDirectories())
     executionData.setFrom(jacocoExecutionData())
@@ -308,13 +321,11 @@ tasks.register<JacocoReport>("jacocoAppReport") {
     group = "verification"
     description = "Gera relatório JaCoCo da lógica coberta por testes unitários (domain + data + VMs)."
     dependsOn("testDebugUnitTest")
-
     reports {
         xml.required.set(true)
         html.required.set(true)
         csv.required.set(false)
     }
-
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(appClassDirectories())
     executionData.setFrom(jacocoExecutionData())
@@ -324,11 +335,9 @@ tasks.register<JacocoCoverageVerification>("jacocoDomainCoverageVerification") {
     group = "verification"
     description = "Exige ≥80% de cobertura de linhas no pacote domain."
     dependsOn("jacocoDomainReport")
-
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(domainClassDirectories())
     executionData.setFrom(jacocoExecutionData())
-
     violationRules {
         rule {
             limit {
@@ -344,11 +353,9 @@ tasks.register<JacocoCoverageVerification>("jacocoAppCoverageVerification") {
     group = "verification"
     description = "Exige ≥80% de cobertura de linhas no escopo app (relatório Sonar)."
     dependsOn("jacocoAppReport")
-
     sourceDirectories.setFrom(files("src/main/java"))
     classDirectories.setFrom(appClassDirectories())
     executionData.setFrom(jacocoExecutionData())
-
     violationRules {
         rule {
             limit {
