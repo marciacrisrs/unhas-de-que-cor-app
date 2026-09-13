@@ -163,14 +163,29 @@ class NailContourEdgeSpecialist {
         return abs(inside - outside) * COARSE_EDGE_WEIGHT + abs(fineInside - fineOutside) * FINE_EDGE_WEIGHT
     }
 
+    /** Bilinear luma sampling keeps the edge search genuinely sub-pixel. */
     private fun sampleLuma(pixels: IntArray, width: Int, height: Int, x: Float, y: Float): Float {
-        val ix = x.toInt().coerceIn(0, width - 1)
-        val iy = y.toInt().coerceIn(0, height - 1)
-        val px = pixels[iy * width + ix]
-        val r = (px shr RED_SHIFT and CHANNEL_MASK) / CHANNEL_MAX
-        val g = (px shr GREEN_SHIFT and CHANNEL_MASK) / CHANNEL_MAX
-        val b = (px and CHANNEL_MASK) / CHANNEL_MAX
-        return LUMA_RED * r + LUMA_GREEN * g + LUMA_BLUE * b
+        val clampedX = x.coerceIn(0f, (width - 1).toFloat())
+        val clampedY = y.coerceIn(0f, (height - 1).toFloat())
+        val x0 = floor(clampedX).toInt()
+        val y0 = floor(clampedY).toInt()
+        val x1 = min(x0 + 1, width - 1)
+        val y1 = min(y0 + 1, height - 1)
+        val fx = clampedX - x0
+        val fy = clampedY - y0
+
+        fun lumaAt(px: Int): Float {
+            val r = (px shr RED_SHIFT and CHANNEL_MASK) / CHANNEL_MAX
+            val g = (px shr GREEN_SHIFT and CHANNEL_MASK) / CHANNEL_MAX
+            val b = (px and CHANNEL_MASK) / CHANNEL_MAX
+            return LUMA_RED * r + LUMA_GREEN * g + LUMA_BLUE * b
+        }
+
+        val top = lumaAt(pixels[y0 * width + x0]) * (1f - fx) +
+            lumaAt(pixels[y0 * width + x1]) * fx
+        val bottom = lumaAt(pixels[y1 * width + x0]) * (1f - fx) +
+            lumaAt(pixels[y1 * width + x1]) * fx
+        return top * (1f - fy) + bottom * fy
     }
 
     private fun smooth(values: FloatArray): FloatArray {
@@ -244,7 +259,7 @@ class NailContourEdgeSpecialist {
         }
 
         fun xAt(t: Float, s: Float) = bx + t * ux + s * vx
-        fun yAt(t: Float, s: Float) = by + t * uy + s * vy
+        fun yAt(t: Float, s: Float) = by + t * ux * 0f + t * uy + s * vy
         fun point(t: Float, s: Float, mask: NailMask) = ImageCoordinates.PixelPoint(
             bx + t * ux + s * vx + mask.originX,
             by + t * uy + s * vy + mask.originY,
