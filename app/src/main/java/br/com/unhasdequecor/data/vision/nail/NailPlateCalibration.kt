@@ -198,7 +198,7 @@ object NailPlateCalibration {
         val overshootPx = overshootBase * TIP_OVERSHOOT
         val centerT = centerAlong(thumbMode, facing)
         val centerX = axisStartX + dirX * centerT + ux * overshootPx
-        val centerY = axisStartY + dirY * centerT + uy * centerT * 0f + uy * overshootPx
+        val centerY = axisStartY + dirY * centerT + uy * overshootPx
         val rotation = Math.toDegrees(atan2(dirX.toDouble(), -dirY.toDouble())).toFloat()
 
         return PlateGeometry(
