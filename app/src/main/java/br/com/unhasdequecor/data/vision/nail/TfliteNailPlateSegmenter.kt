@@ -19,12 +19,9 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Learned nail-plate segmenter.
- *
- * MediaPipe/ROI remain the spatial prior. The TFLite model is responsible for
- * deciding which pixels in that prior are actually nail plate. The mask is
- * then cleaned by a single-component constraint so another finger cannot leak
- * into the current nail.
+ * Learned nail-plate segmenter followed by a strict pixel-level boundary
+ * refiner. MediaPipe/ROI provide localization only; the learned model supplies
+ * a high-precision seed and the refiner recovers the full plate conservatively.
  */
 @Singleton
 class TfliteNailPlateSegmenter @Inject constructor(
@@ -32,6 +29,7 @@ class TfliteNailPlateSegmenter @Inject constructor(
 ) : NailSegmenter {
 
     private val lock = Any()
+    private val boundaryRefiner = NailPlateBoundaryRefiner()
     private var interpreter: Interpreter? = null
 
     override fun segment(image: Bitmap, roi: NailRoi): NailMask? {
@@ -77,10 +75,9 @@ class TfliteNailPlateSegmenter @Inject constructor(
             return null
         }
         val modelMask = probabilityToBitmap(probability, inputWidth, inputHeight)
-        val fullMask = projectMaskToRoi(
+        val fullMask = projectMaskToContext(
             modelMask = modelMask,
             contextBounds = contextRect,
-            roiBounds = roiRect,
         )
         modelMask.recycle()
         inputBitmap.recycle()
@@ -91,27 +88,21 @@ class TfliteNailPlateSegmenter @Inject constructor(
         )
         val cleaned = keepNailComponent(
             alpha = fullMask,
-            width = roiRect.width(),
-            height = roiRect.height(),
+            width = contextRect.width(),
+            height = contextRect.height(),
             seed = midpoint,
-            originX = roiRect.left,
-            originY = roiRect.top,
+            originX = contextRect.left,
+            originY = contextRect.top,
         ) ?: return null
 
-        return NailMask(
-            width = roiRect.width(),
-            height = roiRect.height(),
+        val seedMask = NailMask(
+            width = contextRect.width(),
+            height = contextRect.height(),
             alpha = cleaned,
-            originX = roiRect.left,
-            originY = roiRect.top,
-            boundaryPolygon = buildBoundaryPolygon(
-                alpha = cleaned,
-                width = roiRect.width(),
-                height = roiRect.height(),
-                originX = roiRect.left,
-                originY = roiRect.top,
-            ),
+            originX = contextRect.left,
+            originY = contextRect.top,
         )
+        return boundaryRefiner.refine(image, roi, seedMask)
     }
 
     private fun getInterpreter(): Interpreter? {
@@ -194,14 +185,16 @@ class TfliteNailPlateSegmenter @Inject constructor(
         val values = FloatArray(height * width)
         val dataType = tensor.dataType()
         val quantization = tensor.quantizationParams()
-        val positiveChannel = if (channels == 1) 0 else channels - 1
         for (index in values.indices) {
-            var selected = 0f
+            val channelValues = FloatArray(channels)
             for (channel in 0 until channels) {
-                val value = readValue(buffer, dataType, quantization)
-                if (channel == positiveChannel) selected = value
+                channelValues[channel] = readValue(buffer, dataType, quantization)
             }
-            values[index] = normalizeProbability(selected)
+            values[index] = if (channels == 1) {
+                normalizeProbability(channelValues[0])
+            } else {
+                softmaxPositive(channelValues)
+            }
         }
         return values
     }
@@ -219,15 +212,22 @@ class TfliteNailPlateSegmenter @Inject constructor(
         }
         return when (dataType) {
             DataType.FLOAT32 -> raw
-            DataType.UINT8, DataType.INT8 -> raw * quantization.scale + quantization.zeroPoint
+            DataType.UINT8, DataType.INT8 -> (raw - quantization.zeroPoint) * quantization.scale
             else -> raw
         }
     }
 
     private fun normalizeProbability(value: Float): Float = when {
         value in 0f..1f -> value
-        value > 0f -> 1f / (1f + exp(-value))
-        else -> 0f
+        else -> 1f / (1f + exp(-value))
+    }
+
+    private fun softmaxPositive(values: FloatArray): Float {
+        val maxValue = values.maxOrNull() ?: return 0f
+        var sum = 0f
+        for (value in values) sum += exp(value - maxValue)
+        val positive = exp(values.last() - maxValue)
+        return (positive / sum).coerceIn(0f, 1f)
     }
 
     private fun probabilityToBitmap(probability: FloatArray, width: Int, height: Int): Bitmap {
@@ -254,19 +254,17 @@ class TfliteNailPlateSegmenter @Inject constructor(
         )
     }
 
-    private fun projectMaskToRoi(modelMask: Bitmap, contextBounds: Rect, roiBounds: Rect): ByteArray {
-        val width = roiBounds.width()
-        val height = roiBounds.height()
+    private fun projectMaskToContext(modelMask: Bitmap, contextBounds: Rect): ByteArray {
+        val width = contextBounds.width()
+        val height = contextBounds.height()
         val source = IntArray(modelMask.width * modelMask.height)
         modelMask.getPixels(source, 0, modelMask.width, 0, 0, modelMask.width, modelMask.height)
         val alpha = ByteArray(width * height)
         for (y in 0 until height) {
-            val imageY = roiBounds.top + y
-            val sy = ((imageY - contextBounds.top).toFloat() / contextBounds.height() * modelMask.height)
+            val sy = (y.toFloat() / height * modelMask.height)
                 .roundToInt().coerceIn(0, modelMask.height - 1)
             for (x in 0 until width) {
-                val imageX = roiBounds.left + x
-                val sx = ((imageX - contextBounds.left).toFloat() / contextBounds.width() * modelMask.width)
+                val sx = (x.toFloat() / width * modelMask.width)
                     .roundToInt().coerceIn(0, modelMask.width - 1)
                 alpha[y * width + x] = (source[sy * modelMask.width + sx] ushr 24).toByte()
             }
@@ -289,19 +287,21 @@ class TfliteNailPlateSegmenter @Inject constructor(
         val seedY = (seed.y - originY).roundToInt().coerceIn(0, height - 1)
         val visited = BooleanArray(binary.size)
         val queue = IntArray(binary.size)
+        var head = 0
+        var tail = 0
         var best: IntArray? = null
         var bestContainsSeed = false
 
         for (start in binary.indices) {
             if (!binary[start] || visited[start]) continue
-            var head = 0
-            var tail = 0
-            queue[tail++] = start
+            var componentHead = 0
+            var componentTail = 0
+            queue[componentTail++] = start
             visited[start] = true
             val points = ArrayList<Int>()
             var containsSeed = false
-            while (head < tail) {
-                val current = queue[head++]
+            while (componentHead < componentTail) {
+                val current = queue[componentHead++]
                 points += current
                 containsSeed = containsSeed || current == seedY * width + seedX
                 val x = current % width
@@ -309,7 +309,7 @@ class TfliteNailPlateSegmenter @Inject constructor(
                 for (neighbor in neighbors(x, y, width, height)) {
                     if (binary[neighbor] && !visited[neighbor]) {
                         visited[neighbor] = true
-                        queue[tail++] = neighbor
+                        queue[componentTail++] = neighbor
                     }
                 }
             }
@@ -336,42 +336,6 @@ class TfliteNailPlateSegmenter @Inject constructor(
         return result.copyOf(count)
     }
 
-    private fun buildBoundaryPolygon(
-        alpha: ByteArray,
-        width: Int,
-        height: Int,
-        originX: Int,
-        originY: Int,
-    ): List<PixelPoint>? {
-        val rows = ArrayList<Triple<Int, Int, Int>>()
-        for (y in 0 until height) {
-            var minX = width
-            var maxX = -1
-            for (x in 0 until width) {
-                if ((alpha[y * width + x].toInt() and 0xFF) >= MODEL_THRESHOLD) {
-                    minX = min(minX, x)
-                    maxX = max(maxX, x)
-                }
-            }
-            if (maxX >= minX) rows += Triple(y, minX, maxX)
-        }
-        if (rows.size < MIN_BOUNDARY_ROWS) return null
-
-        val polygon = ArrayList<PixelPoint>(rows.size * 2)
-        rows.forEachIndexed { index, row ->
-            if (index % BOUNDARY_STEP == 0) {
-                polygon += PixelPoint(row.second + originX, row.first + originY)
-            }
-        }
-        rows.indices.reversed().forEach { index ->
-            if (index % BOUNDARY_STEP == 0) {
-                val row = rows[index]
-                polygon += PixelPoint(row.third + originX, row.first + originY)
-            }
-        }
-        return polygon.takeIf { it.size >= 3 }
-    }
-
     private fun validBounds(bounds: ImageCoordinates.PixelRect, image: Bitmap): Boolean =
         bounds.left >= 0 && bounds.top >= 0 &&
             bounds.right <= image.width && bounds.bottom <= image.height
@@ -385,14 +349,12 @@ class TfliteNailPlateSegmenter @Inject constructor(
 
     private companion object {
         const val MODEL_ASSET = "nail_segmentation_mobilenet_v2.tflite"
-        const val CONTEXT_FACTOR = 1.35f
+        const val CONTEXT_FACTOR = 1.75f
         const val INFERENCE_THREADS = 2
         const val CHANNELS = 3
         const val MIN_SIZE = 12
         const val MODEL_THRESHOLD = 128
         const val MIN_COMPONENT_PIXELS = 12
-        const val MIN_BOUNDARY_ROWS = 4
-        const val BOUNDARY_STEP = 2
         const val MAX_SEGMENT_CHANNELS = 4
     }
 }
