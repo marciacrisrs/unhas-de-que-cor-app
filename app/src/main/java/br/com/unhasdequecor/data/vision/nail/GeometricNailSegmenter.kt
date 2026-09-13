@@ -88,6 +88,8 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
             var bestScore = Float.NEGATIVE_INFINITY
             var bestOffset = 0f
 
+            // A borda geométrica pode estar significativamente para dentro da
+            // placa real. Procuramos além dela antes de desistir da evidência.
             for (offset in -SEARCH_INWARD..SEARCH_OUTWARD) {
                 val cx = point.x + nx * offset
                 val cy = point.y + ny * offset
@@ -104,7 +106,7 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
                 val shift = bestOffset.coerceIn(-MAX_INWARD_SHIFT, MAX_OUTWARD_SHIFT)
                 candidates += PixelPoint(point.x + nx * shift, point.y + ny * shift)
                 evidenceSum += bestScore
-                if (abs(shift) >= 1f) movedCount++
+                if (abs(shift) >= MIN_MEANINGFUL_SHIFT) movedCount++
             }
         }
 
@@ -272,15 +274,16 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         const val MASK_SOLID = 128
         const val MIN_ABSOLUTE_KEEP = 8
         const val FEATHER_RADIUS = 2
-        const val SEARCH_INWARD = 8
-        const val SEARCH_OUTWARD = 8
-        const val MAX_INWARD_SHIFT = 6f
-        const val MAX_OUTWARD_SHIFT = 8f
+        const val SEARCH_INWARD = 12
+        const val SEARCH_OUTWARD = 24
+        const val MAX_INWARD_SHIFT = 10f
+        const val MAX_OUTWARD_SHIFT = 20f
         const val SAMPLE_DISTANCE = 2.5f
         const val COLOR_DISTANCE_SCALE = 80f
         const val CONTRAST_WEIGHT = 0.70f
         const val TRANSITION_WEIGHT = 0.30f
         const val MIN_EDGE_SCORE = 0.16f
+        const val MIN_MEANINGFUL_SHIFT = 1f
         const val MIN_MOVED_FRACTION = 0.18f
         const val MIN_AVERAGE_EVIDENCE = 0.10f
         const val CURRENT_WEIGHT = 0.72f
