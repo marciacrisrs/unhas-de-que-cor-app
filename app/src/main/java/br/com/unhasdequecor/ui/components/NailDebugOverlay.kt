@@ -25,8 +25,9 @@ import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetricsSnapshot
  *
  * A máscara atual é desenhada diretamente por cima da foto, sem alterar a
  * segmentação. Isso permite separar visualmente:
- * - amarelo: ROI estimada;
- * - verde: polígono geométrico/prior;
+ * - amarelo: ROI de busca;
+ * - azul: prior geométrico original;
+ * - verde: contorno efetivamente usado pela NailMask;
  * - vermelho: NailMask efetivamente entregue ao renderizador.
  */
 @Composable
@@ -62,17 +63,27 @@ fun NailDebugOverlay(
                     size = Size(b.width() * sx, b.height() * sy),
                     style = Stroke(width = 2f),
                 )
-                val path = Path()
-                nail.roi.polygon.forEachIndexed { index, p ->
-                    val o = Offset(p.x * sx, p.y * sy)
-                    if (index == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
-                }
-                path.close()
-                drawPath(
-                    path,
-                    color = Color(0xFF7CFF00).copy(alpha = 0.9f),
-                    style = Stroke(width = 2.5f),
+
+                // Prior geométrico: mostra de onde o segmentador partiu.
+                drawPolygon(
+                    points = nail.roi.polygon,
+                    sx = sx,
+                    sy = sy,
+                    color = Color.Blue.copy(alpha = 0.75f),
+                    strokeWidth = 2f,
                 )
+
+                // Contorno efetivo da NailMask: este é o limite que precisa
+                // acompanhar a placa real, e não apenas a geometria sintética.
+                nail.mask.boundaryPolygon?.let { boundary ->
+                    drawPolygon(
+                        points = boundary,
+                        sx = sx,
+                        sy = sy,
+                        color = Color(0xFF7CFF00).copy(alpha = 0.95f),
+                        strokeWidth = 2.5f,
+                    )
+                }
             }
         }
 
@@ -104,6 +115,23 @@ fun NailDebugOverlay(
             }
         }
     }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolygon(
+    points: List<br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint>,
+    sx: Float,
+    sy: Float,
+    color: Color,
+    strokeWidth: Float,
+) {
+    if (points.size < 3) return
+    val path = Path()
+    points.forEachIndexed { index, p ->
+        val o = Offset(p.x * sx, p.y * sy)
+        if (index == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
+    }
+    path.close()
+    drawPath(path, color = color, style = Stroke(width = strokeWidth))
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(
