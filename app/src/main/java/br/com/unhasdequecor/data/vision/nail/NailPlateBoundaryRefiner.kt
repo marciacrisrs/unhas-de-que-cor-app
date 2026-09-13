@@ -1,17 +1,13 @@
 package br.com.unhasdequecor.data.vision.nail
 
-import android.graphics.Bitmap
-
 /**
- * Compatibility facade for the strict nail-plate boundary refiner.
+ * Compatibility pass-through for the learned segmentation path.
  *
- * The strict implementation owns the production refinement rules. Keeping
- * this facade preserves existing callers while avoiding a second, divergent
- * refinement implementation.
+ * The visual baseline is now the learned nail segmentation model itself.
+ * Classical color/geometry expansion is intentionally not part of this path:
+ * the model output must be evaluated on its own before another heuristic is
+ * allowed to change the physical nail boundary.
  */
 class NailPlateBoundaryRefiner {
-    private val delegate = StrictNailPlateBoundaryRefiner()
-
-    fun refine(image: Bitmap, roi: NailRoi, seedMask: NailMask): NailMask? =
-        delegate.refine(image, roi, seedMask)
+    fun refine(image: android.graphics.Bitmap, roi: NailRoi, seedMask: NailMask): NailMask? = seedMask
 }
