@@ -1,0 +1,52 @@
+name: Update dependency verification metadata
+
+on:
+  push:
+    paths:
+      - .github/workflows/update-verification-metadata.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add narrowly scoped trusted artifacts
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("gradle/verification-metadata.xml")
+          text = path.read_text(encoding="utf-8")
+
+          marker = "      <trusted-artifacts>\n"
+          entries = [
+              '         <trust group="com.google.ai.edge.litert" name="litert" version="1.0.1" reason="Google AI Edge LiteRT 1.0.1 resolved from Google Maven"/>\n',
+              '         <trust group="com.google.ai.edge.litert" name="litert-api" version="1.0.1" reason="Google AI Edge LiteRT API 1.0.1 resolved from Google Maven"/>\n',
+              '         <trust group="org.tensorflow" name="tensorflow-lite" version="2.17.0" reason="TensorFlow Lite 2.17.0 relocation metadata resolved from Maven Central"/>\n',
+          ]
+
+          if marker not in text:
+              raise SystemExit("trusted-artifacts section not found")
+
+          missing = [entry for entry in entries if entry.strip() not in text]
+          if missing:
+              text = text.replace(marker, marker + "".join(missing), 1)
+              path.write_text(text, encoding="utf-8")
+
+      - name: Commit metadata
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gradle/verification-metadata.xml
+          if git diff --cached --quiet; then
+            echo "No metadata changes needed"
+            exit 0
+          fi
+          git commit -m "build: trust LiteRT dependency artifacts"
+          git push
