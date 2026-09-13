@@ -126,10 +126,20 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         nx: Float,
         ny: Float,
     ): Float {
-        val inner = sampleColor(pixels, width, height, cx - nx * SAMPLE_DISTANCE)
-            ?: return Float.NEGATIVE_INFINITY
-        val outer = sampleColor(pixels, width, height, cx + nx * SAMPLE_DISTANCE)
-            ?: return Float.NEGATIVE_INFINITY
+        val inner = sampleColor(
+            pixels,
+            width,
+            height,
+            cx - nx * SAMPLE_DISTANCE,
+            cy - ny * SAMPLE_DISTANCE,
+        ) ?: return Float.NEGATIVE_INFINITY
+        val outer = sampleColor(
+            pixels,
+            width,
+            height,
+            cx + nx * SAMPLE_DISTANCE,
+            cy + ny * SAMPLE_DISTANCE,
+        ) ?: return Float.NEGATIVE_INFINITY
         val center = sampleColor(pixels, width, height, cx, cy)
             ?: return Float.NEGATIVE_INFINITY
 
