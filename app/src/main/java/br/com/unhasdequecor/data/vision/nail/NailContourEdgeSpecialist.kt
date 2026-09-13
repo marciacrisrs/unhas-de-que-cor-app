@@ -33,7 +33,17 @@ class NailContourEdgeSpecialist {
             val pos = t - bins.first()
             val lo = interpolate(left, pos) ?: continue
             val hi = interpolate(right, pos) ?: continue
-            if (s in lo..hi && withinObservedBand(t, s, observed, bins)) alpha[i] = FULL_ALPHA
+            if (!withinObservedBand(t, s, observed, bins)) continue
+
+            val boundaryDistance = min(s - lo, hi - s)
+            val coverage = when {
+                boundaryDistance >= FEATHER_WIDTH -> 1f
+                boundaryDistance <= 0f -> 0f
+                else -> boundaryDistance / FEATHER_WIDTH
+            }
+            if (coverage > 0f) {
+                alpha[i] = (coverage * FULL_ALPHA_VALUE).toInt().coerceIn(1, FULL_ALPHA_VALUE).toByte()
+            }
         }
         return mask.copy(alpha = alpha, boundaryPolygon = polygon(bins, left, right, frame, mask))
     }
@@ -52,11 +62,7 @@ class NailContourEdgeSpecialist {
         return out
     }
 
-    /**
-     * Finds one globally coherent boundary path instead of greedily choosing
-     * the strongest local edge at each cross-section. This prevents wrinkles
-     * and texture from turning into the small lateral zig-zags seen in debug.
-     */
+    /** Finds one globally coherent boundary path instead of greedily choosing local edges. */
     private fun traceBoundary(
         pixels: IntArray,
         width: Int,
@@ -140,26 +146,10 @@ class NailContourEdgeSpecialist {
         s: Float,
         side: Int,
     ): Float {
-        val inside = sampleLuma(
-            pixels, width, height,
-            frame.xAt(t, s - side * SAMPLE_OFFSET),
-            frame.yAt(t, s - side * SAMPLE_OFFSET),
-        )
-        val outside = sampleLuma(
-            pixels, width, height,
-            frame.xAt(t, s + side * SAMPLE_OFFSET),
-            frame.yAt(t, s + side * SAMPLE_OFFSET),
-        )
-        val fineInside = sampleLuma(
-            pixels, width, height,
-            frame.xAt(t, s - side * FINE_SAMPLE_OFFSET),
-            frame.yAt(t, s - side * FINE_SAMPLE_OFFSET),
-        )
-        val fineOutside = sampleLuma(
-            pixels, width, height,
-            frame.xAt(t, s + side * FINE_SAMPLE_OFFSET),
-            frame.yAt(t, s + side * FINE_SAMPLE_OFFSET),
-        )
+        val inside = sampleLuma(pixels, width, height, frame.xAt(t, s - side * SAMPLE_OFFSET), frame.yAt(t, s - side * SAMPLE_OFFSET))
+        val outside = sampleLuma(pixels, width, height, frame.xAt(t, s + side * SAMPLE_OFFSET), frame.yAt(t, s + side * SAMPLE_OFFSET))
+        val fineInside = sampleLuma(pixels, width, height, frame.xAt(t, s - side * FINE_SAMPLE_OFFSET), frame.yAt(t, s - side * FINE_SAMPLE_OFFSET))
+        val fineOutside = sampleLuma(pixels, width, height, frame.xAt(t, s + side * FINE_SAMPLE_OFFSET), frame.yAt(t, s + side * FINE_SAMPLE_OFFSET))
         return abs(inside - outside) * COARSE_EDGE_WEIGHT + abs(fineInside - fineOutside) * FINE_EDGE_WEIGHT
     }
 
@@ -181,10 +171,8 @@ class NailContourEdgeSpecialist {
             return LUMA_RED * r + LUMA_GREEN * g + LUMA_BLUE * b
         }
 
-        val top = lumaAt(pixels[y0 * width + x0]) * (1f - fx) +
-            lumaAt(pixels[y0 * width + x1]) * fx
-        val bottom = lumaAt(pixels[y1 * width + x0]) * (1f - fx) +
-            lumaAt(pixels[y1 * width + x1]) * fx
+        val top = lumaAt(pixels[y0 * width + x0]) * (1f - fx) + lumaAt(pixels[y0 * width + x1]) * fx
+        val bottom = lumaAt(pixels[y1 * width + x0]) * (1f - fx) + lumaAt(pixels[y1 * width + x1]) * fx
         return top * (1f - fy) + bottom * fy
     }
 
@@ -259,7 +247,7 @@ class NailContourEdgeSpecialist {
         }
 
         fun xAt(t: Float, s: Float) = bx + t * ux + s * vx
-        fun yAt(t: Float, s: Float) = by + t * ux * 0f + t * uy + s * vy
+        fun yAt(t: Float, s: Float) = by + t * uy + s * vy
         fun point(t: Float, s: Float, mask: NailMask) = ImageCoordinates.PixelPoint(
             bx + t * ux + s * vx + mask.originX,
             by + t * uy + s * vy + mask.originY,
@@ -302,9 +290,10 @@ class NailContourEdgeSpecialist {
         const val OUT_OF_BOUNDS_SCORE = -1f
         const val COARSE_EDGE_WEIGHT = 0.75f
         const val FINE_EDGE_WEIGHT = 0.25f
+        const val FEATHER_WIDTH = 1.25f
+        const val FULL_ALPHA_VALUE = 255
         const val TWO = 2f
         const val PIXEL_CENTER = 0.5f
-        const val FULL_ALPHA: Byte = -1
         const val NO_PREVIOUS = -1
         const val RED_SHIFT = 16
         const val GREEN_SHIFT = 8
