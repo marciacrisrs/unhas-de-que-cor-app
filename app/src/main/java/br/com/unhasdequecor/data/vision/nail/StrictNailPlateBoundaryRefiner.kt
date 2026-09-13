@@ -24,7 +24,7 @@ class StrictNailPlateBoundaryRefiner {
         val grown = grow(pixels, seed, nail, skin, envelope, extent, w, h)
         val safe = prune(pixels, grown, seed, nail, skin, envelope, w, h)
         if (safe.count { (it.toInt() and 255) > 0 } < 20) return null
-        val polygon = polygon(safe, w, h, seedMask.originX, seedMask.originY) ?: return null
+        val polygon = polygon(safe, w, h, seedMask.originX, seedMask.originY, frame) ?: return null
         return seedMask.copy(alpha = safe, boundaryPolygon = polygon)
     }
 
@@ -32,6 +32,8 @@ class StrictNailPlateBoundaryRefiner {
     private data class M(val f: F)
     private data class Frame(val bx: Float, val by: Float, val ux: Float, val uy: Float, val vx: Float, val vy: Float) {
         fun p(x: Float, y: Float): Pair<Float, Float> = Pair((x - bx) * ux + (y - by) * uy, (x - bx) * vx + (y - by) * vy)
+        fun point(t: Float, s: Float, ox: Int, oy: Int): ImageCoordinates.PixelPoint =
+            ImageCoordinates.PixelPoint(bx + t * ux + s * vx + ox, by + t * uy + s * vy + oy)
     }
     private data class Extent(val minT: Float, val maxT: Float, val halfS: Float)
     private data class Env(val minT: Float, val maxT: Float, val half: Float, val frame: Frame) {
@@ -152,9 +154,6 @@ class StrictNailPlateBoundaryRefiner {
                 out[i] = 0
                 continue
             }
-            // Similarity rejection is applied only on the actual boundary.
-            // Carving interior pixels was creating the triangular notches seen
-            // on otherwise correctly covered nail plates.
             if (!isBoundaryPixel(out, x, y, w, h)) continue
             val nm = similarity(feature(p[i]), nail)
             val ns = skin?.let { similarity(feature(p[i]), it) } ?: 0f
@@ -236,34 +235,49 @@ class StrictNailPlateBoundaryRefiner {
         return (1f - (rgb * .58f + abs(a.y - m.f.y) * .27f + abs(a.s - m.f.s) * .15f)).coerceIn(0f, 1f)
     }
 
-    private fun polygon(mask: ByteArray, w: Int, h: Int, ox: Int, oy: Int): List<ImageCoordinates.PixelPoint>? {
-        val rows = ArrayList<Triple<Int, Int, Int>>()
-        for (y in 0 until h) {
-            var left = w
-            var right = -1
-            for (x in 0 until w) if ((mask[y * w + x].toInt() and 255) >= 255) {
-                left = min(left, x)
-                right = max(right, x)
-            }
-            if (right >= left) rows += Triple(y, left, right)
+    /** Builds the safety/debug polygon in the nail's longitudinal frame. */
+    private fun polygon(
+        mask: ByteArray,
+        w: Int,
+        h: Int,
+        ox: Int,
+        oy: Int,
+        frame: Frame,
+    ): List<ImageCoordinates.PixelPoint>? {
+        val profiles = HashMap<Int, Pair<Float, Float>>()
+        for (i in mask.indices) {
+            if ((mask[i].toInt() and 255) < 255) continue
+            val x = i % w
+            val y = i / w
+            val (t, s) = frame.p(x + PIXEL_CENTER, y + PIXEL_CENTER)
+            val bin = kotlin.math.floor(t).toInt()
+            val current = profiles[bin]
+            profiles[bin] = if (current == null) Pair(s, s) else Pair(min(current.first, s), max(current.second, s))
         }
-        if (rows.size < 4) return null
-        val leftProfile = smoothProfile(rows.map { it.second.toFloat() })
-        val rightProfile = smoothProfile(rows.map { it.third.toFloat() })
-        val out = ArrayList<ImageCoordinates.PixelPoint>(rows.size * 2)
-        rows.forEachIndexed { i, row ->
-            if (i % 2 == 0) out += ImageCoordinates.PixelPoint(leftProfile[i] + ox, row.first.toFloat() + oy)
+        if (profiles.size < 4) return null
+
+        val bins = profiles.keys.sorted()
+        val left = smoothProfile(bins.map { profiles.getValue(it).first })
+        val right = smoothProfile(bins.map { profiles.getValue(it).second })
+        val stride = max(1, bins.size / MAX_POLYGON_POINTS)
+        val out = ArrayList<ImageCoordinates.PixelPoint>(MAX_POLYGON_POINTS * 2)
+        for (i in bins.indices step stride) {
+            out += frame.point(bins[i].toFloat(), left[i] - POLYGON_MARGIN, ox, oy)
         }
-        rows.indices.reversed().forEach { i ->
-            if (i % 2 == 0) out += ImageCoordinates.PixelPoint(rightProfile[i] + ox, rows[i].first.toFloat() + oy)
+        var i = bins.lastIndex
+        while (i >= 0) {
+            out += frame.point(bins[i].toFloat(), right[i] + POLYGON_MARGIN, ox, oy)
+            i -= stride
         }
-        return out.takeIf { it.size >= 3 }
+        return out.takeIf { it.size >= MIN_POLYGON_POINTS }
     }
 
     private fun smoothProfile(values: List<Float>): FloatArray {
         if (values.size < 3) return values.toFloatArray()
         val out = values.toFloatArray()
-        for (i in 1 until values.lastIndex) out[i] = (values[i - 1] + values[i] * 2f + values[i + 1]) * .25f
+        for (i in 1 until values.lastIndex) {
+            out[i] = (values[i - 1] + values[i] * 2f + values[i + 1]) * .25f
+        }
         return out
     }
 
@@ -299,5 +313,9 @@ class StrictNailPlateBoundaryRefiner {
         const val FINAL_MIN_NAIL_SIMILARITY = .40f
         const val FINAL_MAX_SKIN_SIMILARITY = .93f
         const val FINAL_NAIL_SKIN_MARGIN = .02f
+        const val PIXEL_CENTER = .5f
+        const val POLYGON_MARGIN = .75f
+        const val MIN_POLYGON_POINTS = 6
+        const val MAX_POLYGON_POINTS = 64
     }
 }
