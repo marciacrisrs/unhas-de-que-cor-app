@@ -8,6 +8,7 @@ import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -65,7 +66,11 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val polygonAnalysis = boundary(component, aw, ah, frame, minT, maxT) ?: return null
         val polygonFull = polygonAnalysis.map { PixelPoint(it.x / scale, it.y / scale) }
         val safePolygon = insetForPainting(polygonFull, width, height)
-        if (!shapeIsSafe(safePolygon, roi, frame, scale, minT, maxT)) return null
+        val fullFrame = Frame(
+            PixelPoint(roi.axisFromDip.x - b.left, roi.axisFromDip.y - b.top),
+            PixelPoint(roi.axisToTip.x - b.left, roi.axisToTip.y - b.top),
+        )
+        if (!shapeIsSafe(safePolygon, roi, fullFrame, minT / scale, maxT / scale)) return null
 
         val alpha = rasterizeAndFeather(safePolygon, width, height)
         return NailMask(
@@ -190,19 +195,17 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
             val i = queue.removeFirst()
             val x = i % width
             val y = i / width
-            for (dy in -1..1) {
-                for (dx in -1..1) {
-                    if (dx == 0 && dy == 0) continue
-                    val nx = x + dx
-                    val ny = y + dy
-                    if (nx !in 1 until width - 1 || ny !in 1 until height - 1) continue
-                    val ni = ny * width + nx
-                    if (result[ni] || scores[ni] < threshold) continue
-                    val edge = edgeScore(pixels, width, x, y, nx, ny)
-                    if (edge > MAX_CROSS_EDGE && scores[ni] < threshold + STRONG_EDGE_BONUS) continue
-                    result[ni] = true
-                    queue.add(ni)
-                }
+            for (dy in -1..1) for (dx in -1..1) {
+                if (dx == 0 && dy == 0) continue
+                val nx = x + dx
+                val ny = y + dy
+                if (nx !in 1 until width - 1 || ny !in 1 until height - 1) continue
+                val ni = ny * width + nx
+                if (result[ni] || scores[ni] < threshold) continue
+                val edge = edgeScore(pixels, width, x, y, nx, ny)
+                if (edge > MAX_CROSS_EDGE && scores[ni] < threshold + STRONG_EDGE_BONUS) continue
+                result[ni] = true
+                queue.add(ni)
             }
         }
         return result
@@ -212,16 +215,14 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         var current = mask
         repeat(CLEANUP_PASSES) {
             val next = current.copyOf()
-            for (y in 1 until height - 1) {
-                for (x in 1 until width - 1) {
-                    var neighbors = 0
-                    for (dy in -1..1) for (dx in -1..1) {
-                        if (dx != 0 || dy != 0) if (current[(y + dy) * width + x + dx]) neighbors++
-                    }
-                    val i = y * width + x
-                    if (current[i] && neighbors < REMOVE_NEIGHBORS) next[i] = false
-                    if (!current[i] && neighbors >= ADD_NEIGHBORS) next[i] = true
+            for (y in 1 until height - 1) for (x in 1 until width - 1) {
+                var neighbors = 0
+                for (dy in -1..1) for (dx in -1..1) {
+                    if (dx != 0 || dy != 0) if (current[(y + dy) * width + x + dx]) neighbors++
                 }
+                val i = y * width + x
+                if (current[i] && neighbors < REMOVE_NEIGHBORS) next[i] = false
+                if (!current[i] && neighbors >= ADD_NEIGHBORS) next[i] = true
             }
             current = next
         }
@@ -321,21 +322,17 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         polygon: List<PixelPoint>,
         roi: NailRoi,
         frame: Frame,
-        scale: Float,
         minT: Float,
         maxT: Float,
     ): Boolean {
         if (polygon.size < MIN_BOUNDARY_BINS * 2) return false
         val roiArea = (roi.widthPx * roi.lengthPx).coerceAtLeast(1f)
         val area = abs(area(polygon))
-        if (area < roiArea * scale * scale * MIN_AREA_RATIO) return false
-        if (area > roiArea * scale * scale * MAX_AREA_RATIO) return false
+        if (area < roiArea * MIN_AREA_RATIO || area > roiArea * MAX_AREA_RATIO) return false
         val maxLateral = polygon.maxOf { abs(frame.project(it).s) }
-        if (maxLateral > roi.widthPx * scale * MAX_LATERAL_FACTOR) return false
+        if (maxLateral > roi.widthPx * MAX_LATERAL_FACTOR) return false
         val projected = polygon.map(frame::project)
-        val tMin = projected.minOf { it.t }
-        val tMax = projected.maxOf { it.t }
-        return tMin >= minT - maxT_DRIFT * scale && tMax <= maxT + maxT_DRIFT * scale
+        return projected.minOf { it.t } >= minT - MAX_T_DRIFT && projected.maxOf { it.t } <= maxT + MAX_T_DRIFT
     }
 
     private fun rasterizeAndFeather(polygon: List<PixelPoint>, width: Int, height: Int): ByteArray {
