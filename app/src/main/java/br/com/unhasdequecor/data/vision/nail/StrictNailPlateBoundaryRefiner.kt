@@ -259,17 +259,31 @@ class StrictNailPlateBoundaryRefiner {
             if (right >= left) rows += Triple(y, left, right)
         }
         if (rows.size < 4) return null
+
+        // The binary mask is pixel-accurate enough for coverage, but taking
+        // every raw row edge makes the boundary polygon inherit a staircase.
+        // Smooth the left/right profiles independently by one light 3-point
+        // pass. This only changes the drawable contour representation; the
+        // actual alpha mask remains untouched and therefore cannot gain spill.
+        val leftProfile = smoothProfile(rows.map { it.second.toFloat() })
+        val rightProfile = smoothProfile(rows.map { it.third.toFloat() })
         val out = ArrayList<ImageCoordinates.PixelPoint>(rows.size * 2)
         rows.forEachIndexed { i, row ->
-            if (i % 2 == 0) out += ImageCoordinates.PixelPoint((row.second + ox).toFloat(), (row.first + oy).toFloat())
+            if (i % 2 == 0) out += ImageCoordinates.PixelPoint(leftProfile[i] + ox, row.first.toFloat() + oy)
         }
         rows.indices.reversed().forEach { i ->
-            if (i % 2 == 0) {
-                val row = rows[i]
-                out += ImageCoordinates.PixelPoint((row.third + ox).toFloat(), (row.first + oy).toFloat())
-            }
+            if (i % 2 == 0) out += ImageCoordinates.PixelPoint(rightProfile[i] + ox, rows[i].first.toFloat() + oy)
         }
         return out.takeIf { it.size >= 3 }
+    }
+
+    private fun smoothProfile(values: List<Float>): FloatArray {
+        if (values.size < 3) return values.toFloatArray()
+        val out = values.toFloatArray()
+        for (i in 1 until values.lastIndex) {
+            out[i] = (values[i - 1] + values[i] * 2f + values[i + 1]) * .25f
+        }
+        return out
     }
 
     private fun neighbors(x: Int, y: Int, w: Int, h: Int): IntArray {
