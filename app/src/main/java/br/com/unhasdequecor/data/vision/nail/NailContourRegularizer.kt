@@ -5,11 +5,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Removes pixel-scale contour spikes while preserving the observed plate extent.
+ * Removes raster-scale contour spikes while preserving the observed plate extent.
  *
- * The learned mask decides what is plausible. This stage only regularizes the
- * boundary: it cannot create a new nail shape and limits every correction to a
- * small distance from the learned contour.
+ * The learned/completed mask remains authoritative. This stage only removes
+ * small boundary oscillations and fills tiny notches already surrounded by the
+ * foreground. The safety polygon is generated from the same envelope in the
+ * mask coordinate system, so it can never become a disconnected/invalid guard.
  */
 class NailContourRegularizer {
     fun regularize(roi: NailRoi, mask: NailMask): NailMask {
@@ -34,10 +35,10 @@ class NailContourRegularizer {
         val rawMin = HashMap<Int, Float>()
         val rawMax = HashMap<Int, Float>()
         for (i in mask.alpha.indices) {
-            if ((mask.alpha[i].toInt() and 255) < 128) continue
+            if ((mask.alpha[i].toInt() and 255) < ALPHA_THRESHOLD) continue
             val x = i % mask.width
             val y = i / mask.width
-            val (t, s) = frame(x.toFloat(), y.toFloat())
+            val (t, s) = frame(x.toFloat() + 0.5f, y.toFloat() + 0.5f)
             val bin = floor(t).toInt()
             rawMin[bin] = min(rawMin[bin] ?: Float.POSITIVE_INFINITY, s)
             rawMax[bin] = max(rawMax[bin] ?: Float.NEGATIVE_INFINITY, s)
@@ -54,12 +55,13 @@ class NailContourRegularizer {
         for (i in out.indices) {
             val x = i % mask.width
             val y = i / mask.width
-            val (t, s) = frame(x.toFloat(), y.toFloat())
+            val (t, s) = frame(x.toFloat() + 0.5f, y.toFloat() + 0.5f)
             val pos = t - firstBin
             val lo = interpolateAt(smoothLeft, pos) ?: continue
             val hi = interpolateAt(smoothRight, pos) ?: continue
             val value = out[i].toInt() and 255
-            if (value >= 128) {
+
+            if (value >= ALPHA_THRESHOLD) {
                 val leftExcess = lo - s
                 val rightExcess = s - hi
                 if (leftExcess > MAX_BOUNDARY_CORRECTION || rightExcess > MAX_BOUNDARY_CORRECTION) {
@@ -83,6 +85,7 @@ class NailContourRegularizer {
             ox = mask.originX,
             oy = mask.originY,
         )
+
         return mask.copy(alpha = out, boundaryPolygon = polygon)
     }
 
@@ -138,9 +141,13 @@ class NailContourRegularizer {
             if (dx == 0 && dy == 0) continue
             val nx = x + dx
             val ny = y + dy
-            if (nx in 0 until w && ny in 0 until h && (alpha[ny * w + nx].toInt() and 255) >= 128) count++
+            if (nx in 0 until w && ny in 0 until h &&
+                (alpha[ny * w + nx].toInt() and 255) >= ALPHA_THRESHOLD
+            ) {
+                count++
+            }
         }
-        return count >= 5
+        return count >= MIN_FOREGROUND_NEIGHBORS
     }
 
     private fun polygonFromEnvelope(
@@ -159,11 +166,13 @@ class NailContourRegularizer {
         if (bins.size < 4) return null
         val stride = max(1, bins.size / MAX_POLYGON_POINTS)
         val out = ArrayList<ImageCoordinates.PixelPoint>(MAX_POLYGON_POINTS * 2)
-        bins.indices.filter { it % stride == 0 }.forEach { i ->
-            out += point(bins[i].toFloat(), left[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
+        for (i in bins.indices step stride) {
+            out += point(bins[i].toFloat() + 0.5f, left[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
         }
-        bins.indices.reversed().filter { it % stride == 0 }.forEach { i ->
-            out += point(bins[i].toFloat(), right[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
+        var i = bins.lastIndex
+        while (i >= 0) {
+            out += point(bins[i].toFloat() + 0.5f, right[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
+            i -= stride
         }
         return out.takeIf { it.size >= 6 }
     }
@@ -185,8 +194,10 @@ class NailContourRegularizer {
     )
 
     private companion object {
+        const val ALPHA_THRESHOLD = 128
         const val SMOOTH_RADIUS = 2
         const val MAX_BOUNDARY_CORRECTION = 1.25f
+        const val MIN_FOREGROUND_NEIGHBORS = 5
         const val MAX_POLYGON_POINTS = 32
     }
 }
