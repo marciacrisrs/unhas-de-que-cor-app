@@ -3,21 +3,23 @@ package br.com.unhasdequecor.data.vision.nail
 import android.graphics.Bitmap
 
 /**
- * Compatibility facade for the strict nail-plate completion stage.
+ * Conservative nail-plate refinement facade.
  *
- * MediaPipe remains localization only. The learned mask is the seed; this
- * stage completes the visible plate using the finger axis and local appearance
- * while keeping a conservative skin rejection rule. The contour specialist
- * then locks the final boundary to local image evidence.
+ * MediaPipe remains localization only and the learned segmentation stays the
+ * source of truth for the visible plate. The strict stage may recover pixels
+ * that are confidently missing, while the regularizer removes small raster
+ * irregularities without inventing a new image-driven contour.
+ *
+ * The edge specialist is intentionally not part of the live path: local image
+ * gradients can lock the boundary onto skin texture, reflections and laptop
+ * edges, producing the artificial waves seen in the try-on preview.
  */
 class NailPlateBoundaryRefiner {
     private val delegate = StrictNailPlateBoundaryRefiner()
     private val contourRegularizer = NailContourRegularizer()
-    private val contourEdgeSpecialist = NailContourEdgeSpecialist()
 
     fun refine(image: Bitmap, roi: NailRoi, seedMask: NailMask): NailMask? =
         delegate.refine(image, roi, seedMask)?.let { completed ->
-            val regularized = contourRegularizer.regularize(roi, completed)
-            contourEdgeSpecialist.refine(image, roi, regularized)
+            contourRegularizer.regularize(roi, completed)
         }
 }
