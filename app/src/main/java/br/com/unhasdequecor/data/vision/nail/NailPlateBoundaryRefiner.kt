@@ -1,13 +1,17 @@
 package br.com.unhasdequecor.data.vision.nail
 
+import android.graphics.Bitmap
+
 /**
- * Compatibility pass-through for the learned segmentation path.
+ * Compatibility facade for the strict nail-plate completion stage.
  *
- * The visual baseline is now the learned nail segmentation model itself.
- * Classical color/geometry expansion is intentionally not part of this path:
- * the model output must be evaluated on its own before another heuristic is
- * allowed to change the physical nail boundary.
+ * MediaPipe remains localization only. The learned mask is the seed; this
+ * stage completes the visible plate using the finger axis and local appearance
+ * while keeping a conservative skin rejection rule.
  */
 class NailPlateBoundaryRefiner {
-    fun refine(image: android.graphics.Bitmap, roi: NailRoi, seedMask: NailMask): NailMask? = seedMask
+    private val delegate = StrictNailPlateBoundaryRefiner()
+
+    fun refine(image: Bitmap, roi: NailRoi, seedMask: NailMask): NailMask? =
+        delegate.refine(image, roi, seedMask)
 }
