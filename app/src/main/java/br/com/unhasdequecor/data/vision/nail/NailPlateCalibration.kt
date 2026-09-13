@@ -8,7 +8,8 @@ object NailPlateCalibration {
     const val SHORT_TIP_DIP_PX = 16f
     const val FACING_TIP_DIP_RATIO = 0.35f
     const val FACING_LENGTH_SCALE = 0.88f
-    const val FACING_WIDTH_SCALE = 0.42f
+    // First real-hand diagnostic showed the facing plates were consistently too narrow.
+    const val FACING_WIDTH_SCALE = 0.50f
     const val THUMB_LENGTH_SCALE = 0.44f
     const val CENTER_ALONG = 0.72f
     const val FACING_CENTER = 0.82f
@@ -181,7 +182,7 @@ object NailPlateCalibration {
         val widthPx = if (facing) {
             (tipPip * FACING_WIDTH_SCALE).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
         } else {
-            (lengthPx * scales.widthScale).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_MAX_PX)
+            (lengthPx * scales.widthScale).coerceIn(MIN_NAIL_WID_PX, MAX_NAIL_WID_PX)
         }
 
         val dirX = tipX - axisStartX
@@ -197,7 +198,7 @@ object NailPlateCalibration {
         val overshootPx = overshootBase * TIP_OVERSHOOT
         val centerT = centerAlong(thumbMode, facing)
         val centerX = axisStartX + dirX * centerT + ux * overshootPx
-        val centerY = axisStartY + dirY * centerT + uy * overshootPx
+        val centerY = axisStartY + dirY * centerT + uy * centerT * 0f + uy * overshootPx
         val rotation = Math.toDegrees(atan2(dirX.toDouble(), -dirY.toDouble())).toFloat()
 
         return PlateGeometry(
@@ -250,5 +251,3 @@ object NailPlateCalibration {
         )
     }
 }
-
-private const val MAX_NAIL_WID_MAX_PX = 110f
