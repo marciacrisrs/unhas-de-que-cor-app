@@ -11,6 +11,8 @@ data class NailMask(
     /** Origem da máscara no espaço da imagem completa (px). */
     val originX: Int = 0,
     val originY: Int = 0,
+    /** Contorno efetivamente usado para gerar a máscara, no espaço da imagem. */
+    val boundaryPolygon: List<ImageCoordinates.PixelPoint>? = null,
 ) {
     init {
         require(width > 0 && height > 0)
@@ -43,6 +45,7 @@ data class NailMask(
             height == other.height &&
             originX == other.originX &&
             originY == other.originY &&
+            boundaryPolygon == other.boundaryPolygon &&
             alpha.contentEquals(other.alpha)
     }
 
@@ -51,6 +54,7 @@ data class NailMask(
         result = 31 * result + height
         result = 31 * result + originX
         result = 31 * result + originY
+        result = 31 * result + (boundaryPolygon?.hashCode() ?: 0)
         result = 31 * result + alpha.contentHashCode()
         return result
     }
