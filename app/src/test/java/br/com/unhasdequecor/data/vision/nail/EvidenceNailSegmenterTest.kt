@@ -14,13 +14,12 @@ class EvidenceNailSegmenterTest {
 
     @Test
     fun `recovers visible nail boundaries instead of returning the geometric rectangle`() {
-        val width = 80
-        val height = 100
+        val rw = 80
+        val rh = 100
         val skin = argb(188, 132, 112)
         val nail = argb(226, 207, 198)
-        val pixels = IntArray(width * height) { skin }
+        val pixels = IntArray(rw * rh) { skin }
 
-        // Rounded/almond plate with a narrower tip and a visible cuticle line.
         for (y in 22 until 78) {
             val halfWidth = when {
                 y < 30 -> 5
@@ -29,13 +28,13 @@ class EvidenceNailSegmenterTest {
                 else -> 11
             }
             for (x in 40 - halfWidth..40 + halfWidth) {
-                pixels[y * width + x] = nail
+                pixels[y * rw + x] = nail
             }
         }
 
         val image = mockk<Bitmap>(relaxed = true) {
-            every { this@mockk.width } returns 120
-            every { this@mockk.height } returns 140
+            every { width } returns 120
+            every { height } returns 140
             every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
                 val dest = firstArg<IntArray>()
                 System.arraycopy(pixels, 0, dest, 0, pixels.size)
@@ -70,13 +69,13 @@ class EvidenceNailSegmenterTest {
 
     @Test
     fun `rejects uniform skin instead of inventing a nail`() {
-        val width = 60
-        val height = 80
+        val rw = 60
+        val rh = 80
         val skin = argb(188, 132, 112)
-        val pixels = IntArray(width * height) { skin }
+        val pixels = IntArray(rw * rh) { skin }
         val image = mockk<Bitmap>(relaxed = true) {
-            every { this@mockk.width } returns 100
-            every { this@mockk.height } returns 100
+            every { width } returns 100
+            every { height } returns 100
             every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
                 val dest = firstArg<IntArray>()
                 System.arraycopy(pixels, 0, dest, 0, pixels.size)
