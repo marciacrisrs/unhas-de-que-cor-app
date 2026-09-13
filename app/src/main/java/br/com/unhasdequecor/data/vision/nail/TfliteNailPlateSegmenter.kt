@@ -21,7 +21,7 @@ import kotlin.math.roundToInt
 /**
  * Learned nail-plate segmenter followed by a strict pixel-level boundary
  * refiner. MediaPipe/ROI provide localization only; the learned model supplies
- * a high-precision seed and the refiner recovers the full plate conservatively.
+ * the nail-plate evidence and the refiner preserves that evidence conservatively.
  */
 @Singleton
 class TfliteNailPlateSegmenter @Inject constructor(
@@ -74,13 +74,18 @@ class TfliteNailPlateSegmenter @Inject constructor(
             inputBitmap.recycle()
             return null
         }
-        val modelMask = probabilityToBitmap(probability, inputWidth, inputHeight)
-        val fullMask = projectMaskToContext(
-            modelMask = modelMask,
+        inputBitmap.recycle()
+
+        // Keep the model probability field until projection. Nearest-neighbour
+        // expansion was turning the low-resolution model boundary into visible
+        // stair steps; bilinear sampling gives the refiner a continuous edge
+        // signal without inventing coverage outside the learned probability.
+        val fullMask = projectProbabilityToContext(
+            probability = probability,
+            modelWidth = inputWidth,
+            modelHeight = inputHeight,
             contextBounds = contextRect,
         )
-        modelMask.recycle()
-        inputBitmap.recycle()
 
         val midpoint = PixelPoint(
             x = (roi.axisFromDip.x + roi.axisToTip.x) * 0.5f,
@@ -230,15 +235,42 @@ class TfliteNailPlateSegmenter @Inject constructor(
         return (positive / sum).coerceIn(0f, 1f)
     }
 
-    private fun probabilityToBitmap(probability: FloatArray, width: Int, height: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val pixels = IntArray(width * height)
-        for (i in pixels.indices) {
-            val alpha = (probability[i] * 255f).roundToInt().coerceIn(0, 255)
-            pixels[i] = alpha shl 24 or 0x00FFFFFF
+    /**
+     * Projects the learned probability field directly to the image context.
+     * The returned alpha remains a soft confidence field, so later contour
+     * stages can use the model's sub-pixel transition instead of a staircase
+     * produced by binary nearest-neighbour upscaling.
+     */
+    private fun projectProbabilityToContext(
+        probability: FloatArray,
+        modelWidth: Int,
+        modelHeight: Int,
+        contextBounds: Rect,
+    ): ByteArray {
+        val width = contextBounds.width()
+        val height = contextBounds.height()
+        val alpha = ByteArray(width * height)
+        val maxX = modelWidth - 1
+        val maxY = modelHeight - 1
+        for (y in 0 until height) {
+            val modelY = if (height <= 1) 0f else y.toFloat() * maxY / (height - 1).toFloat()
+            val y0 = modelY.toInt().coerceIn(0, maxY)
+            val y1 = (y0 + 1).coerceAtMost(maxY)
+            val fy = modelY - y0
+            for (x in 0 until width) {
+                val modelX = if (width <= 1) 0f else x.toFloat() * maxX / (width - 1).toFloat()
+                val x0 = modelX.toInt().coerceIn(0, maxX)
+                val x1 = (x0 + 1).coerceAtMost(maxX)
+                val fx = modelX - x0
+                val top = probability[y0 * modelWidth + x0] * (1f - fx) +
+                    probability[y0 * modelWidth + x1] * fx
+                val bottom = probability[y1 * modelWidth + x0] * (1f - fx) +
+                    probability[y1 * modelWidth + x1] * fx
+                val value = top * (1f - fy) + bottom * fy
+                alpha[y * width + x] = (value * 255f).roundToInt().coerceIn(0, 255).toByte()
+            }
         }
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
+        return alpha
     }
 
     private fun expandedBounds(bounds: Rect, image: Bitmap): Rect {
@@ -252,24 +284,6 @@ class TfliteNailPlateSegmenter @Inject constructor(
             min(image.width, left + width),
             min(image.height, top + height),
         )
-    }
-
-    private fun projectMaskToContext(modelMask: Bitmap, contextBounds: Rect): ByteArray {
-        val width = contextBounds.width()
-        val height = contextBounds.height()
-        val source = IntArray(modelMask.width * modelMask.height)
-        modelMask.getPixels(source, 0, modelMask.width, 0, 0, modelMask.width, modelMask.height)
-        val alpha = ByteArray(width * height)
-        for (y in 0 until height) {
-            val sy = (y.toFloat() / height * modelMask.height)
-                .roundToInt().coerceIn(0, modelMask.height - 1)
-            for (x in 0 until width) {
-                val sx = (x.toFloat() / width * modelMask.width)
-                    .roundToInt().coerceIn(0, modelMask.width - 1)
-                alpha[y * width + x] = (source[sy * modelMask.width + sx] ushr 24).toByte()
-            }
-        }
-        return alpha
     }
 
     private fun keepNailComponent(
@@ -287,8 +301,6 @@ class TfliteNailPlateSegmenter @Inject constructor(
         val seedY = (seed.y - originY).roundToInt().coerceIn(0, height - 1)
         val visited = BooleanArray(binary.size)
         val queue = IntArray(binary.size)
-        var head = 0
-        var tail = 0
         var best: IntArray? = null
         var bestContainsSeed = false
 
