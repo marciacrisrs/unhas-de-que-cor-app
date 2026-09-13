@@ -37,9 +37,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val height = max(MIN_ANALYSIS_SIZE, (fullHeight * scale).roundToInt())
         val pixels = downsample(source, fullWidth, fullHeight, width, height)
 
-        val geometric = roi.polygon.map {
-            PixelPoint((it.x - bounds.left) * scale, (it.y - bounds.top) * scale)
-        }
+        val geometric = roi.polygon.map { PixelPoint((it.x - bounds.left) * scale, (it.y - bounds.top) * scale) }
         if (geometric.size < 4) return null
 
         val axisBase = PixelPoint((roi.axisFromDip.x - bounds.left) * scale, (roi.axisFromDip.y - bounds.top) * scale)
@@ -54,32 +52,14 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val roiHalfWidth = (fullWidth * 0.5f * scale).coerceIn(MIN_HALF_WIDTH, MAX_HALF_WIDTH)
 
         val skinModel = buildSkinModel(pixels, width, height, geometric, frame)
-        val cuticle = findEndBoundary(
-            pixels, width, height, frame, geometricMinT, geometricMaxT,
-            nominalHalfWidth, roiHalfWidth, skinModel, proximal = true,
-        )
-        val tip = findEndBoundary(
-            pixels, width, height, frame, geometricMinT, geometricMaxT,
-            nominalHalfWidth, roiHalfWidth, skinModel, proximal = false,
-        )
-
-        val traced = traceSides(
-            pixels = pixels,
-            width = width,
-            height = height,
-            frame = frame,
-            minT = cuticle.t,
-            maxT = tip.t,
-            nominalHalfWidth = nominalHalfWidth,
-            searchHalfWidth = roiHalfWidth,
-            geometric = geometric,
-            skinModel = skinModel,
-        )
+        val cuticle = findEndBoundary(pixels, width, height, frame, geometricMinT, geometricMaxT, nominalHalfWidth, roiHalfWidth, skinModel, proximal = true)
+        val tip = findEndBoundary(pixels, width, height, frame, geometricMinT, geometricMaxT, nominalHalfWidth, roiHalfWidth, skinModel, proximal = false)
+        val traced = traceSides(pixels, width, height, frame, cuticle.t, tip.t, nominalHalfWidth, roiHalfWidth, geometric, skinModel)
 
         val polygonAnalysis = buildPolygon(frame, cuticle, tip, traced)
         val polygonFull = polygonAnalysis.map { PixelPoint(it.x / scale, it.y / scale) }
         val safe = insetForPainting(polygonFull, fullWidth, fullHeight)
-        if (!isSafeShape(safe, roi, frame.scaleToFull(scale))) return null
+        if (!isSafeShape(safe, roi, frame.scaleToFull(scale), fullWidth)) return null
 
         return NailMask(
             width = fullWidth,
@@ -99,18 +79,9 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val uy = dy / length.coerceAtLeast(EPSILON)
         val vx = -uy
         val vy = ux
-        fun project(point: PixelPoint): Projection = Projection(
-            (point.x - base.x) * ux + (point.y - base.y) * uy,
-            (point.x - base.x) * vx + (point.y - base.y) * vy,
-        )
-        fun point(t: Float, s: Float): PixelPoint = PixelPoint(
-            base.x + ux * t + vx * s,
-            base.y + uy * t + vy * s,
-        )
-        fun scaleToFull(scale: Float): Frame = Frame(
-            PixelPoint(base.x / scale, base.y / scale),
-            PixelPoint(tip.x / scale, tip.y / scale),
-        )
+        fun project(point: PixelPoint): Projection = Projection((point.x - base.x) * ux + (point.y - base.y) * uy, (point.x - base.x) * vx + (point.y - base.y) * vy)
+        fun point(t: Float, s: Float): PixelPoint = PixelPoint(base.x + ux * t + vx * s, base.y + uy * t + vy * s)
+        fun scaleToFull(scale: Float): Frame = Frame(PixelPoint(base.x / scale, base.y / scale), PixelPoint(tip.x / scale, tip.y / scale))
     }
 
     private data class Projection(val t: Float, val s: Float)
@@ -121,51 +92,25 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
     private data class SideTrace(val left: List<SideBoundary>, val right: List<SideBoundary>)
     private data class LineEvidence(val score: Float, val halfWidth: Float)
 
-    private fun findEndBoundary(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        frame: Frame,
-        minT: Float,
-        maxT: Float,
-        nominalHalfWidth: Float,
-        searchHalfWidth: Float,
-        skinModel: Model,
-        proximal: Boolean,
-    ): EndBoundary {
+    private fun findEndBoundary(pixels: IntArray, width: Int, height: Int, frame: Frame, minT: Float, maxT: Float, nominalHalfWidth: Float, searchHalfWidth: Float, skinModel: Model, proximal: Boolean): EndBoundary {
         val span = (maxT - minT).coerceAtLeast(MIN_AXIS_LENGTH)
         val anchor = if (proximal) minT else maxT
         val direction = if (proximal) 1f else -1f
         var best = EndBoundary(anchor, nominalHalfWidth, 0f)
         var bestScore = Float.NEGATIVE_INFINITY
-
         for (offset in END_SCAN_START..END_SCAN_END) {
             val t = anchor + direction * offset * scaleLength(span)
             if (t !in minT - span * 0.45f..maxT + span * 0.45f) continue
-            val line = lineEvidence(
-                pixels, width, height, frame, t, nominalHalfWidth, searchHalfWidth, direction, skinModel,
-            )
+            val line = lineEvidence(pixels, width, height, frame, t, nominalHalfWidth, searchHalfWidth, direction, skinModel)
             if (line.score > bestScore) {
                 bestScore = line.score
                 best = EndBoundary(t, line.halfWidth, line.score)
             }
         }
-        return if (best.confidence < MIN_END_CONFIDENCE) {
-            EndBoundary(anchor, nominalHalfWidth, 0f)
-        } else best
+        return if (best.confidence < MIN_END_CONFIDENCE) EndBoundary(anchor, nominalHalfWidth, 0f) else best
     }
 
-    private fun lineEvidence(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        frame: Frame,
-        t: Float,
-        nominalHalfWidth: Float,
-        searchHalfWidth: Float,
-        direction: Float,
-        skinModel: Model,
-    ): LineEvidence {
+    private fun lineEvidence(pixels: IntArray, width: Int, height: Int, frame: Frame, t: Float, nominalHalfWidth: Float, searchHalfWidth: Float, direction: Float, skinModel: Model): LineEvidence {
         var total = 0f
         var positive = 0
         var count = 0
@@ -184,21 +129,11 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         if (count == 0) return LineEvidence(0f, nominalHalfWidth)
         val continuity = positive.toFloat() / count
         val mean = total / count
-        val widthEstimate = estimateEndWidth(pixels, width, height, frame, t, nominalHalfWidth, searchHalfWidth, direction, skinModel)
+        val widthEstimate = estimateEndWidth(pixels, width, height, frame, t, nominalHalfWidth, searchHalfWidth, skinModel)
         return LineEvidence((mean * 0.68f + continuity * 0.32f).coerceIn(0f, 1f), widthEstimate)
     }
 
-    private fun estimateEndWidth(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        frame: Frame,
-        t: Float,
-        nominalHalfWidth: Float,
-        searchHalfWidth: Float,
-        direction: Float,
-        skinModel: Model,
-    ): Float {
+    private fun estimateEndWidth(pixels: IntArray, width: Int, height: Int, frame: Frame, t: Float, nominalHalfWidth: Float, searchHalfWidth: Float, skinModel: Model): Float {
         var best = nominalHalfWidth
         var bestScore = Float.NEGATIVE_INFINITY
         val maxCandidate = min(searchHalfWidth * 0.90f, max(nominalHalfWidth * 1.65f, nominalHalfWidth + 4f))
@@ -218,18 +153,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         return best.coerceIn(nominalHalfWidth * 0.72f, maxCandidate)
     }
 
-    private fun traceSides(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        frame: Frame,
-        minT: Float,
-        maxT: Float,
-        nominalHalfWidth: Float,
-        searchHalfWidth: Float,
-        geometric: List<PixelPoint>,
-        skinModel: Model,
-    ): SideTrace {
+    private fun traceSides(pixels: IntArray, width: Int, height: Int, frame: Frame, minT: Float, maxT: Float, nominalHalfWidth: Float, searchHalfWidth: Float, geometric: List<PixelPoint>, skinModel: Model): SideTrace {
         val left = ArrayList<SideBoundary>(SIDE_SAMPLES)
         val right = ArrayList<SideBoundary>(SIDE_SAMPLES)
         var previousLeft = -nominalHalfWidth
@@ -247,25 +171,13 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         return SideTrace(left, right)
     }
 
-    private fun findSideBoundary(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        frame: Frame,
-        t: Float,
-        expectedHalf: Float,
-        searchHalfWidth: Float,
-        side: Int,
-        previous: Float,
-        skinModel: Model,
-    ): SideBoundary {
+    private fun findSideBoundary(pixels: IntArray, width: Int, height: Int, frame: Frame, t: Float, expectedHalf: Float, searchHalfWidth: Float, side: Int, previous: Float, skinModel: Model): SideBoundary {
         var bestS = side * expectedHalf
         var bestScore = Float.NEGATIVE_INFINITY
         val minHalf = expectedHalf * SIDE_MIN_FACTOR
         val maxHalf = min(searchHalfWidth * SIDE_MAX_ROI_FACTOR, max(expectedHalf * SIDE_MAX_FACTOR, expectedHalf + 5f))
         for (step in 0..SIDE_SEARCH_STEPS) {
-            val fraction = step.toFloat() / SIDE_SEARCH_STEPS
-            val magnitude = lerp(minHalf, maxHalf, fraction)
+            val magnitude = lerp(minHalf, maxHalf, step.toFloat() / SIDE_SEARCH_STEPS)
             val s = side * magnitude
             val insidePoint = frame.point(t, s - side * SIDE_INSET)
             val outsidePoint = frame.point(t, s + side * SIDE_OUTSET)
@@ -294,9 +206,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
                 maxS = max(maxS, projection.s)
             }
         }
-        return if (minS.isFinite() && maxS.isFinite()) {
-            ((maxS - minS) * 0.5f).coerceIn(fallback * 0.55f, fallback * 1.20f)
-        } else fallback
+        return if (minS.isFinite() && maxS.isFinite()) ((maxS - minS) * 0.5f).coerceIn(fallback * 0.55f, fallback * 1.20f) else fallback
     }
 
     private fun buildPolygon(frame: Frame, cuticle: EndBoundary, tip: EndBoundary, trace: SideTrace): List<PixelPoint> {
@@ -328,15 +238,11 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
 
     private fun buildSkinModel(pixels: IntArray, width: Int, height: Int, polygon: List<PixelPoint>, frame: Frame): Model {
         val samples = ArrayList<Feature>()
-        for (y in 2 until height - 2 step 3) {
-            for (x in 2 until width - 2 step 3) {
-                val point = PixelPoint(x + 0.5f, y + 0.5f)
-                if (pointInPolygon(point.x, point.y, polygon)) continue
-                val projection = frame.project(point)
-                if (projection.t in -frame.length * 0.15f..frame.length * 1.15f && abs(projection.s) < frame.length * 0.90f) {
-                    sampleFeature(pixels, width, height, point.x, point.y)?.let(samples::add)
-                }
-            }
+        for (y in 2 until height - 2 step 3) for (x in 2 until width - 2 step 3) {
+            val point = PixelPoint(x + 0.5f, y + 0.5f)
+            if (pointInPolygon(point.x, point.y, polygon)) continue
+            val projection = frame.project(point)
+            if (projection.t in -frame.length * 0.15f..frame.length * 1.15f && abs(projection.s) < frame.length * 0.90f) sampleFeature(pixels, width, height, point.x, point.y)?.let(samples::add)
         }
         if (samples.isEmpty()) return Model(Feature(0.5f, 0.2f, 0.33f, 0.33f, 0.34f), 0.15f)
         val mean = meanFeature(samples)
@@ -344,8 +250,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         return Model(mean, variance)
     }
 
-    private fun normalizedModelDistance(feature: Feature, model: Model): Float =
-        (featureDistance(feature, model.feature) / (model.variance * MODEL_DISTANCE_SCALE).coerceAtLeast(EPSILON)).coerceIn(0f, 1f)
+    private fun normalizedModelDistance(feature: Feature, model: Model): Float = (featureDistance(feature, model.feature) / (model.variance * MODEL_DISTANCE_SCALE).coerceAtLeast(EPSILON)).coerceIn(0f, 1f)
 
     private fun meanFeature(features: List<Feature>): Feature {
         var l = 0f; var s = 0f; var r = 0f; var g = 0f; var b = 0f
@@ -355,46 +260,35 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
     }
 
     private fun sampleFeature(pixels: IntArray, width: Int, height: Int, x: Float, y: Float): Feature? {
-        val ix = x.roundToInt()
-        val iy = y.roundToInt()
+        val ix = x.roundToInt(); val iy = y.roundToInt()
         if (ix !in 0 until width || iy !in 0 until height) return null
         val color = pixels[iy * width + ix]
         val r = ((color shr 16) and 0xFF).toFloat() / 255f
         val g = ((color shr 8) and 0xFF).toFloat() / 255f
         val b = (color and 0xFF).toFloat() / 255f
-        val maxChannel = max(r, max(g, b))
-        val minChannel = min(r, min(g, b))
-        return Feature(
-            luma = 0.2126f * r + 0.7152f * g + 0.0722f * b,
-            saturation = (maxChannel - minChannel) / maxChannel.coerceAtLeast(1f / 255f),
-            r = r, g = g, b = b,
-        )
+        val maxChannel = max(r, max(g, b)); val minChannel = min(r, min(g, b))
+        return Feature(0.2126f * r + 0.7152f * g + 0.0722f * b, (maxChannel - minChannel) / maxChannel.coerceAtLeast(1f / 255f), r, g, b)
     }
 
-    private fun featureDistance(a: Feature, b: Feature): Float =
-        (abs(a.luma - b.luma) * 0.45f + abs(a.saturation - b.saturation) * 0.15f +
-            (abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b)) / 3f * 0.40f).coerceIn(0f, 1f)
+    private fun featureDistance(a: Feature, b: Feature): Float = (abs(a.luma - b.luma) * 0.45f + abs(a.saturation - b.saturation) * 0.15f + (abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b)) / 3f * 0.40f).coerceIn(0f, 1f)
 
     private fun insetForPainting(points: List<PixelPoint>, width: Int, height: Int): List<PixelPoint> {
         if (points.size < 3) return points
-        val cx = points.map { it.x }.average().toFloat()
-        val cy = points.map { it.y }.average().toFloat()
+        val cx = points.map { it.x }.average().toFloat(); val cy = points.map { it.y }.average().toFloat()
         return points.map { point ->
-            val dx = cx - point.x
-            val dy = cy - point.y
-            val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+            val dx = cx - point.x; val dy = cy - point.y; val distance = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
             val inset = PAINT_INSET_PX.coerceAtMost(distance * 0.20f)
             PixelPoint((point.x + dx / distance * inset).coerceIn(0f, width - 1f), (point.y + dy / distance * inset).coerceIn(0f, height - 1f))
         }
     }
 
-    private fun isSafeShape(polygon: List<PixelPoint>, roi: NailRoi, frame: Frame): Boolean {
+    private fun isSafeShape(polygon: List<PixelPoint>, roi: NailRoi, frame: Frame, roiWidth: Int): Boolean {
         if (polygon.size < 10) return false
-        val area = abs(polygonArea(polygon))
-        val expectedArea = (roi.widthPx * roi.lengthPx).coerceAtLeast(1f)
+        val area = abs(polygonArea(polygon)); val expectedArea = (roi.widthPx * roi.lengthPx).coerceAtLeast(1f)
         if (area < expectedArea * MIN_AREA_RATIO || area > expectedArea * MAX_AREA_RATIO) return false
         val projected = polygon.map(frame::project)
-        return projected.maxOf { abs(it.s) } <= roi.widthPx * MAX_LATERAL_FACTOR
+        val lateralLimit = max(roi.widthPx * MAX_LATERAL_FACTOR, roiWidth * 0.49f)
+        return projected.maxOf { abs(it.s) } <= lateralLimit
     }
 
     private fun rasterize(polygon: List<PixelPoint>, width: Int, height: Int): ByteArray {
@@ -402,8 +296,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         for (y in 0 until height) for (x in 0 until width) mask[y * width + x] = pointInPolygon(x + 0.5f, y + 0.5f, polygon)
         val alpha = ByteArray(mask.size)
         for (y in 0 until height) for (x in 0 until width) {
-            val index = y * width + x
-            if (!mask[index]) continue
+            val index = y * width + x; if (!mask[index]) continue
             var edge = false
             for (dy in -1..1) for (dx in -1..1) {
                 val nx = x + dx; val ny = y + dy
@@ -428,8 +321,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
     }
 
     private fun pointInPolygon(x: Float, y: Float, polygon: List<PixelPoint>): Boolean {
-        var inside = false
-        var j = polygon.lastIndex
+        var inside = false; var j = polygon.lastIndex
         for (i in polygon.indices) {
             val a = polygon[i]; val b = polygon[j]
             if (((a.y > y) != (b.y > y)) && x < (b.x - a.x) * (y - a.y) / ((b.y - a.y).takeIf { abs(it) > EPSILON } ?: EPSILON) + a.x) inside = !inside
