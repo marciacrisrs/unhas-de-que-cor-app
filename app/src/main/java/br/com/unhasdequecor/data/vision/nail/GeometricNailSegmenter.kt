@@ -44,12 +44,16 @@ class GeometricNailSegmenter @Inject constructor() : NailSegmenter {
         val kept = solid.count { (it.toInt() and 0xFF) >= MASK_SOLID }
         if (kept < MIN_ABSOLUTE_KEEP) return null
 
+        val boundaryInImage = contour.map { p ->
+            PixelPoint(p.x + bounds.left, p.y + bounds.top)
+        }
         return NailMask(
             width = rw,
             height = rh,
             alpha = feather(solid, rw, rh, FEATHER_RADIUS),
             originX = bounds.left,
             originY = bounds.top,
+            boundaryPolygon = boundaryInImage,
         )
     }
 
