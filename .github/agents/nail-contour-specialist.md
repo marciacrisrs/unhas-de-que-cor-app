@@ -20,92 +20,72 @@ A informação deve ser combinada nesta ordem:
 1. máscara aprendida = evidência primária;
 2. eixo do dedo = sistema de coordenadas;
 3. bordas observadas ao longo de várias secções transversais = forma;
-4. continuidade e suavidade = regularização;
-5. evidência de pele = barreira contra spill;
-6. anatomia = limite final de plausibilidade.
-
-Nunca usar suavização para fabricar cobertura que a evidência não suporta.
+4. evidência de imagem na fronteira = correção de posição;
+5. continuidade e suavidade = regularização;
+6. evidência de pele = barreira contra spill;
+7. anatomia = limite final de plausibilidade.
 
 ## Algoritmo de contorno
 
-### 1. Trabalhar no frame do dedo
+### 1. Frame do dedo
 
-Transforme os pixels para coordenadas `(t, s)`:
+Transforme os pixels para `(t, s)`:
 - `t` = posição da base em direção à ponta;
 - `s` = distância lateral ao eixo.
 
-Isso permite tratar uma unha inclinada como uma forma vertical sem perder a orientação real.
+### 2. Envelope observado
 
-### 2. Medir o envelope real
+Para cada faixa de `t`, obtenha `left(t)` e `right(t)` da máscara válida. Não usar uma largura global.
 
-Para cada faixa de `t`, obtenha `left(t)` e `right(t)` da máscara válida.
+### 3. Busca local de borda
 
-Não usar uma única largura global.
+A máscara é um prior, não a fronteira definitiva. Em uma faixa estreita ao redor de cada lado, procurar a transição visual placa/pele usando **gradiente bilateral**: comparar a aparência imediatamente para dentro e para fora da fronteira.
 
-A largura pode variar naturalmente:
-- proximalmente mais estreita;
-- corpo mais largo;
-- distalmente convergente ou arredondado;
-- polegar com proporção própria.
+Pontuar cada candidato por:
+- força da transição local;
+- consistência entre amostras vizinhas;
+- distância da fronteira observada;
+- compatibilidade com a direção do eixo.
 
-### 3. Regularizar, não desenhar
+Isso evita que uma textura isolada ou um reflexo interno seja confundido com a borda.
 
-Aplicar filtro robusto às séries laterais para remover apenas oscilações de escala de pixel.
+### 4. Continuidade
 
-Preferir mediana/robust smoothing a média simples para não deslocar a borda em direção à pele.
+A borda escolhida deve ter baixa variação entre secções consecutivas. Um salto grande só pode ser aceito quando houver evidência visual forte.
 
-Limitar a correção espacial. Uma regularização nunca deve mover a borda vários pixels sem evidência independente.
+### 5. Regularização
 
-### 4. Ponta merece tratamento próprio
+Suavizar o **perfil `left(t)`/`right(t)`**, não simplesmente desfocar a máscara. O filtro remove serrilhado raster sem transformar a unha em elipse.
 
-A ponta não é uma continuação infinita do corpo.
+A suavização nunca pode inventar cobertura fora da evidência local.
 
-Próximo ao extremo distal:
-- procurar convergência das duas laterais;
-- preservar a curvatura observada;
-- impedir quinas artificiais;
-- não ultrapassar a evidência de placa nem entrar na polpa/ar.
+### 6. Ponta
 
-Não fechar a ponta com um retângulo ou elipse genérica.
+A ponta tem tratamento próprio:
+- laterais convergem progressivamente;
+- preservar curvatura observada;
+- eliminar quinas artificiais;
+- não ultrapassar placa, polpa ou ar.
 
-### 5. Cutícula merece tratamento próprio
+### 7. Cutícula
 
-Na região proximal, a borda deve parar antes do eponíquio/cutícula.
+A região proximal termina antes do eponíquio/cutícula. Uma curva bonita não justifica pintar pele.
 
-Não suavizar uma borda para dentro da pele só porque isso produz uma curva mais bonita.
+### 8. Assimetria
 
-### 6. Curvatura bilateral
+Tratar esquerda e direita separadamente. Não forçar simetria perfeita. O polegar tem proporção e eixo próprios.
 
-As duas laterais devem ser tratadas separadamente e depois avaliadas juntas.
+### 9. Representação
 
-Regras:
-- evitar zig-zag;
-- evitar mudanças abruptas de largura entre secções vizinhas;
-- permitir assimetria real pequena;
-- não forçar simetria perfeita;
-- impedir que uma lateral seja corrigida usando a outra como espelho.
+`alpha` e `boundaryPolygon` devem nascer da **mesma fronteira final** e permanecer no mesmo sistema de origem. Um polígono bonito que não coincide com a máscara é uma falha P0.
 
-### 7. Contorno subpixel / raster
+## Diagnóstico
 
-A máscara é raster, mas o limite visual não precisa parecer serrilhado.
-
-O polígono pode ser suavizado para renderização, mas o polígono de segurança precisa permanecer coerente com a máscara raster.
-
-Nunca gerar um `boundaryPolygon` com coordenadas incorretas ou desconectadas do sistema de origem `(originX, originY)`.
-
-## Diagnóstico de falhas
-
-- Máscara curta, contorno correto: problema de segmentação/completion.
-- Máscara cobre a placa, mas há dentes/quinas: problema de contorno.
-- Polígono diverge da máscara: problema de representação/guard.
-- Ponta correta na máscara, mas errada no overlay: problema de composição.
-- Spill lateral: problema de segmentação, guard ou tracker; não resolver apenas com blur.
-
-## Regra de ouro
-
-**Primeiro localizar a placa. Depois medir a borda. Depois regularizar a borda. Só então renderizar.**
-
-Nunca usar “ficou mais bonito” como critério suficiente. O contorno precisa continuar sendo a placa ungueal real.
+- Máscara curta, contorno correto: segmentação/completion.
+- Máscara cobre a placa, mas há dentes/quinas: contorno.
+- Contorno correto no debug, overlay errado: composição.
+- Spill lateral: segmentação/guard/tracker.
+- Bordas parecem adesivo: representação do contorno ainda está errada.
 
 ## Critérios P0
 
@@ -113,6 +93,7 @@ Nunca usar “ficou mais bonito” como critério suficiente. O contorno precisa
 - ponta sem overshoot;
 - laterais contínuas e naturais;
 - formato preservado em unhas curtas, longas e diferentes formatos;
-- polegar não tratado como os demais dedos;
-- `boundaryPolygon` sempre coerente com `alpha` e origem da máscara;
-- nenhuma expansão global apenas para aumentar cobertura.
+- polegar com eixo próprio;
+- `boundaryPolygon` coerente com `alpha` e origem;
+- nenhuma expansão global apenas para aumentar cobertura;
+- contorno guiado pela imagem, não somente por geometria.
