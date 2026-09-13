@@ -98,7 +98,8 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val direction = if (proximal) 1f else -1f
         var best = EndBoundary(anchor, nominalHalfWidth, 0f)
         var bestScore = Float.NEGATIVE_INFINITY
-        for (offset in END_SCAN_START..END_SCAN_END) {
+        for (step in 0..END_SCAN_STEPS) {
+            val offset = step.toFloat()
             val t = anchor + direction * offset * scaleLength(span)
             if (t !in minT - span * 0.45f..maxT + span * 0.45f) continue
             val line = lineEvidence(pixels, width, height, frame, t, nominalHalfWidth, searchHalfWidth, direction, skinModel)
@@ -345,8 +346,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val MIN_AXIS_LENGTH = 6f
         const val MIN_HALF_WIDTH = 4f
         const val MAX_HALF_WIDTH = 55f
-        const val END_SCAN_START = 0f
-        const val END_SCAN_END = 22f
+        const val END_SCAN_STEPS = 22
         const val END_LATERAL_SAMPLES = 13
         const val END_DISTANCE = 2.5f
         const val MIN_END_CONFIDENCE = 0.12f
