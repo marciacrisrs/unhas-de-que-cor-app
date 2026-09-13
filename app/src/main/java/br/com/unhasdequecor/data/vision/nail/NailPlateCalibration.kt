@@ -32,9 +32,8 @@ object NailPlateCalibration {
     const val TIP_POINT_FACTOR = 0.66f
     const val SHORT_TIP_POINT_FACTOR = 0.72f
     const val SHORT_PLATE_ASPECT = 1.28f
-    // Give the proximal plate enough room to reach the visible cuticle.
-    // The final mask is still constrained by the generated anatomical contour.
-    const val CUTICLE_BACK = 1.18f
+    // Keep the proximal contour inside the calibrated plate length.
+    const val CUTICLE_BACK = 0.98f
     const val MID_FORWARD = 0.20f
 
     data class FingerScale(val widthScale: Float, val lengthScale: Float)
