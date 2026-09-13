@@ -22,6 +22,12 @@ import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetricsSnapshot
 
 /**
  * Overlay de debug (somente quando NailTryOnPipeline.debugEnabled = true).
+ *
+ * A máscara atual é desenhada diretamente por cima da foto, sem alterar a
+ * segmentação. Isso permite separar visualmente:
+ * - amarelo: ROI estimada;
+ * - verde: polígono geométrico/prior;
+ * - vermelho: NailMask efetivamente entregue ao renderizador.
  */
 @Composable
 fun NailDebugOverlay(
@@ -32,6 +38,11 @@ fun NailDebugOverlay(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val imgW = landmarks?.imageWidth?.toFloat()?.coerceAtLeast(1f) ?: size.width
+            val imgH = landmarks?.imageHeight?.toFloat()?.coerceAtLeast(1f) ?: size.height
+            val sx = size.width / imgW
+            val sy = size.height / imgH
+
             landmarks?.points?.forEach { p ->
                 drawCircle(
                     color = Color.Cyan.copy(alpha = 0.85f),
@@ -39,12 +50,12 @@ fun NailDebugOverlay(
                     center = Offset(p.x * size.width, p.y * size.height),
                 )
             }
+
             nails.forEach { nail ->
+                // Máscara efetiva: esta é a forma que o NailColorApplier recebe.
+                drawNailMask(nail, sx, sy)
+
                 val b = nail.roi.bounds
-                val imgW = landmarks?.imageWidth?.toFloat()?.coerceAtLeast(1f) ?: size.width
-                val imgH = landmarks?.imageHeight?.toFloat()?.coerceAtLeast(1f) ?: size.height
-                val sx = size.width / imgW
-                val sy = size.height / imgH
                 drawRect(
                     color = Color.Yellow.copy(alpha = 0.7f),
                     topLeft = Offset(b.left * sx, b.top * sy),
@@ -94,3 +105,49 @@ fun NailDebugOverlay(
         }
     }
 }
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(
+    nail: DetectedNail,
+    sx: Float,
+    sy: Float,
+) {
+    val mask = nail.mask
+    val originX = mask.originX * sx
+    val originY = mask.originY * sy
+    val pixelW = sx.coerceAtLeast(0.5f)
+    val pixelH = sy.coerceAtLeast(0.5f)
+
+    // Agrupa pixels contíguos de cada linha para manter o overlay leve em debug.
+    for (y in 0 until mask.height) {
+        var x = 0
+        while (x < mask.width) {
+            while (x < mask.width && mask.coverageAt(x, y) < MASK_VISIBLE_THRESHOLD) x++
+            if (x >= mask.width) break
+            val start = x
+            var maxAlpha = 0
+            while (x < mask.width) {
+                val alpha = mask.coverageAt(x, y)
+                if (alpha < MASK_VISIBLE_THRESHOLD) break
+                maxAlpha = maxOf(maxAlpha, alpha)
+                x++
+            }
+            drawRect(
+                color = Color.Red.copy(
+                    alpha = MASK_MIN_ALPHA + MASK_MAX_EXTRA_ALPHA * (maxAlpha / 255f),
+                ),
+                topLeft = Offset(
+                    originX + start * pixelW,
+                    originY + y * pixelH,
+                ),
+                size = Size(
+                    (x - start) * pixelW,
+                    pixelH,
+                ),
+            )
+        }
+    }
+}
+
+private const val MASK_VISIBLE_THRESHOLD = 16
+private const val MASK_MIN_ALPHA = 0.16f
+private const val MASK_MAX_EXTRA_ALPHA = 0.44f
