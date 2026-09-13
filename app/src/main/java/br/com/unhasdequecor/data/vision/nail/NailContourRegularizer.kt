@@ -5,12 +5,13 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Removes raster-scale contour spikes while preserving the observed plate extent.
+ * Anatomical contour regularization for the visible nail plate.
  *
- * The learned/completed mask remains authoritative. This stage only removes
- * small boundary oscillations and fills tiny notches already surrounded by the
- * foreground. The safety polygon is generated from the same envelope in the
- * mask coordinate system, so it can never become a disconnected/invalid guard.
+ * The learned/completed mask remains the source of observed coverage. This
+ * stage estimates a smooth left/right boundary along the finger axis, removes
+ * raster spikes, closes tiny notches and never lets smoothing expand beyond
+ * the observed envelope. The safety polygon is derived from that same final
+ * envelope in image coordinates.
  */
 class NailContourRegularizer {
     fun regularize(roi: NailRoi, mask: NailMask): NailMask {
@@ -48,8 +49,14 @@ class NailContourRegularizer {
         val firstBin = min(rawMin.keys.minOrNull() ?: 0, rawMax.keys.minOrNull() ?: 0)
         val lastBin = max(rawMin.keys.maxOrNull() ?: 0, rawMax.keys.maxOrNull() ?: 0)
         val bins = (firstBin..lastBin).toList()
-        val smoothLeft = medianSmooth(interpolateMissing(bins, rawMin))
-        val smoothRight = medianSmooth(interpolateMissing(bins, rawMax))
+        val rawLeft = interpolateMissing(bins, rawMin)
+        val rawRight = interpolateMissing(bins, rawMax)
+
+        // Low-pass the boundary trajectory, then clamp it to the observed side
+        // of the plate. This removes staircase/spike noise without inventing
+        // coverage in skin or air.
+        val smoothLeft = clampToObserved(gaussianSmooth(rawLeft), rawLeft, isLeft = true)
+        val smoothRight = clampToObserved(gaussianSmooth(rawRight), rawRight, isLeft = false)
 
         val out = mask.alpha.copyOf()
         for (i in out.indices) {
@@ -62,12 +69,15 @@ class NailContourRegularizer {
             val value = out[i].toInt() and 255
 
             if (value >= ALPHA_THRESHOLD) {
+                // Only trim pixels that sit materially outside the regularized
+                // boundary. Small one-pixel raster differences are retained.
                 val leftExcess = lo - s
                 val rightExcess = s - hi
                 if (leftExcess > MAX_BOUNDARY_CORRECTION || rightExcess > MAX_BOUNDARY_CORRECTION) {
                     out[i] = 0
                 }
             } else if (s in lo..hi && nearForeground(out, x, y, mask.width, mask.height)) {
+                // Fill only small holes touching the existing plate.
                 out[i] = 255.toByte()
             }
         }
@@ -114,15 +124,36 @@ class NailContourRegularizer {
         return result
     }
 
-    private fun medianSmooth(values: FloatArray): FloatArray {
-        val out = values.copyOf()
+    private fun gaussianSmooth(values: FloatArray): FloatArray {
+        if (values.size < 3) return values.copyOf()
+        val out = FloatArray(values.size)
+        val radius = SMOOTH_RADIUS
+        val sigma = 1.35f
         for (i in values.indices) {
-            val sample = ArrayList<Float>(SMOOTH_RADIUS * 2 + 1)
-            for (j in max(0, i - SMOOTH_RADIUS)..min(values.lastIndex, i + SMOOTH_RADIUS)) {
-                sample += values[j]
+            var weighted = 0f
+            var weightSum = 0f
+            for (j in max(0, i - radius)..min(values.lastIndex, i + radius)) {
+                val d = (j - i).toFloat()
+                val weight = kotlin.math.exp(-(d * d) / (2f * sigma * sigma))
+                weighted += values[j] * weight
+                weightSum += weight
             }
-            sample.sort()
-            out[i] = sample[sample.size / 2]
+            out[i] = weighted / weightSum
+        }
+        return out
+    }
+
+    private fun clampToObserved(smoothed: FloatArray, raw: FloatArray, isLeft: Boolean): FloatArray {
+        val out = smoothed.copyOf()
+        for (i in out.indices) {
+            out[i] = if (isLeft) {
+                // s grows toward the right: never smooth the left boundary
+                // farther outward than the observed left edge.
+                max(out[i], raw[i])
+            } else {
+                // Never smooth the right boundary farther outward than observed.
+                min(out[i], raw[i])
+            }
         }
         return out
     }
@@ -195,9 +226,9 @@ class NailContourRegularizer {
 
     private companion object {
         const val ALPHA_THRESHOLD = 128
-        const val SMOOTH_RADIUS = 2
+        const val SMOOTH_RADIUS = 3
         const val MAX_BOUNDARY_CORRECTION = 1.25f
         const val MIN_FOREGROUND_NEIGHBORS = 5
-        const val MAX_POLYGON_POINTS = 32
+        const val MAX_POLYGON_POINTS = 64
     }
 }
