@@ -52,6 +52,72 @@ class PaintAwareNailSegmenterTest {
     }
 
     @Test
+    fun `traces beyond narrow geometric prior when visible plate is wider`() {
+        val width = 100
+        val height = 120
+        val skin = argb(132, 86, 74)
+        val nail = argb(210, 194, 188)
+        val pixels = IntArray(width * height) { skin }
+        for (y in 30 until 92) {
+            for (x in 33..67) pixels[y * width + x] = nail
+        }
+
+        val mask = segmenter.segment(
+            bitmap(width, height, pixels),
+            NailRoi(
+                finger = Finger.MIDDLE,
+                bounds = PixelRect(25, 20, 75, 105),
+                polygon = listOf(
+                    PixelPoint(47f, 43f), PixelPoint(53f, 43f),
+                    PixelPoint(53f, 78f), PixelPoint(47f, 78f),
+                ),
+                axisFromDip = PixelPoint(50f, 82f),
+                axisToTip = PixelPoint(50f, 28f),
+                lengthPx = 35f,
+                widthPx = 6f,
+                rotationDegrees = 0f,
+                geometricConfidence = 0.95f,
+            ),
+        )
+
+        assertThat(mask).isNotNull()
+        assertThat(mask!!.filledRatio()).isGreaterThan(0.18f)
+        val xs = mask.boundaryPolygon!!.map { it.x }
+        assertThat(xs.max() - xs.min()).isGreaterThan(20f)
+    }
+
+    @Test
+    fun `keeps dark polish on deep skin instead of reverting to skin`() {
+        val width = 100
+        val height = 120
+        val skin = argb(72, 48, 38)
+        val wine = argb(58, 22, 32)
+        val pixels = IntArray(width * height) { skin }
+        for (y in 30 until 92) for (x in 37..63) pixels[y * width + x] = wine
+
+        val mask = segmenter.segment(
+            bitmap(width, height, pixels),
+            NailRoi(
+                finger = Finger.MIDDLE,
+                bounds = PixelRect(25, 20, 75, 105),
+                polygon = listOf(
+                    PixelPoint(45f, 43f), PixelPoint(55f, 43f),
+                    PixelPoint(55f, 78f), PixelPoint(45f, 78f),
+                ),
+                axisFromDip = PixelPoint(50f, 82f),
+                axisToTip = PixelPoint(50f, 28f),
+                lengthPx = 35f,
+                widthPx = 10f,
+                rotationDegrees = 0f,
+                geometricConfidence = 0.95f,
+            ),
+        )
+
+        assertThat(mask).isNotNull()
+        assertThat(mask!!.filledRatio()).isGreaterThan(0.10f)
+    }
+
+    @Test
     fun `rejects all skin roi instead of painting the finger`() {
         val width = 80
         val height = 100
