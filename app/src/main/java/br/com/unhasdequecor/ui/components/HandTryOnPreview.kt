@@ -75,18 +75,15 @@ private data class TryOnPreviewData(
     val nails: List<DetectedNail> = emptyList(),
     val landmarks: HandLandmarks? = null,
     val showDebug: Boolean = false,
-    /** Foto da usuária: Canvas usa o mesmo tamanho da elipse (não a âncora cheia). */
     val matchEllipsePlate: Boolean = false,
     val failureReason: DetectionFailureReason? = null,
 )
 
-/** Cache de detecção/máscara independente da cor do esmalte. */
 private data class TryOnBaseAssets(
     val decoded: Bitmap,
     val snapshot: NailDetectionSnapshot? = null,
     val sampleMask: Bitmap? = null,
     val sampleId: String? = null,
-    /** Motivo quando MediaPipe não devolve landmarks (sem snapshot). */
     val noLandmarkReason: DetectionFailureReason? = null,
 )
 
@@ -94,7 +91,6 @@ private enum class TryOnMode {
     MASK,
     DETECTED,
     APPROXIMATE,
-    /** Sem landmarks utilizáveis / presence rejeitada — sem overlay de unha. */
     NOT_DETECTED,
 }
 
@@ -329,7 +325,6 @@ private fun loadTryOnBaseAssets(
         if (hasCalibratedMask) {
             sampleMask = PolishMaskRecolorer.loadMask(appContext, sampleId)
         }
-        // Amostra sem máscara calibrada: detectar como foto real (evita elipse que pinta pele).
         val snapshot = if (!hasCalibratedMask) {
             pipeline.detect(decoded, stabilize = false)
         } else {
@@ -368,10 +363,6 @@ private fun recycleTryOnBaseAssets(held: TryOnBaseAssets?) {
     recycleQuietly(held?.decoded)
 }
 
-/**
- * Produz bitmap pintado a partir do cache de detecção/máscara.
- * O bitmap devolvido é sempre uma cópia/pintura nova (ou a decoded se APPROXIMATE sem paint).
- */
 private fun paintPreview(
     assets: TryOnBaseAssets,
     polishColor: Color,
@@ -491,6 +482,25 @@ private fun paintUserFull(
     polishColor: Color,
     pipeline: NailTryOnPipeline,
 ): TryOnPreviewData {
+    // Debug é um modo de diagnóstico: não podemos contaminar a foto com o
+    // próprio recolor que estamos tentando avaliar. A foto original fica limpa
+    // e o NailDebugOverlay mostra a NailMask efetiva, ROI, contorno e landmarks.
+    if (pipeline.debugEnabled) {
+        val display = ownedPreviewBitmap(
+            candidate = snapshot.workingBitmap,
+            protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
+        )
+        return TryOnPreviewData(
+            bitmap = display,
+            anchors = emptyList(),
+            mode = TryOnMode.DETECTED,
+            nails = snapshot.nails,
+            landmarks = snapshot.landmarks,
+            showDebug = true,
+            failureReason = snapshot.failureReason,
+        )
+    }
+
     val result = pipeline.recolor(snapshot, polishColor)
     val painted = ownedPreviewBitmap(
         candidate = result.bitmap,
@@ -528,7 +538,6 @@ private fun paintUserApproximate(
     )
 }
 
-/** Garante bitmap que a UI pode reciclar sem tocar no cache de detecção. */
 private fun ownedPreviewBitmap(
     candidate: Bitmap,
     protected: List<Bitmap>,
