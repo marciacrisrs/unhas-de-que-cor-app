@@ -6,34 +6,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Stroke
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Text
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
+import br.com.unhasdequecor.data.vision.nail.NailDiagnosticStage
+import br.com.unhasdequecor.data.vision.nail.NailMaskDiagnostic
 import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetrics
 import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetricsSnapshot
 
-/**
- * Overlay de debug (somente quando NailTryOnPipeline.debugEnabled = true).
- *
- * A máscara atual é desenhada diretamente por cima da foto, sem alterar a
- * segmentação. Isso permite separar visualmente:
- * - amarelo: ROI de busca;
- * - azul: prior geométrico original;
- * - verde: contorno efetivamente usado pela NailMask;
- * - vermelho: NailMask efetivamente entregue ao renderizador.
- */
+/** Debug-only overlay. Never changes segmentation or production rendering. */
 @Composable
 fun NailDebugOverlay(
     landmarks: HandLandmarks?,
     nails: List<DetectedNail>,
+    diagnostics: List<NailMaskDiagnostic> = emptyList(),
     metrics: TryOnPipelineMetricsSnapshot = TryOnPipelineMetrics.latestDebugSnapshot,
     modifier: Modifier = Modifier,
 ) {
@@ -45,83 +40,53 @@ fun NailDebugOverlay(
             val sy = size.height / imgH
 
             landmarks?.points?.forEach { p ->
-                drawCircle(
-                    color = Color.Cyan.copy(alpha = 0.85f),
-                    radius = 4f,
-                    center = Offset(p.x * size.width, p.y * size.height),
-                )
+                drawCircle(Color.Cyan.copy(alpha = 0.85f), 4f, Offset(p.x * size.width, p.y * size.height))
             }
 
             nails.forEach { nail ->
-                // Máscara efetiva: esta é a forma que o NailColorApplier recebe.
                 drawNailMask(nail, sx, sy)
-
                 val b = nail.roi.bounds
-                drawRect(
-                    color = Color.Yellow.copy(alpha = 0.7f),
-                    topLeft = Offset(b.left * sx, b.top * sy),
-                    size = Size(b.width() * sx, b.height() * sy),
-                    style = Stroke(width = 2f),
-                )
-
-                // Prior geométrico: mostra de onde o segmentador partiu.
-                drawPolygon(
-                    points = nail.roi.polygon,
-                    sx = sx,
-                    sy = sy,
-                    color = Color.Blue.copy(alpha = 0.75f),
-                    strokeWidth = 2f,
-                )
-
-                // Contorno efetivo da NailMask: este é o limite que precisa
-                // acompanhar a placa real, e não apenas a geometria sintética.
-                nail.mask.boundaryPolygon?.let { boundary ->
-                    drawPolygon(
-                        points = boundary,
-                        sx = sx,
-                        sy = sy,
-                        color = Color(0xFF7CFF00).copy(alpha = 0.95f),
-                        strokeWidth = 2.5f,
-                    )
-                }
+                drawRect(Color.Yellow.copy(alpha = 0.7f), Offset(b.left * sx, b.top * sy), Size(b.width() * sx, b.height() * sy), style = Stroke(width = 2f))
+                drawPolygon(nail.roi.polygon, sx, sy, Color.Blue.copy(alpha = 0.75f), 2f)
+                nail.mask.boundaryPolygon?.let { drawPolygon(it, sx, sy, Color(0xFF7CFF00).copy(alpha = 0.95f), 2.5f) }
             }
         }
 
-        if (metrics.sampleCount > 0) {
-            Column(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.72f))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = "proc ${metrics.effectiveFps.toInt()} FPS | " +
-                        "p95 ${metrics.p95Ms.toInt()}ms | " +
-                        "max ${metrics.maxMs.toInt()}ms",
-                    color = Color.White,
-                )
-                Text(
-                    text = "MP ${metrics.mediaPipeMs.toInt()}ms | " +
-                        "seg ${metrics.segmentationMs.toInt()}ms | " +
-                        "track ${metrics.trackingMs.toInt()}ms",
-                    color = Color.White,
-                )
-                Text(
-                    text = "pred ${metrics.predictionFrames} | " +
-                        "recovery ${metrics.recoveryFrames} | " +
-                        "fail ${metrics.rejectedFrames}",
-                    color = Color.White,
-                )
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.78f))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            if (metrics.sampleCount > 0) {
+                Text("proc ${metrics.effectiveFps.toInt()} FPS | p95 ${metrics.p95Ms.toInt()}ms | max ${metrics.maxMs.toInt()}ms", color = Color.White)
+                Text("MP ${metrics.mediaPipeMs.toInt()}ms | seg ${metrics.segmentationMs.toInt()}ms | track ${metrics.trackingMs.toInt()}ms", color = Color.White)
+                Text("pred ${metrics.predictionFrames} | recovery ${metrics.recoveryFrames} | fail ${metrics.rejectedFrames}", color = Color.White)
                 if (metrics.lastFailureReason != null || metrics.lastNailsDetected == 0) {
-                    Text(
-                        text = "last nails ${metrics.lastNailsDetected} | " +
-                            "reason ${metrics.lastFailureReason?.name ?: "NONE"}",
-                        color = Color.White,
-                    )
+                    Text("last nails ${metrics.lastNailsDetected} | reason ${metrics.lastFailureReason?.name ?: "NONE"}", color = Color.White)
                 }
+            }
+            diagnostics.sortedBy { it.finger.ordinal }.forEach { diagnostic ->
+                Text(
+                    text = diagnosticLine(diagnostic),
+                    color = Color.White,
+                )
             }
         }
     }
+}
+
+private fun diagnosticLine(d: NailMaskDiagnostic): String {
+    val finger = when (d.finger.name) {
+        "THUMB" -> "P"
+        "INDEX" -> "I"
+        "MIDDLE" -> "M"
+        "RING" -> "A"
+        "PINKY" -> "Mi"
+        else -> d.finger.name.take(2)
+    }
+    val detail = d.rejectionReason ?: "ok"
+    return "$finger ${d.stage.name} geo=${"%.2f".format(d.geometricConfidence)} seg=${"%.2f".format(d.segmentationConfidence)} fill=${"%.3f".format(d.postGuardFilledRatio)} $detail"
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolygon(
@@ -132,40 +97,25 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolygon(
     strokeWidth: Float,
 ) {
     if (points.size < 3) return
-
     val scaled = points.map { Offset(it.x * sx, it.y * sy) }
     val path = Path()
     path.moveTo(scaled.first().x, scaled.first().y)
-
-    // Quadratic midpoint interpolation keeps the debug contour continuous
-    // without changing the underlying NailMask. The previous polyline exposed
-    // every sampling bin as a visible corner, making a good contour look like
-    // a polygon/sticker in the live diagnostic view.
     for (index in scaled.indices) {
         val current = scaled[index]
         val next = scaled[(index + 1) % scaled.size]
-        val midpoint = Offset(
-            (current.x + next.x) * 0.5f,
-            (current.y + next.y) * 0.5f,
-        )
+        val midpoint = Offset((current.x + next.x) * 0.5f, (current.y + next.y) * 0.5f)
         path.quadraticTo(current.x, current.y, midpoint.x, midpoint.y)
     }
     path.close()
-    drawPath(path, color = color, style = Stroke(width = strokeWidth))
+    drawPath(path, color, style = Stroke(width = strokeWidth))
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(
-    nail: DetectedNail,
-    sx: Float,
-    sy: Float,
-) {
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(nail: DetectedNail, sx: Float, sy: Float) {
     val mask = nail.mask
     val originX = mask.originX * sx
     val originY = mask.originY * sy
     val pixelW = sx.coerceAtLeast(0.5f)
     val pixelH = sy.coerceAtLeast(0.5f)
-
-    // Agrupa pixels contíguos de cada linha para manter o overlay leve em debug.
     for (y in 0 until mask.height) {
         var x = 0
         while (x < mask.width) {
@@ -180,17 +130,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(
                 x++
             }
             drawRect(
-                color = Color.Red.copy(
-                    alpha = MASK_MIN_ALPHA + MASK_MAX_EXTRA_ALPHA * (maxAlpha / 255f),
-                ),
-                topLeft = Offset(
-                    originX + start * pixelW,
-                    originY + y * pixelH,
-                ),
-                size = Size(
-                    (x - start) * pixelW,
-                    pixelH,
-                ),
+                color = Color.Red.copy(alpha = MASK_MIN_ALPHA + MASK_MAX_EXTRA_ALPHA * (maxAlpha / 255f)),
+                topLeft = Offset(originX + start * pixelW, originY + y * pixelH),
+                size = Size((x - start) * pixelW, pixelH),
             )
         }
     }
