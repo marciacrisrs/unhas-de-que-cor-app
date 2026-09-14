@@ -63,32 +63,17 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 @Composable
-fun LiveTryOnScreen(
-    onBack: () -> Unit,
-    viewModel: LiveTryOnViewModel = hiltViewModel(),
-) {
+fun LiveTryOnScreen(onBack: () -> Unit, viewModel: LiveTryOnViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     KeepScreenOn()
     if (state.errorMessage != null) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            ErrorContent(
-                message = state.errorMessage.orEmpty(),
-                onRetry = onBack,
-                retryLabel = "Voltar",
-            )
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            ErrorContent(message = state.errorMessage.orEmpty(), onRetry = onBack, retryLabel = "Voltar")
         }
         return
     }
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
-        LiveTryOnPermissionGate(
-            state = state,
-            onBack = onBack,
-            onFrame = viewModel::consumeFrame,
-            onCameraError = viewModel::onCameraUnavailable,
-        )
+        LiveTryOnPermissionGate(state, onBack, viewModel::consumeFrame, viewModel::onCameraUnavailable)
     }
 }
 
@@ -98,9 +83,7 @@ private fun KeepScreenOn() {
     DisposableEffect(activity) {
         val window = activity?.window
         window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose {
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 }
 
@@ -112,67 +95,26 @@ private fun LiveTryOnPermissionGate(
     onCameraError: () -> Unit,
 ) {
     val context = LocalContext.current
-    val cameraAvailable = remember {
-        context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
-    }
+    val cameraAvailable = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
     var granted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED,
-        )
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted = it }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     LaunchedEffect(cameraAvailable) {
-        if (cameraAvailable && !granted) {
-            launcher.launch(Manifest.permission.CAMERA)
-        }
+        if (cameraAvailable && !granted) launcher.launch(Manifest.permission.CAMERA)
     }
     when {
-        !cameraAvailable -> PermissionPane(
-            title = "Este aparelho não tem câmera.",
-            actionLabel = "Voltar",
-            onAction = onBack,
-            onBack = onBack,
-        )
-        granted -> LiveCameraPane(
-            state = state,
-            onBack = onBack,
-            onFrame = onFrame,
-            onCameraError = onCameraError,
-        )
-        else -> PermissionPane(
-            title = "Precisamos da câmera para o try-on ao vivo.",
-            actionLabel = "Permitir câmera",
-            onAction = { launcher.launch(Manifest.permission.CAMERA) },
-            onBack = onBack,
-        )
+        !cameraAvailable -> PermissionPane("Este aparelho não tem câmera.", "Voltar", onBack, onBack)
+        granted -> LiveCameraPane(state, onBack, onFrame, onCameraError)
+        else -> PermissionPane("Precisamos da câmera para o try-on ao vivo.", "Permitir câmera", { launcher.launch(Manifest.permission.CAMERA) }, onBack)
     }
 }
 
 @Composable
-private fun PermissionPane(
-    title: String,
-    actionLabel: String,
-    onAction: () -> Unit,
-    onBack: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = title,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-            )
+private fun PermissionPane(title: String, actionLabel: String, onAction: () -> Unit, onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(text = title, color = Color.White, style = MaterialTheme.typography.titleMedium)
             PrimaryCtaButton(text = actionLabel, onClick = onAction)
             SecondaryCtaButton(text = "Voltar", onClick = onBack)
         }
@@ -191,87 +133,44 @@ private fun LiveCameraPane(
     val previewView = remember { PreviewView(context) }
     val executor = remember { Executors.newSingleThreadExecutor() }
     val statusText = TryOnPreviewLabels.status(state.claim, state.failureReason)
-    val frameDescription = TryOnPreviewLabels.contentDescription(
-        colorName = state.colorName,
-        claim = state.claim,
-        reason = state.failureReason,
-    )
+    val frameDescription = TryOnPreviewLabels.contentDescription(state.colorName, state.claim, state.failureReason)
 
     DisposableEffect(lifecycleOwner) {
-        val session = LiveCameraSession(
-            context = context,
-            lifecycleOwner = lifecycleOwner,
-            previewView = previewView,
-            executor = executor,
-            onFrame = onFrame,
-            onCameraError = onCameraError,
-        )
+        val session = LiveCameraSession(context, lifecycleOwner, previewView, executor, onFrame, onCameraError)
         session.start()
         onDispose { session.release() }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .semantics {
-                contentDescription = frameDescription
-                liveRegion = LiveRegionMode.Polite
-            },
-    ) {
+    Box(modifier = Modifier.fillMaxSize().semantics {
+        contentDescription = frameDescription
+        liveRegion = LiveRegionMode.Polite
+    }) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
         val overlay = state.overlay
         if (overlay != null && !overlay.isRecycled) {
-            Image(
-                bitmap = overlay.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Image(bitmap = overlay.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
         }
         if (state.showDebug) {
             NailDebugOverlay(
                 landmarks = state.landmarks,
                 nails = state.nails,
+                diagnostics = state.diagnostics,
                 modifier = Modifier.fillMaxSize(),
             )
         }
         IconButton(
             onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(4.dp)
-                .background(Color.Black.copy(alpha = CHROME_CHIP_ALPHA), MaterialTheme.shapes.medium),
+            modifier = Modifier.align(Alignment.TopStart).padding(4.dp).background(Color.Black.copy(alpha = CHROME_CHIP_ALPHA), MaterialTheme.shapes.medium),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Voltar",
-                tint = Color.White,
-            )
+            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.White)
         }
         Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
-                .background(Color.Black.copy(alpha = CHROME_CHIP_ALPHA), MaterialTheme.shapes.medium)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp).background(Color.Black.copy(alpha = CHROME_CHIP_ALPHA), MaterialTheme.shapes.medium).padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = "Try-on ao vivo",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = state.colorName,
-                color = Color.White.copy(alpha = 0.85f),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = statusText,
-                color = Color.White,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            Text(text = "Try-on ao vivo", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text(text = state.colorName, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+            Text(text = statusText, color = Color.White, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -286,18 +185,13 @@ private class LiveCameraSession(
 ) {
     private val mainExecutor = ContextCompat.getMainExecutor(context)
     private val providerFuture = ProcessCameraProvider.getInstance(context)
-    @Volatile
-    private var disposed = false
+    @Volatile private var disposed = false
 
-    fun start() {
-        providerFuture.addListener(::onProviderReady, mainExecutor)
-    }
+    fun start() { providerFuture.addListener(::onProviderReady, mainExecutor) }
 
     fun release() {
         disposed = true
-        if (providerFuture.isDone) {
-            runCatching { providerFuture.get().unbindAll() }
-        }
+        if (providerFuture.isDone) runCatching { providerFuture.get().unbindAll() }
         executor.shutdown()
     }
 
@@ -305,18 +199,9 @@ private class LiveCameraSession(
         if (disposed) return
         val provider = runCatching { providerFuture.get() }.getOrNull()
         if (disposed) return
-        if (provider == null) {
-            onCameraError()
-            return
-        }
-        val lens = LiveTryOnCamera.lens(
-            hasFront = hasLens(provider, CameraSelector.DEFAULT_FRONT_CAMERA),
-            hasBack = hasLens(provider, CameraSelector.DEFAULT_BACK_CAMERA),
-        )
-        if (lens == null) {
-            onCameraError()
-            return
-        }
+        if (provider == null) { onCameraError(); return }
+        val lens = LiveTryOnCamera.lens(hasFront = hasLens(provider, CameraSelector.DEFAULT_FRONT_CAMERA), hasBack = hasLens(provider, CameraSelector.DEFAULT_BACK_CAMERA))
+        if (lens == null) { onCameraError(); return }
         bindUseCases(provider, lens)
     }
 
@@ -325,81 +210,40 @@ private class LiveCameraSession(
             LiveTryOnLens.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
             LiveTryOnLens.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
         }
-        val preview = Preview.Builder().build().also { useCase ->
-            useCase.surfaceProvider = previewView.surfaceProvider
-        }
+        val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
         val analysis = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
-            .also { useCase ->
-                useCase.setAnalyzer(
-                    executor,
-                    LiveFrameAnalyzer(
-                        onFrame = onFrame,
-                        mirror = LiveTryOnCamera.shouldMirror(lens),
-                    ),
-                )
-            }
+            .also { it.setAnalyzer(executor, LiveFrameAnalyzer(onFrame, LiveTryOnCamera.shouldMirror(lens))) }
         val bound = runCatching {
-            if (disposed ||
-                !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.INITIALIZED)
-            ) {
-                return@runCatching
-            }
+            if (disposed || !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.INITIALIZED)) return@runCatching
             provider.unbindAll()
             if (disposed) return@runCatching
-            provider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                preview,
-                analysis,
-            )
+            provider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, analysis)
         }
-        if (bound.isFailure && !disposed) {
-            onCameraError()
-        }
+        if (bound.isFailure && !disposed) onCameraError()
     }
 
-    private fun hasLens(provider: ProcessCameraProvider, selector: CameraSelector): Boolean =
-        runCatching { provider.hasCamera(selector) }.getOrDefault(false)
+    private fun hasLens(provider: ProcessCameraProvider, selector: CameraSelector): Boolean = runCatching { provider.hasCamera(selector) }.getOrDefault(false)
 }
 
-private class LiveFrameAnalyzer(
-    private val onFrame: (Bitmap) -> Unit,
-    private val mirror: Boolean,
-) : ImageAnalysis.Analyzer {
+private class LiveFrameAnalyzer(private val onFrame: (Bitmap) -> Unit, private val mirror: Boolean) : ImageAnalysis.Analyzer {
     override fun analyze(image: ImageProxy) {
         try {
             val raw = image.toBitmap()
-            val oriented = orientLiveFrame(
-                source = raw,
-                rotationDegrees = image.imageInfo.rotationDegrees,
-                mirror = mirror,
-            )
-            if (oriented !== raw && !raw.isRecycled) {
-                raw.recycle()
-            }
+            val oriented = orientLiveFrame(raw, image.imageInfo.rotationDegrees, mirror)
+            if (oriented !== raw && !raw.isRecycled) raw.recycle()
             onFrame(oriented)
-        } finally {
-            image.close()
-        }
+        } finally { image.close() }
     }
 }
 
-internal fun orientLiveFrame(
-    source: Bitmap,
-    rotationDegrees: Int,
-    mirror: Boolean,
-): Bitmap {
+internal fun orientLiveFrame(source: Bitmap, rotationDegrees: Int, mirror: Boolean): Bitmap {
     if (rotationDegrees == 0 && !mirror) return source
     val matrix = Matrix()
-    if (rotationDegrees != 0) {
-        matrix.postRotate(rotationDegrees.toFloat())
-    }
-    if (mirror) {
-        matrix.postScale(-1f, 1f)
-    }
+    if (rotationDegrees != 0) matrix.postRotate(rotationDegrees.toFloat())
+    if (mirror) matrix.postScale(-1f, 1f)
     return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, false)
 }
 
