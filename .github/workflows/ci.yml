@@ -4,6 +4,7 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -31,7 +32,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          # SonarCloud precisa do histórico completo para blame / new code.
           fetch-depth: 0
 
       - name: Set up JDK 17
@@ -49,8 +49,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
-          # Instala o necessário aqui; evita cache manual do SDK (restore tar flaky).
-          # NDK: assembleRelease com ndk.debugSymbolLevel (símbolos nativos / MediaPipe).
           packages: 'tools platform-tools platforms;android-36 build-tools;36.0.0 ndk;28.2.13676358'
 
       - name: Write local.properties
@@ -59,11 +57,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 1) Qualidade + cobertura + assemble (verifyCi)
       - name: Run CI verification
         run: ./gradlew verifyCi --stacktrace --no-configuration-cache
 
-      # 2) Sonar + Quality Gate (bloqueante com SONAR_QUALITY_GATE_WAIT=true)
       - name: Sonar analysis
         if: ${{ env.SONAR_TOKEN != '' }}
         env:
@@ -110,10 +106,8 @@ jobs:
 
       - name: Upload unit test reports
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: unit-test-reports
           path: app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
-
-# CI retrigger marker
