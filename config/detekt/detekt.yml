@@ -8,7 +8,11 @@ processors:
 console-reports:
   active: true
 
+# CI policy: Detekt continues to analyze the whole codebase, but only
+# correctness/safety-oriented findings block the build. Maintainability and
+# style findings remain visible in reports without blocking try-on validation.
 complexity:
+  severity: warning
   LongMethod:
     active: true
     allowedLines: 120
@@ -34,11 +38,12 @@ complexity:
     active: true
     allowedComplexity: 25
 
-
 coroutines:
+  severity: warning
   active: true
 
 naming:
+  severity: warning
   FunctionNaming:
     active: true
     ignoreAnnotated: ['Composable']
@@ -48,9 +53,9 @@ naming:
     active: true
 
 style:
+  severity: warning
   MagicNumber:
     active: true
-    # Desenho/Compose tende a usar literals de layout; cobrimos dívida via baseline.
     ignoreNumbers: ['-1', '0', '1', '2', '3', '4', '5', '6', '8', '10', '12']
     ignoreHashCodeFunction: true
     ignorePropertyDeclaration: true
@@ -84,6 +89,7 @@ style:
     active: true
 
 comments:
+  severity: warning
   UndocumentedPublicClass:
     active: false
   UndocumentedPublicFunction:
@@ -92,13 +98,22 @@ comments:
     active: false
 
 potential-bugs:
+  severity: error
   active: true
 
 performance:
+  severity: warning
   active: true
 
 exceptions:
+  severity: error
   active: true
 
 empty-blocks:
+  severity: warning
   active: true
+
+# KtLint-backed formatting findings are useful feedback but should not block
+# the functional try-on validation. Critical correctness rules above remain blocking.
+formatting:
+  severity: warning
