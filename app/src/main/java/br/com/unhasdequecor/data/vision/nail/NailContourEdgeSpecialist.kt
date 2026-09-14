@@ -25,24 +25,38 @@ class NailContourEdgeSpecialist {
         val left = smooth(traceBoundary(pixels, mask.width, mask.height, frame, bins, leftBase, -1))
         val right = smooth(traceBoundary(pixels, mask.width, mask.height, frame, bins, rightBase, 1))
 
-        val alpha = ByteArray(mask.alpha.size)
+        // The learned mask is the source of coverage. The traced contour is a
+        // conservative boundary constraint, not a reason to paint the whole
+        // left/right strip. Rebuilding alpha from the strip was producing the
+        // rectangular/diamond artifacts visible in the live preview.
+        val alpha = mask.alpha.copyOf()
         for (i in alpha.indices) {
+            val originalAlpha = alpha[i].toInt() and ALPHA_MASK
+            if (originalAlpha == 0) continue
+
             val x = i % mask.width
             val y = i / mask.width
             val (t, s) = frame.toTs(x + PIXEL_CENTER, y + PIXEL_CENTER)
             val pos = t - bins.first()
-            val lo = interpolate(left, pos) ?: continue
-            val hi = interpolate(right, pos) ?: continue
-            if (!withinObservedBand(t, s, observed, bins)) continue
+            val lo = interpolate(left, pos) ?: run {
+                alpha[i] = 0
+                continue
+            }
+            val hi = interpolate(right, pos) ?: run {
+                alpha[i] = 0
+                continue
+            }
+            if (!withinObservedBand(t, s, observed, bins)) {
+                alpha[i] = 0
+                continue
+            }
 
             val boundaryDistance = min(s - lo, hi - s)
-            val coverage = when {
-                boundaryDistance >= FEATHER_WIDTH -> 1f
-                boundaryDistance <= 0f -> 0f
-                else -> boundaryDistance / FEATHER_WIDTH
-            }
-            if (coverage > 0f) {
-                alpha[i] = (coverage * FULL_ALPHA_VALUE).toInt().coerceIn(1, FULL_ALPHA_VALUE).toByte()
+            if (boundaryDistance <= 0f) {
+                alpha[i] = 0
+            } else if (boundaryDistance < FEATHER_WIDTH) {
+                val coverage = boundaryDistance / FEATHER_WIDTH
+                alpha[i] = (originalAlpha * coverage).toInt().coerceIn(0, ALPHA_MASK).toByte()
             }
         }
         return mask.copy(alpha = alpha, boundaryPolygon = polygon(bins, left, right, frame, mask))
@@ -291,7 +305,6 @@ class NailContourEdgeSpecialist {
         const val COARSE_EDGE_WEIGHT = 0.75f
         const val FINE_EDGE_WEIGHT = 0.25f
         const val FEATHER_WIDTH = 1.25f
-        const val FULL_ALPHA_VALUE = 255
         const val TWO = 2f
         const val PIXEL_CENTER = 0.5f
         const val NO_PREVIOUS = -1
