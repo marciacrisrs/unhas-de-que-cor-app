@@ -4,15 +4,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Anatomical contour regularization for the visible nail plate.
- *
- * The learned/completed mask remains the source of observed coverage. This
- * stage estimates a smooth left/right boundary along the finger axis, removes
- * raster spikes, closes tiny notches and never lets smoothing expand beyond
- * the observed envelope. The safety polygon is derived from that same final
- * envelope in image coordinates.
- */
+/** Anatomical contour regularization for the visible nail plate. */
 class NailContourRegularizer {
     fun regularize(roi: NailRoi, mask: NailMask): NailMask {
         if (mask.width < 12 || mask.height < 12) return mask
@@ -73,6 +65,7 @@ class NailContourRegularizer {
         val polygon = polygonFromEnvelope(bins, smoothLeft, smoothRight, baseX, baseY, ux, uy, vx, vy, mask.originX, mask.originY)
         return mask.copy(alpha = out, boundaryPolygon = polygon)
     }
+
     private fun interpolateMissing(bins: List<Int>, values: Map<Int, Float>): FloatArray {
         val result = FloatArray(bins.size)
         var previous = -1
@@ -94,6 +87,7 @@ class NailContourRegularizer {
         }
         return result
     }
+
     private fun gaussianSmooth(values: FloatArray): FloatArray {
         if (values.size < 3) return values.copyOf()
         val out = FloatArray(values.size)
@@ -110,11 +104,13 @@ class NailContourRegularizer {
         }
         return out
     }
+
     private fun clampToObserved(smoothed: FloatArray, raw: FloatArray, isLeft: Boolean): FloatArray {
         val out = smoothed.copyOf()
         for (i in out.indices) out[i] = if (isLeft) max(out[i], raw[i]) else min(out[i], raw[i])
         return out
     }
+
     private fun interpolateAt(values: FloatArray, position: Float): Float? {
         if (position < 0f || position > values.lastIndex.toFloat()) return null
         val lo = floor(position).toInt().coerceIn(0, values.lastIndex)
@@ -122,8 +118,13 @@ class NailContourRegularizer {
         val f = position - lo
         return values[lo] + (values[hi] - values[lo]) * f
     }
-    private fun nearForeground(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean = foregroundNeighborCount(alpha, x, y, w, h) >= MIN_FOREGROUND_NEIGHBORS
-    private fun isIsolatedSpike(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean = foregroundNeighborCount(alpha, x, y, w, h) <= MAX_SPIKE_NEIGHBORS
+
+    private fun nearForeground(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
+        foregroundNeighborCount(alpha, x, y, w, h) >= MIN_FOREGROUND_NEIGHBORS
+
+    private fun isIsolatedSpike(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
+        foregroundNeighborCount(alpha, x, y, w, h) <= MAX_SPIKE_NEIGHBORS
+
     private fun foregroundNeighborCount(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Int {
         var count = 0
         for (dy in -1..1) for (dx in -1..1) {
@@ -133,7 +134,12 @@ class NailContourRegularizer {
         }
         return count
     }
-    private fun polygonFromEnvelope(bins: List<Int>, left: FloatArray, right: FloatArray, baseX: Float, baseY: Float, ux: Float, uy: Float, vx: Float, vy: Float, ox: Int, oy: Int): List<ImageCoordinates.PixelPoint>? {
+
+    private fun polygonFromEnvelope(
+        bins: List<Int>, left: FloatArray, right: FloatArray,
+        baseX: Float, baseY: Float, ux: Float, uy: Float, vx: Float, vy: Float,
+        ox: Int, oy: Int,
+    ): List<ImageCoordinates.PixelPoint>? {
         if (bins.size < 4) return null
         val stride = max(1, bins.size / MAX_POLYGON_POINTS)
         val out = ArrayList<ImageCoordinates.PixelPoint>(MAX_POLYGON_POINTS * 2)
@@ -142,12 +148,15 @@ class NailContourRegularizer {
         while (i >= 0) { out += point(bins[i].toFloat() + 0.5f, right[i], baseX, baseY, ux, uy, vx, vy, ox, oy); i -= stride }
         return out.takeIf { it.size >= 6 }
     }
-    private fun point(t: Float, s: Float, baseX: Float, baseY: Float, ux: Float, uy: Float, vx: Float, vy: Float, ox: Int, oy: Int): ImageCoordinates.PixelPoint = ImageCoordinates.PixelPoint(baseX + t * ux + s * vx + ox, baseY + t * uy + s * vy + oy)
+
+    private fun point(t: Float, s: Float, baseX: Float, baseY: Float, ux: Float, uy: Float, vx: Float, vy: Float, ox: Int, oy: Int): ImageCoordinates.PixelPoint =
+        ImageCoordinates.PixelPoint(baseX + t * ux + s * vx + ox, baseY + t * uy + s * vy + oy)
+
     private companion object {
         const val ALPHA_THRESHOLD = 128
         const val SMOOTH_RADIUS = 3
         const val MAX_BOUNDARY_CORRECTION = 1.25f
-        const val MIN_FOREGROUND_NEIGHBORS = 4
+        const val MIN_FOREGROUND_NEIGHBORS = 3
         const val MAX_SPIKE_NEIGHBORS = 2
         const val MAX_POLYGON_POINTS = 64
     }
