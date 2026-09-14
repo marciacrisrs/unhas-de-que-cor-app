@@ -19,39 +19,32 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
         val height = bounds.height()
         if (width < MIN_SIZE || height < MIN_SIZE) return null
         if (bounds.left < 0 || bounds.top < 0 || bounds.right > image.width || bounds.bottom > image.height) return null
-
         val pixels = IntArray(width * height)
         image.getPixels(pixels, 0, width, bounds.left, bounds.top, width, height)
         val polygon = roi.polygon.map { PixelPoint(it.x - bounds.left, it.y - bounds.top) }
         if (polygon.size < MIN_POLYGON_POINTS) return null
-
-        val base = PixelPoint(roi.axisFromDip.x - bounds.left, roi.axisFromDip.y - bounds.top)
-        val tip = PixelPoint(roi.axisToTip.x - bounds.left, roi.axisToTip.y - bounds.top)
-        val frame = Frame(base, tip)
+        val frame = Frame(
+            PixelPoint(roi.axisFromDip.x - bounds.left, roi.axisFromDip.y - bounds.top),
+            PixelPoint(roi.axisToTip.x - bounds.left, roi.axisToTip.y - bounds.top),
+        )
         if (frame.length < MIN_AXIS_LENGTH) return null
-
         val projected = polygon.map(frame::project)
         val minT = projected.minOf { it.t }
         val maxT = projected.maxOf { it.t }
-        val geometricHalfWidth = max(
-            roi.widthPx * HALF,
-            projected.maxOf { abs(it.s) },
-        ).coerceIn(MIN_HALF_WIDTH, MAX_HALF_WIDTH)
+        val geometricHalfWidth = max(roi.widthPx * HALF, projected.maxOf { abs(it.s) })
+            .coerceIn(MIN_HALF_WIDTH, MAX_HALF_WIDTH)
         val searchHalfWidth = max(geometricHalfWidth * SEARCH_WIDTH_FACTOR, geometricHalfWidth + SEARCH_WIDTH_MARGIN)
             .coerceAtMost(MAX_SEARCH_HALF_WIDTH)
-
         val skin = estimateSkin(pixels, width, height, frame, minT, maxT, searchHalfWidth)
         val candidates = classify(pixels, width, height, frame, minT, maxT, searchHalfWidth, skin)
         val component = seededComponent(candidates, width, height, frame, polygon) ?: return null
         if (component.count { it } < MIN_COMPONENT_PIXELS) return null
-
         val samples = boundarySamples(component, width, height, frame, minT, maxT)
         if (samples.size < MIN_SAMPLES) return null
         val left = samples.map { frame.point(it.t, it.minS + INSET) }
         val right = samples.asReversed().map { frame.point(it.t, it.maxS - INSET) }
         val contour = (left + right).map { PixelPoint(it.x, it.y) }
         if (!coherent(contour, polygon, frame, searchHalfWidth)) return null
-
         val alpha = rasterize(contour, width, height)
         if (alpha.count { (it.toInt() and ALPHA_MASK) >= SOLID_ALPHA } < MIN_COMPONENT_PIXELS) return null
         return NailMask(
@@ -76,10 +69,7 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
             (point.x - base.x) * ux + (point.y - base.y) * uy,
             (point.x - base.x) * vx + (point.y - base.y) * vy,
         )
-        fun point(t: Float, s: Float) = PixelPoint(
-            base.x + ux * t + vx * s,
-            base.y + uy * t + vy * s,
-        )
+        fun point(t: Float, s: Float) = PixelPoint(base.x + ux * t + vx * s, base.y + uy * t + vy * s)
     }
 
     private data class Projection(val t: Float, val s: Float)
@@ -96,22 +86,22 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
         maxT: Float,
         searchHalfWidth: Float,
     ): SkinModel {
-        val values = ArrayList<Feature>()
+        val samples = ArrayList<Feature>()
         val ring = searchHalfWidth * SKIN_RING_FACTOR
         for (y in 1 until height - 1 step SAMPLE_STRIDE) {
             for (x in 1 until width - 1 step SAMPLE_STRIDE) {
                 val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
                 if (p.t !in minT..maxT || abs(p.s) < ring) continue
-                values += featureAt(pixels, width, height, x, y)
+                samples += featureAt(pixels, width, height, x, y)
             }
         }
-        if (values.isEmpty()) return SkinModel(DEFAULT_SKIN, DEFAULT_SPREAD)
+        if (samples.isEmpty()) return SkinModel(DEFAULT_SKIN, DEFAULT_SPREAD)
         val mean = Feature(
-            values.sumOf { it.r.toDouble() }.toFloat() / values.size,
-            values.sumOf { it.g.toDouble() }.toFloat() / values.size,
-            values.sumOf { it.b.toDouble() }.toFloat() / values.size,
+            samples.sumOf { it.r.toDouble() }.toFloat() / samples.size,
+            samples.sumOf { it.g.toDouble() }.toFloat() / samples.size,
+            samples.sumOf { it.b.toDouble() }.toFloat() / samples.size,
         )
-        val spread = values.map { distance(it, mean) }.average().toFloat().coerceAtLeast(MIN_SPREAD)
+        val spread = samples.map { distance(it, mean) }.average().toFloat().coerceAtLeast(MIN_SPREAD)
         return SkinModel(mean, spread)
     }
 
@@ -145,17 +135,17 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
         val center = polygon.map(frame::project)
         val t = center.map { it.t }.average().toFloat()
         val s = center.map { it.s }.average().toFloat()
-        val seed = frame.point(t, s)
-        val start = nearest(candidates, width, height, seed.x.roundToInt(), seed.y.roundToInt()) ?: return null
+        val seedPoint = frame.point(t, s)
+        val start = nearest(candidates, width, height, seedPoint.x.roundToInt(), seedPoint.y.roundToInt()) ?: return null
         val visited = BooleanArray(candidates.size)
-        val result = BooleanArray(candidates.size)
+        val component = BooleanArray(candidates.size)
         val queue = java.util.ArrayDeque<Int>()
         queue += start
         visited[start] = true
         while (queue.isNotEmpty()) {
             val index = queue.removeFirst()
             if (!candidates[index]) continue
-            result[index] = true
+            component[index] = true
             val x = index % width
             val y = index / width
             for (dy in -1..1) for (dx in -1..1) {
@@ -170,7 +160,7 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
                 }
             }
         }
-        return result.takeIf { it.any(Boolean::not) }
+        return component.takeIf { it.any { value -> value } }
     }
 
     private fun nearest(mask: BooleanArray, width: Int, height: Int, x: Int, y: Int): Int? {
@@ -195,24 +185,24 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
         minT: Float,
         maxT: Float,
     ): List<BoundarySample> {
-        val output = ArrayList<BoundarySample>()
+        val result = ArrayList<BoundarySample>()
         val step = max(1f, (maxT - minT) / MAX_SAMPLES)
         var t = minT
         while (t <= maxT) {
-            var lo = Float.POSITIVE_INFINITY
-            var hi = Float.NEGATIVE_INFINITY
+            var minS = Float.POSITIVE_INFINITY
+            var maxS = Float.NEGATIVE_INFINITY
             for (y in 0 until height) for (x in 0 until width) {
                 if (!component[y * width + x]) continue
                 val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
                 if (abs(p.t - t) <= SAMPLE_TOLERANCE) {
-                    lo = min(lo, p.s)
-                    hi = max(hi, p.s)
+                    minS = min(minS, p.s)
+                    maxS = max(maxS, p.s)
                 }
             }
-            if (lo.isFinite() && hi.isFinite()) output += BoundarySample(t, lo, hi)
+            if (minS.isFinite() && maxS.isFinite()) result += BoundarySample(t, minS, maxS)
             t += step
         }
-        return output
+        return result
     }
 
     private fun coherent(candidate: List<PixelPoint>, geometric: List<PixelPoint>, frame: Frame, halfWidth: Float): Boolean {
@@ -224,9 +214,9 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
         val geometricProjection = geometric.map(frame::project)
         val minT = geometricProjection.minOf { it.t }
         val maxT = geometricProjection.maxOf { it.t }
-        if (candidateProjection.minOf { it.t } < minT - halfWidth * AXIS_DRIFT) return false
-        if (candidateProjection.maxOf { it.t } > maxT + halfWidth * AXIS_DRIFT) return false
-        return candidateProjection.maxOf { abs(it.s) } <= halfWidth * MAX_WIDTH_FACTOR
+        if (candidateProjection.minOf { it.t } < minT - halfWidth * AXIS_DRIFT_FACTOR) return false
+        if (candidateProjection.maxOf { it.t } > maxT + halfWidth * AXIS_DRIFT_FACTOR) return false
+        return true
     }
 
     private fun rasterize(polygon: List<PixelPoint>, width: Int, height: Int): ByteArray {
@@ -238,11 +228,9 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
             for (i in polygon.indices) {
                 val a = polygon[i]
                 val b = polygon[(i + 1) % polygon.size]
-                if ((a.y <= y + HALF_PIXEL && b.y > y + HALF_PIXEL) ||
-                    (b.y <= y + HALF_PIXEL && a.y > y + HALF_PIXEL)
-                ) {
-                    val f = (y + HALF_PIXEL - a.y) / (b.y - a.y)
-                    intersections += a.x + (b.x - a.x) * f
+                if ((a.y <= y + HALF_PIXEL && b.y > y + HALF_PIXEL) || (b.y <= y + HALF_PIXEL && a.y > y + HALF_PIXEL)) {
+                    val ratio = (y + HALF_PIXEL - a.y) / (b.y - a.y)
+                    intersections += a.x + (b.x - a.x) * ratio
                 }
             }
             intersections.sort()
@@ -258,14 +246,8 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
     }
 
     private fun featureAt(pixels: IntArray, width: Int, height: Int, x: Int, y: Int): Feature {
-        val safeX = x.coerceIn(0, width - 1)
-        val safeY = y.coerceIn(0, height - 1)
-        val color = pixels[safeY * width + safeX]
-        return Feature(
-            ((color shr 16) and 0xFF) / 255f,
-            ((color shr 8) and 0xFF) / 255f,
-            (color and 0xFF) / 255f,
-        )
+        val color = pixels[y.coerceIn(0, height - 1) * width + x.coerceIn(0, width - 1)]
+        return Feature(((color shr 16) and 0xFF) / 255f, ((color shr 8) and 0xFF) / 255f, (color and 0xFF) / 255f)
     }
 
     private fun distance(a: Feature, b: Feature): Float =
@@ -297,11 +279,10 @@ class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
         const val MIN_SAMPLES = 4
         const val MAX_SAMPLES = 48f
         const val SAMPLE_TOLERANCE = 0.8f
-        const val INSET = 0.6f
+        const val INSET = 0f
         const val MIN_AREA_RATIO = 0.08f
         const val MAX_AREA_RATIO = 7f
-        const val AXIS_DRIFT = 0.15f
-        const val MAX_WIDTH_FACTOR = 1.9f
+        const val AXIS_DRIFT_FACTOR = 0.15f
         const val SOLID_ALPHA = 255
         const val ALPHA_MASK = 255
         const val HALF = 0.5f
