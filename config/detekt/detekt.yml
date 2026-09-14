@@ -112,8 +112,3 @@ exceptions:
 empty-blocks:
   severity: warning
   active: true
-
-# KtLint-backed formatting findings are useful feedback but should not block
-# the functional try-on validation. Critical correctness rules above remain blocking.
-formatting:
-  severity: warning
