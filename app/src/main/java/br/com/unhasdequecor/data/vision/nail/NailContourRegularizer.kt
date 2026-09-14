@@ -73,7 +73,8 @@ class NailContourRegularizer {
         var previous = -1
         for (i in bins.indices) {
             if (values.containsKey(bins[i])) {
-                result[i] = values.getValue(bins[i]); previous = i
+                result[i] = values.getValue(bins[i])
+                previous = i
             } else if (previous >= 0) {
                 var next = i + 1
                 while (next < bins.size && !values.containsKey(bins[next])) next++
@@ -177,7 +178,7 @@ class NailContourRegularizer {
         const val MAX_BOUNDARY_CORRECTION = 1.25f
         const val MIN_FOREGROUND_NEIGHBORS = 3
         const val MIN_NOTCH_NEIGHBORS = 3
-        const val MAX_SPIKE_NEIGHBORS = 2
+        const val MAX_SPIKE_NEIGHBORS = 3
         const val MAX_POLYGON_POINTS = 64
     }
 }
