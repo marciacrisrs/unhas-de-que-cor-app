@@ -52,9 +52,6 @@ class NailContourRegularizer {
         val rawLeft = interpolateMissing(bins, rawMin)
         val rawRight = interpolateMissing(bins, rawMax)
 
-        // Low-pass the boundary trajectory, then clamp it to the observed side
-        // of the plate. This removes staircase/spike noise without inventing
-        // coverage in skin or air.
         val smoothLeft = clampToObserved(gaussianSmooth(rawLeft), rawLeft, isLeft = true)
         val smoothRight = clampToObserved(gaussianSmooth(rawRight), rawRight, isLeft = false)
 
@@ -69,15 +66,16 @@ class NailContourRegularizer {
             val value = out[i].toInt() and 255
 
             if (value >= ALPHA_THRESHOLD) {
-                // Only trim pixels that sit materially outside the regularized
-                // boundary. Small one-pixel raster differences are retained.
+                if (isIsolatedSpike(out, x, y, mask.width, mask.height)) {
+                    out[i] = 0
+                    continue
+                }
                 val leftExcess = lo - s
                 val rightExcess = s - hi
                 if (leftExcess > MAX_BOUNDARY_CORRECTION || rightExcess > MAX_BOUNDARY_CORRECTION) {
                     out[i] = 0
                 }
             } else if (s in lo..hi && nearForeground(out, x, y, mask.width, mask.height)) {
-                // Fill only small holes touching the existing plate.
                 out[i] = 255.toByte()
             }
         }
@@ -146,14 +144,7 @@ class NailContourRegularizer {
     private fun clampToObserved(smoothed: FloatArray, raw: FloatArray, isLeft: Boolean): FloatArray {
         val out = smoothed.copyOf()
         for (i in out.indices) {
-            out[i] = if (isLeft) {
-                // s grows toward the right: never smooth the left boundary
-                // farther outward than the observed left edge.
-                max(out[i], raw[i])
-            } else {
-                // Never smooth the right boundary farther outward than observed.
-                min(out[i], raw[i])
-            }
+            out[i] = if (isLeft) max(out[i], raw[i]) else min(out[i], raw[i])
         }
         return out
     }
@@ -166,7 +157,13 @@ class NailContourRegularizer {
         return values[lo] + (values[hi] - values[lo]) * f
     }
 
-    private fun nearForeground(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean {
+    private fun nearForeground(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
+        foregroundNeighborCount(alpha, x, y, w, h) >= MIN_FOREGROUND_NEIGHBORS
+
+    private fun isIsolatedSpike(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
+        foregroundNeighborCount(alpha, x, y, w, h) <= MAX_SPIKE_NEIGHBORS
+
+    private fun foregroundNeighborCount(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Int {
         var count = 0
         for (dy in -1..1) for (dx in -1..1) {
             if (dx == 0 && dy == 0) continue
@@ -174,11 +171,9 @@ class NailContourRegularizer {
             val ny = y + dy
             if (nx in 0 until w && ny in 0 until h &&
                 (alpha[ny * w + nx].toInt() and 255) >= ALPHA_THRESHOLD
-            ) {
-                count++
-            }
+            ) count++
         }
-        return count >= MIN_FOREGROUND_NEIGHBORS
+        return count
     }
 
     private fun polygonFromEnvelope(
@@ -229,6 +224,7 @@ class NailContourRegularizer {
         const val SMOOTH_RADIUS = 3
         const val MAX_BOUNDARY_CORRECTION = 1.25f
         const val MIN_FOREGROUND_NEIGHBORS = 5
+        const val MAX_SPIKE_NEIGHBORS = 2
         const val MAX_POLYGON_POINTS = 64
     }
 }
