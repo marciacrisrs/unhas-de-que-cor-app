@@ -12,6 +12,7 @@ data class NailTryOnResult(
     val nails: List<DetectedNail>,
     val landmarks: HandLandmarks?,
     val debugEnabled: Boolean,
+    val diagnostics: List<NailMaskDiagnostic> = emptyList(),
 )
 
 data class NailDetectionSnapshot(
@@ -22,6 +23,7 @@ data class NailDetectionSnapshot(
     val reliability: TryOnReliability,
     val failureReason: DetectionFailureReason? = null,
     val rejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
+    val diagnostics: List<NailMaskDiagnostic> = emptyList(),
 )
 
 /**
@@ -130,6 +132,7 @@ class NailTryOnPipeline @Inject constructor(
         val rawNails = if (stabilize) tracker.stabilize(segmented.nails) else segmented.nails
         val trackingMs = elapsedMs(trackingStartNs)
         val nails = DetectionConfidenceFloor.filterPaintable(rawNails)
+        val diagnostics = nails.map(NailMaskDiagnostics::from)
         val adjusted = adjustReliability(reliability, nails)
         val barrier = resolveBarrier(
             nailsEmpty = nails.isEmpty(),
@@ -147,6 +150,7 @@ class NailTryOnPipeline @Inject constructor(
             reliability = adjusted,
             failureReason = failureReason,
             rejectionBarrier = barrier,
+            diagnostics = diagnostics,
         )
         recordMetrics(
             frameStartNs = frameStartNs,
@@ -322,6 +326,7 @@ class NailTryOnPipeline @Inject constructor(
                 nails = emptyList(),
                 landmarks = snapshot.landmarks,
                 debugEnabled = debugEnabled,
+                diagnostics = snapshot.diagnostics,
             )
         }
         // Etapa 1 do diagnóstico: quando o overlay de debug está ligado,
@@ -333,6 +338,7 @@ class NailTryOnPipeline @Inject constructor(
                 nails = snapshot.nails,
                 landmarks = snapshot.landmarks,
                 debugEnabled = true,
+                diagnostics = snapshot.diagnostics,
             )
         }
         val paintableCount = DetectionConfidenceFloor.countPaintable(snapshot.nails)
@@ -346,6 +352,7 @@ class NailTryOnPipeline @Inject constructor(
             nails = snapshot.nails,
             landmarks = snapshot.landmarks,
             debugEnabled = debugEnabled,
+            diagnostics = snapshot.diagnostics,
         )
     }
 
