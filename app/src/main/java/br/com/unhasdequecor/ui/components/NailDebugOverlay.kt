@@ -59,7 +59,7 @@ fun NailDebugOverlay(
                 Text("MP ${metrics.mediaPipeMs.toInt()}ms | seg ${metrics.segmentationMs.toInt()}ms | track ${metrics.trackingMs.toInt()}ms", color = Color.White)
                 Text("pred ${metrics.predictionFrames} | recovery ${metrics.recoveryFrames} | fail ${metrics.rejectedFrames}", color = Color.White)
                 if (metrics.lastFailureReason != null || metrics.lastNailsDetected == 0) {
-                    Text("last nails ${metrics.lastNailsDetected} | reason ${metrics.lastFailureReason?.name ?: "NONE"}", color = Color.White)
+                    Text("last nails ${metrics.lastNailsDetected} | reason ${metrics.lastFailureReason?.logCode ?: "NONE"}", color = Color.White)
                 }
             }
             diagnostics.sortedBy { it.finger.ordinal }.forEach { diagnostic ->
