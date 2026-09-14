@@ -37,14 +37,25 @@ fun NailDebugOverlay(
             val sx = size.width / imgW
             val sy = size.height / imgH
             landmarks?.points?.forEach { p ->
-                drawCircle(Color.Cyan.copy(alpha = 0.85f), 4f, Offset(p.x * size.width, p.y * size.height))
+                drawCircle(
+                    Color.Cyan.copy(alpha = 0.85f),
+                    4f,
+                    Offset(p.x * size.width, p.y * size.height),
+                )
             }
             nails.forEach { nail ->
                 drawNailMask(nail, sx, sy)
                 val b = nail.roi.bounds
-                drawRect(Color.Yellow.copy(alpha = 0.7f), Offset(b.left * sx, b.top * sy), Size(b.width() * sx, b.height() * sy), style = Stroke(width = 2f))
+                drawRect(
+                    Color.Yellow.copy(alpha = 0.7f),
+                    Offset(b.left * sx, b.top * sy),
+                    Size(b.width() * sx, b.height() * sy),
+                    style = Stroke(width = 2f),
+                )
                 drawPolygon(nail.roi.polygon, sx, sy, Color.Blue.copy(alpha = 0.75f), 2f)
-                nail.mask.boundaryPolygon?.let { drawPolygon(it, sx, sy, Color(0xFF7CFF00).copy(alpha = 0.95f), 2.5f) }
+                nail.mask.boundaryPolygon?.let {
+                    drawPolygon(it, sx, sy, Color(0xFF7CFF00).copy(alpha = 0.95f), 2.5f)
+                }
             }
         }
 
@@ -55,12 +66,44 @@ fun NailDebugOverlay(
                 .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             if (metrics.sampleCount > 0) {
-                Text("proc ${metrics.effectiveFps.toInt()} FPS | p95 ${metrics.p95Ms.toInt()}ms | max ${metrics.maxMs.toInt()}ms", color = Color.White)
-                Text("MP ${metrics.mediaPipeMs.toInt()}ms | seg ${metrics.segmentationMs.toInt()}ms | track ${metrics.trackingMs.toInt()}ms", color = Color.White)
-                Text("pred ${metrics.predictionFrames} | recovery ${metrics.recoveryFrames} | fail ${metrics.rejectedFrames}", color = Color.White)
-                if (metrics.lastFailureReason != null || metrics.lastNailsDetected == 0) {
-                    Text("last nails ${metrics.lastNailsDetected} | reason ${metrics.lastFailureReason?.logCode ?: "NONE"}", color = Color.White)
+                Text(
+                    "proc ${metrics.effectiveFps.toInt()} FPS | " +
+                        "p95 ${metrics.p95Ms.toInt()}ms | max ${metrics.maxMs.toInt()}ms",
+                    color = Color.White,
+                )
+                Text(
+                    "MP ${metrics.mediaPipeMs.toInt()}ms | " +
+                        "seg ${metrics.segmentationMs.toInt()}ms | " +
+                        "track ${metrics.trackingMs.toInt()}ms",
+                    color = Color.White,
+                )
+                Text(
+                    "pred ${metrics.predictionFrames} | " +
+                        "recovery ${metrics.recoveryFrames} | fail ${metrics.rejectedFrames}",
+                    color = Color.White,
+                )
+                Text(
+                    "last nails ${metrics.lastNailsDetected} | " +
+                        "barrier ${metrics.lastRejectionBarrier.name}",
+                    color = Color.White,
+                )
+                Text(
+                    "diag ${metrics.lastDiagnosticCount} | " +
+                        "roi ${metrics.lastRoiRejected} | " +
+                        "seg ${metrics.lastSegmentationRejected} | " +
+                        "guard ${metrics.lastGuardRejected} | " +
+                        "conf ${metrics.lastConfidenceRejected}",
+                    color = Color.White,
+                )
+                if (metrics.lastFailureReason != null) {
+                    Text(
+                        "reason ${metrics.lastFailureReason.logCode}",
+                        color = Color.White,
+                    )
                 }
+            }
+            if (diagnostics.isEmpty() && metrics.lastDiagnosticCount == 0) {
+                Text("DIAG EMPTY — no candidate diagnostics reached UI", color = Color.Yellow)
             }
             diagnostics.sortedBy { it.finger.ordinal }.forEach { diagnostic ->
                 Text(diagnosticLine(diagnostic), color = Color.White)
@@ -79,7 +122,9 @@ private fun diagnosticLine(d: NailMaskDiagnostic): String {
         else -> d.finger.name.take(2)
     }
     val detail = d.rejectionReason ?: "ok"
-    return "$finger ${d.stage.name} geo=${"%.2f".format(d.geometricConfidence)} seg=${"%.2f".format(d.segmentationConfidence)} fill=${"%.3f".format(d.postGuardFilledRatio)} $detail"
+    return "$finger ${d.stage.name} geo=${"%.2f".format(d.geometricConfidence)} " +
+        "seg=${"%.2f".format(d.segmentationConfidence)} " +
+        "fill=${"%.3f".format(d.postGuardFilledRatio)} $detail"
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolygon(
@@ -103,7 +148,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolygon(
     drawPath(path, color, style = Stroke(width = strokeWidth))
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(nail: DetectedNail, sx: Float, sy: Float) {
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(
+    nail: DetectedNail,
+    sx: Float,
+    sy: Float,
+) {
     val mask = nail.mask
     val originX = mask.originX * sx
     val originY = mask.originY * sy
@@ -123,7 +172,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawNailMask(nail: 
                 x++
             }
             drawRect(
-                color = Color.Red.copy(alpha = MASK_MIN_ALPHA + MASK_MAX_EXTRA_ALPHA * (maxAlpha / 255f)),
+                color = Color.Red.copy(
+                    alpha = MASK_MIN_ALPHA + MASK_MAX_EXTRA_ALPHA * (maxAlpha / 255f),
+                ),
                 topLeft = Offset(originX + start * pixelW, originY + y * pixelH),
                 size = Size((x - start) * pixelW, pixelH),
             )
