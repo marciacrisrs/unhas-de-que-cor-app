@@ -54,9 +54,11 @@ object NailPlateContour {
         for (i in 0 until samples) {
             val t = i.toFloat() / samples
             val u = 1f - t
+            val x = u * u * from.x + 2f * u * t * control.x + t * t * to.x
+            val y = u * u * from.y + 2f * u * t * control.y + t * t * to.y
             out += PixelPoint(
-                u * u * from.x + 2f * u * t * control.x + t * t * to.x,
-                u * u * from.y + 2f * u * t * control.y + t * t * to.y,
+                x.coerceIn(minOf(from.x, to.x), maxOf(from.x, to.x)),
+                y.coerceIn(minOf(from.y, to.y), maxOf(from.y, to.y)),
             )
         }
     }
