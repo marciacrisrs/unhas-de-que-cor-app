@@ -125,10 +125,23 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPolygon(
     strokeWidth: Float,
 ) {
     if (points.size < 3) return
+
+    val scaled = points.map { Offset(it.x * sx, it.y * sy) }
     val path = Path()
-    points.forEachIndexed { index, p ->
-        val o = Offset(p.x * sx, p.y * sy)
-        if (index == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
+    path.moveTo(scaled.first().x, scaled.first().y)
+
+    // Quadratic midpoint interpolation keeps the debug contour continuous
+    // without changing the underlying NailMask. The previous polyline exposed
+    // every sampling bin as a visible corner, making a good contour look like
+    // a polygon/sticker in the live diagnostic view.
+    for (index in scaled.indices) {
+        val current = scaled[index]
+        val next = scaled[(index + 1) % scaled.size]
+        val midpoint = Offset(
+            (current.x + next.x) * 0.5f,
+            (current.y + next.y) * 0.5f,
+        )
+        path.quadraticTo(current.x, current.y, midpoint.x, midpoint.y)
     }
     path.close()
     drawPath(path, color = color, style = Stroke(width = strokeWidth))
