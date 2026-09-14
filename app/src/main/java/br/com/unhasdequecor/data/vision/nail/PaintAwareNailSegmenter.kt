@@ -52,7 +52,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val boundary = traceBoundary(component, width, height, frame, minT, maxT)
         if (boundary.size < MIN_POLYGON_POINTS) return null
         val inset = inset(boundary, width, height)
-        if (!shapeIsValid(inset, roi, frame, width, height, nominalHalfWidth)) return null
+        if (!shapeIsValid(inset, polygon, frame, width, height, nominalHalfWidth)) return null
 
         val alpha = rasterize(inset, width, height)
         val filled = alpha.count { (it.toInt() and ALPHA_MASK) >= SOLID_ALPHA }
@@ -134,9 +134,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
                 val projection = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
                 if (projection.t !in minT..maxT || abs(projection.s) > halfWidth) continue
                 val feature = featureAt(pixels, width, height, x, y) ?: continue
-                val score = distance(feature, skin.mean)
-                val edge = localContrast(pixels, width, height, x, y)
-                result[y * width + x] = score >= threshold && edge >= MIN_LOCAL_CONTRAST
+                result[y * width + x] = distance(feature, skin.mean) >= threshold
             }
         }
         return result
@@ -261,7 +259,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
 
     private fun shapeIsValid(
         polygon: List<PixelPoint>,
-        roi: NailRoi,
+        roiPolygon: List<PixelPoint>,
         frame: Frame,
         width: Int,
         height: Int,
@@ -269,10 +267,10 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
     ): Boolean {
         if (polygon.size < MIN_POLYGON_POINTS) return false
         val area = abs(polygonArea(polygon))
-        val roiArea = abs(polygonArea(roi.polygon.map { PixelPoint(it.x, it.y) })).coerceAtLeast(1f)
+        val roiArea = abs(polygonArea(roiPolygon)).coerceAtLeast(1f)
         if (area < roiArea * MIN_AREA_RATIO || area > roiArea * MAX_AREA_RATIO) return false
         val projected = polygon.map(frame::project)
-        val geometric = roi.polygon.map { frame.project(PixelPoint(it.x, it.y)) }
+        val geometric = roiPolygon.map(frame::project)
         val minT = geometric.minOf { it.t }
         val maxT = geometric.maxOf { it.t }
         val candidateMinT = projected.minOf { it.t }
@@ -320,19 +318,6 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         return Feature(r, g, b, LUMA_R * r + LUMA_G * g + LUMA_B * b)
     }
 
-    private fun localContrast(pixels: IntArray, width: Int, height: Int, x: Int, y: Int): Float {
-        val center = featureAt(pixels, width, height, x, y) ?: return 0f
-        var total = 0f
-        var count = 0
-        for ((dx, dy) in NEIGHBOR_OFFSETS) {
-            featureAt(pixels, width, height, x + dx, y + dy)?.let {
-                total += distance(center, it)
-                count++
-            }
-        }
-        return if (count == 0) 0f else total / count
-    }
-
     private fun meanFeature(features: List<Feature>): Feature {
         val n = features.size.toFloat()
         return Feature(
@@ -369,7 +354,6 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val MIN_SPREAD = 0.008f
         const val SPREAD_THRESHOLD = 2.4f
         const val MIN_COLOR_DISTANCE = 0.035f
-        const val MIN_LOCAL_CONTRAST = 0.012f
         const val SEED_SEARCH_RADIUS = 12
         const val MIN_COMPONENT_PIXELS = 12
         const val SIDE_SAMPLE_STEP = 1f
@@ -394,6 +378,5 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val EPSILON = 1e-4f
         val DEFAULT_SKIN = Feature(0.33f, 0.33f, 0.34f, 0.33f)
         const val DEFAULT_SPREAD = 0.15f
-        val NEIGHBOR_OFFSETS = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
     }
 }
