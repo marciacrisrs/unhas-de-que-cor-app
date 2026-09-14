@@ -68,7 +68,7 @@ object NailPlateCalibration {
     private const val THUMB_WIDTH_SCALE = 0.88f
     private const val INDEX_WIDTH_SCALE = 0.88f
     private const val INDEX_LENGTH_SCALE = 0.94f
-    private const val MIDDLE_WIDTH_SCALE = 0.90f
+    private const val MIDDLE_WIDTH_SCALE = 0.75f
     private const val MIDDLE_LENGTH_SCALE = 0.96f
     private const val RING_WIDTH_SCALE = 0.88f
     private const val RING_LENGTH_SCALE = 0.94f
@@ -106,9 +106,9 @@ object NailPlateCalibration {
         val rawAxisLength: Float
         when {
             thumbMode -> {
-                axisStartX = dipX
-                axisStartY = dipY
-                rawAxisLength = tipDip
+                axisStartX = mcpX
+                axisStartY = mcpY
+                rawAxisLength = hypot((tipX - mcpX).toDouble(), (tipY - mcpY).toDouble()).toFloat()
             }
             facing -> {
                 axisStartX = pipX
