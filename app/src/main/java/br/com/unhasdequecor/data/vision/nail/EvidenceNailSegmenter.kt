@@ -10,604 +10,304 @@ import kotlin.math.sqrt
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Image-evidence nail segmenter.
- *
- * MediaPipe/ROI geometry is used only as a spatial prior. The final boundary is
- * recovered from image evidence by fitting both lateral borders along the nail
- * axis and a separate cuticle line. A smooth dynamic-programming path prevents
- * the boundary from jumping between unrelated edges in skin/background.
- *
- * This is deliberately model-free so the production pipeline can start using
- * real image evidence immediately. A learned instance-segmentation model can
- * replace this implementation later without changing NailSegmenter's contract.
- */
+/** Model-free image-evidence segmenter using geometry only as a search prior. */
 @Singleton
 class EvidenceNailSegmenter @Inject constructor() : NailSegmenter {
-
     override fun segment(image: Bitmap, roi: NailRoi): NailMask? {
-        val b = roi.bounds
-        val width = b.width()
-        val height = b.height()
-        if (width < MIN_CROP_SIZE || height < MIN_CROP_SIZE) return null
-        if (b.left < 0 || b.top < 0 || b.right > image.width || b.bottom > image.height) return null
+        val bounds = roi.bounds
+        val width = bounds.width()
+        val height = bounds.height()
+        if (width < MIN_SIZE || height < MIN_SIZE) return null
+        if (bounds.left < 0 || bounds.top < 0 || bounds.right > image.width || bounds.bottom > image.height) return null
 
         val pixels = IntArray(width * height)
-        image.getPixels(pixels, 0, width, b.left, b.top, width, height)
+        image.getPixels(pixels, 0, width, bounds.left, bounds.top, width, height)
+        val polygon = roi.polygon.map { PixelPoint(it.x - bounds.left, it.y - bounds.top) }
+        if (polygon.size < MIN_POLYGON_POINTS) return null
 
-        val geometric = roi.polygon.map { PixelPoint(it.x - b.left, it.y - b.top) }
-        if (geometric.size < 4) return null
+        val base = PixelPoint(roi.axisFromDip.x - bounds.left, roi.axisFromDip.y - bounds.top)
+        val tip = PixelPoint(roi.axisToTip.x - bounds.left, roi.axisToTip.y - bounds.top)
+        val frame = Frame(base, tip)
+        if (frame.length < MIN_AXIS_LENGTH) return null
 
-        val axis = deriveAxis(geometric, roi, b.left, b.top) ?: return null
-        val frame = AxisFrame(axis.base, axis.tip)
-        val tBounds = polygonProjectionBounds(geometric, frame)
-        val halfWidth = nominalHalfWidth(roi, geometric, frame)
-        if (tBounds.second - tBounds.first < MIN_AXIS_SPAN || halfWidth < MIN_HALF_WIDTH) return null
+        val projected = polygon.map(frame::project)
+        val minT = projected.minOf { it.t }
+        val maxT = projected.maxOf { it.t }
+        val geometricHalfWidth = max(
+            roi.widthPx * HALF,
+            projected.maxOf { abs(it.s) },
+        ).coerceIn(MIN_HALF_WIDTH, MAX_HALF_WIDTH)
+        val searchHalfWidth = max(geometricHalfWidth * SEARCH_WIDTH_FACTOR, geometricHalfWidth + SEARCH_WIDTH_MARGIN)
+            .coerceAtMost(MAX_SEARCH_HALF_WIDTH)
 
-        val samples = buildLongitudinalSamples(tBounds.first, tBounds.second)
-        if (samples.size < MIN_LONGITUDINAL_SAMPLES) return null
+        val skin = estimateSkin(pixels, width, height, frame, minT, maxT, searchHalfWidth)
+        val candidates = classify(pixels, width, height, frame, minT, maxT, searchHalfWidth, skin)
+        val component = seededComponent(candidates, width, height, frame, polygon) ?: return null
+        if (component.count { it } < MIN_COMPONENT_PIXELS) return null
 
-        val leftPrior = FloatArray(samples.size)
-        val rightPrior = FloatArray(samples.size)
-        for (i in samples.indices) {
-            val interval = polygonCrossSection(geometric, frame, samples[i])
-            if (interval != null) {
-                leftPrior[i] = interval.first
-                rightPrior[i] = interval.second
-            } else {
-                leftPrior[i] = -halfWidth
-                rightPrior[i] = halfWidth
-            }
-        }
+        val samples = boundarySamples(component, width, height, frame, minT, maxT)
+        if (samples.size < MIN_SAMPLES) return null
+        val left = samples.map { frame.point(it.t, it.minS + INSET) }
+        val right = samples.asReversed().map { frame.point(it.t, it.maxS - INSET) }
+        val contour = (left + right).map { PixelPoint(it.x, it.y) }
+        if (!coherent(contour, polygon, frame, searchHalfWidth)) return null
 
-        val leftPath = optimizeBoundary(
-            pixels = pixels,
-            width = width,
-            height = height,
-            frame = frame,
-            tValues = samples,
-            priors = leftPrior,
-            insideSign = 1f,
-            halfWidth = halfWidth,
-        )
-        val rightPath = optimizeBoundary(
-            pixels = pixels,
-            width = width,
-            height = height,
-            frame = frame,
-            tValues = samples,
-            priors = rightPrior,
-            insideSign = -1f,
-            halfWidth = halfWidth,
-        )
-
-        if (leftPath == null || rightPath == null) return null
-
-        val cuticleT = detectCuticle(
-            pixels = pixels,
-            width = width,
-            height = height,
-            frame = frame,
-            tMin = tBounds.first,
-            tMax = tBounds.second,
-            halfWidth = halfWidth,
-        ) ?: tBounds.first
-
-        val points = buildContour(
-            frame = frame,
-            tValues = samples,
-            left = leftPath,
-            right = rightPath,
-            cuticleT = cuticleT,
-            halfWidth = halfWidth,
-            geometric = geometric,
-        ) ?: return null
-
-        val bounded = clampContour(points, width, height)
-        if (!isCoherent(bounded, geometric, frame, halfWidth)) return null
-
-        val solid = ByteArray(width * height)
-        rasterizePolygon(bounded, width, height, solid)
-        val filled = solid.count { (it.toInt() and 0xFF) >= SOLID_ALPHA }
-        if (filled < MIN_FILLED_PIXELS) return null
-
-        val boundary = bounded.map { PixelPoint(it.x + b.left, it.y + b.top) }
+        val alpha = rasterize(contour, width, height)
+        if (alpha.count { (it.toInt() and ALPHA_MASK) >= SOLID_ALPHA } < MIN_COMPONENT_PIXELS) return null
         return NailMask(
             width = width,
             height = height,
-            alpha = feather(solid, width, height),
-            originX = b.left,
-            originY = b.top,
-            boundaryPolygon = boundary,
+            alpha = alpha,
+            originX = bounds.left,
+            originY = bounds.top,
+            boundaryPolygon = contour.map { PixelPoint(it.x + bounds.left, it.y + bounds.top) },
         )
     }
 
-    private fun deriveAxis(
-        polygon: List<PixelPoint>,
-        roi: NailRoi,
-        originX: Int,
-        originY: Int,
-    ): Axis? {
-        val unique = polygon.distinct()
-        if (unique.size < 4) return null
-        var bestA = unique.first()
-        var bestB = unique.last()
-        var bestDistance = 0f
-        for (i in unique.indices) {
-            for (j in i + 1 until unique.size) {
-                val dx = unique[j].x - unique[i].x
-                val dy = unique[j].y - unique[i].y
-                val d = sqrt(dx * dx + dy * dy)
-                if (d > bestDistance) {
-                    bestDistance = d
-                    bestA = unique[i]
-                    bestB = unique[j]
-                }
-            }
-        }
-        if (bestDistance < MIN_AXIS_SPAN) return null
-
-        val tip = PixelPoint(roi.axisToTip.x - originX, roi.axisToTip.y - originY)
-        val base = PixelPoint(roi.axisFromDip.x - originX, roi.axisFromDip.y - originY)
-        val distanceATip = distanceSquared(bestA, tip)
-        val distanceBTip = distanceSquared(bestB, tip)
-        val orientedTip = if (distanceATip <= distanceBTip) bestA else bestB
-        val orientedBase = if (orientedTip == bestA) bestB else bestA
-
-        // If the landmark base/tip orientation is unreliable, the longest
-        // geometric chord still gives us a stable local frame.
-        val landmarkLength = sqrt(distanceSquared(base, tip))
-        return if (landmarkLength >= MIN_AXIS_SPAN) {
-            Axis(base = base, tip = tip)
-        } else {
-            Axis(base = orientedBase, tip = orientedTip)
-        }
+    private data class Frame(val base: PixelPoint, val tip: PixelPoint) {
+        val dx = tip.x - base.x
+        val dy = tip.y - base.y
+        val length = sqrt(dx * dx + dy * dy).coerceAtLeast(EPSILON)
+        val ux = dx / length
+        val uy = dy / length
+        val vx = -uy
+        val vy = ux
+        fun project(point: PixelPoint) = Projection(
+            (point.x - base.x) * ux + (point.y - base.y) * uy,
+            (point.x - base.x) * vx + (point.y - base.y) * vy,
+        )
+        fun point(t: Float, s: Float) = PixelPoint(
+            base.x + ux * t + vx * s,
+            base.y + uy * t + vy * s,
+        )
     }
 
-    private fun polygonProjectionBounds(
-        polygon: List<PixelPoint>,
-        frame: AxisFrame,
-    ): Pair<Float, Float> {
-        var minT = Float.POSITIVE_INFINITY
-        var maxT = Float.NEGATIVE_INFINITY
-        for (p in polygon) {
-            val t = frame.t(p)
-            minT = min(minT, t)
-            maxT = max(maxT, t)
-        }
-        return minT to maxT
-    }
+    private data class Projection(val t: Float, val s: Float)
+    private data class Feature(val r: Float, val g: Float, val b: Float)
+    private data class SkinModel(val mean: Feature, val spread: Float)
+    private data class BoundarySample(val t: Float, val minS: Float, val maxS: Float)
 
-    private fun nominalHalfWidth(
-        roi: NailRoi,
-        polygon: List<PixelPoint>,
-        frame: AxisFrame,
-    ): Float {
-        val fromRoi = roi.widthPx * 0.5f
-        var span = 0f
-        val t = (polygonProjectionBounds(polygon, frame).first + polygonProjectionBounds(polygon, frame).second) * 0.5f
-        val section = polygonCrossSection(polygon, frame, t)
-        if (section != null) span = (section.second - section.first) * 0.5f
-        return max(MIN_HALF_WIDTH, max(fromRoi, span)).coerceAtMost(MAX_HALF_WIDTH)
-    }
-
-    private fun buildLongitudinalSamples(minT: Float, maxT: Float): FloatArray {
-        val start = minT + (maxT - minT) * SAMPLE_START
-        val end = maxT - (maxT - minT) * SAMPLE_END
-        if (end <= start) return FloatArray(0)
-        return FloatArray(LONGITUDINAL_SAMPLES) { index ->
-            start + (end - start) * index / (LONGITUDINAL_SAMPLES - 1f)
-        }
-    }
-
-    private fun polygonCrossSection(
-        polygon: List<PixelPoint>,
-        frame: AxisFrame,
-        t: Float,
-    ): Pair<Float, Float>? {
-        val values = ArrayList<Float>(polygon.size)
-        val projected = polygon.map { frame.project(it) }
-        for (i in projected.indices) {
-            val a = projected[i]
-            val b = projected[(i + 1) % projected.size]
-            val da = a.first - t
-            val db = b.first - t
-            if (abs(da) < 0.001f) values += a.second
-            if ((da < 0f && db > 0f) || (da > 0f && db < 0f)) {
-                val ratio = da / (da - db)
-                values += a.second + (b.second - a.second) * ratio
-            }
-        }
-        if (values.size < 2) return null
-        return values.minOrNull()!! to values.maxOrNull()!!
-    }
-
-    private fun optimizeBoundary(
+    private fun estimateSkin(
         pixels: IntArray,
         width: Int,
         height: Int,
-        frame: AxisFrame,
-        tValues: FloatArray,
-        priors: FloatArray,
-        insideSign: Float,
-        halfWidth: Float,
-    ): FloatArray? {
-        val radius = min(MAX_BOUNDARY_SHIFT, max(MIN_BOUNDARY_SHIFT, halfWidth * BOUNDARY_SHIFT_FRACTION))
-        val candidateCount = (radius * 2f / CANDIDATE_STEP).roundToInt() + 1
-        val candidates = FloatArray(candidateCount) { index ->
-            -radius + index * CANDIDATE_STEP
-        }
-
-        val costs = Array(tValues.size) { FloatArray(candidateCount) { Float.POSITIVE_INFINITY } }
-        val back = Array(tValues.size) { IntArray(candidateCount) { -1 } }
-
-        for (i in tValues.indices) {
-            for (j in candidates.indices) {
-                val s = priors[i] + candidates[j]
-                val evidence = boundaryEvidence(
-                    pixels = pixels,
-                    width = width,
-                    height = height,
-                    frame = frame,
-                    t = tValues[i],
-                    s = s,
-                    insideSign = insideSign,
-                )
-                val priorPenalty = abs(candidates[j]) / radius
-                costs[i][j] = -evidence * EVIDENCE_WEIGHT + priorPenalty * PRIOR_WEIGHT
-                if (i == 0) continue
-                var best = Float.POSITIVE_INFINITY
-                var bestIndex = -1
-                for (k in candidates.indices) {
-                    val transition = abs((priors[i] + candidates[j]) - (priors[i - 1] + candidates[k]))
-                    if (transition > MAX_STEP_CHANGE) continue
-                    val candidateCost = costs[i - 1][k] + transition * SMOOTHNESS_WEIGHT
-                    if (candidateCost < best) {
-                        best = candidateCost
-                        bestIndex = k
-                    }
-                }
-                if (bestIndex >= 0) {
-                    costs[i][j] += best
-                    back[i][j] = bestIndex
-                } else {
-                    costs[i][j] = Float.POSITIVE_INFINITY
-                }
+        frame: Frame,
+        minT: Float,
+        maxT: Float,
+        searchHalfWidth: Float,
+    ): SkinModel {
+        val values = ArrayList<Feature>()
+        val ring = searchHalfWidth * SKIN_RING_FACTOR
+        for (y in 1 until height - 1 step SAMPLE_STRIDE) {
+            for (x in 1 until width - 1 step SAMPLE_STRIDE) {
+                val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
+                if (p.t !in minT..maxT || abs(p.s) < ring) continue
+                values += featureAt(pixels, width, height, x, y)
             }
         }
-
-        var bestIndex = costs.last().indices.minByOrNull { costs.last()[it] } ?: return null
-        if (!costs.last()[bestIndex].isFinite()) return null
-        val result = FloatArray(tValues.size)
-        for (i in tValues.lastIndex downTo 0) {
-            result[i] = priors[i] + candidates[bestIndex]
-            bestIndex = if (i > 0) back[i][bestIndex] else bestIndex
-            if (i > 0 && bestIndex < 0) return null
-        }
-
-        val evidence = result.indices.map { i ->
-            boundaryEvidence(pixels, width, height, frame, tValues[i], result[i], insideSign)
-        }.average().toFloat()
-        return if (evidence >= MIN_PATH_EVIDENCE) result else null
+        if (values.isEmpty()) return SkinModel(DEFAULT_SKIN, DEFAULT_SPREAD)
+        val mean = Feature(
+            values.sumOf { it.r.toDouble() }.toFloat() / values.size,
+            values.sumOf { it.g.toDouble() }.toFloat() / values.size,
+            values.sumOf { it.b.toDouble() }.toFloat() / values.size,
+        )
+        val spread = values.map { distance(it, mean) }.average().toFloat().coerceAtLeast(MIN_SPREAD)
+        return SkinModel(mean, spread)
     }
 
-    private fun boundaryEvidence(
+    private fun classify(
         pixels: IntArray,
         width: Int,
         height: Int,
-        frame: AxisFrame,
-        t: Float,
-        s: Float,
-        insideSign: Float,
-    ): Float {
-        val inside = sampleFeature(pixels, width, height, frame.point(t, s + insideSign * NEAR_SAMPLE))
-            ?: return 0f
-        val farInside = sampleFeature(pixels, width, height, frame.point(t, s + insideSign * FAR_SAMPLE))
-            ?: return 0f
-        val outside = sampleFeature(pixels, width, height, frame.point(t, s - insideSign * NEAR_SAMPLE))
-            ?: return 0f
-        val farOutside = sampleFeature(pixels, width, height, frame.point(t, s - insideSign * FAR_SAMPLE))
-            ?: return 0f
-
-        val transition = colorDistance(inside, outside) / COLOR_SCALE
-        val regional = 0.5f * colorDistance(farInside, farOutside) / COLOR_SCALE +
-            0.5f * colorDistance(inside, farInside) / COLOR_SCALE
-        val edge = transition * EDGE_WEIGHT + regional * REGIONAL_WEIGHT
-        return edge.coerceIn(0f, 2f)
+        frame: Frame,
+        minT: Float,
+        maxT: Float,
+        searchHalfWidth: Float,
+        skin: SkinModel,
+    ): BooleanArray {
+        val result = BooleanArray(width * height)
+        val threshold = max(MIN_COLOR_DISTANCE, skin.spread * SPREAD_FACTOR)
+        for (y in 0 until height) for (x in 0 until width) {
+            val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
+            if (p.t !in minT..maxT || abs(p.s) > searchHalfWidth) continue
+            result[y * width + x] = distance(featureAt(pixels, width, height, x, y), skin.mean) >= threshold
+        }
+        return result
     }
 
-    private fun detectCuticle(
-        pixels: IntArray,
+    private fun seededComponent(
+        candidates: BooleanArray,
         width: Int,
         height: Int,
-        frame: AxisFrame,
-        tMin: Float,
-        tMax: Float,
-        halfWidth: Float,
-    ): Float? {
-        val scanStart = tMin + (tMax - tMin) * CUTICLE_MIN_T
-        val scanEnd = tMin + (tMax - tMin) * CUTICLE_MAX_T
-        var bestT = Float.NaN
-        var bestScore = 0f
-        val lateral = FloatArray(CUTICLE_LATERAL_SAMPLES) { index ->
-            -halfWidth * CUTICLE_LATERAL_SPAN +
-                2f * halfWidth * CUTICLE_LATERAL_SPAN * index / (CUTICLE_LATERAL_SAMPLES - 1f)
-        }
-        var t = scanStart
-        while (t <= scanEnd) {
-            var sum = 0f
-            var valid = 0
-            for (s in lateral) {
-                val near = sampleFeature(pixels, width, height, frame.point(t - CUTICLE_NEAR, s))
-                val far = sampleFeature(pixels, width, height, frame.point(t + CUTICLE_NEAR, s))
-                if (near != null && far != null) {
-                    sum += colorDistance(near, far) / COLOR_SCALE
-                    valid++
+        frame: Frame,
+        polygon: List<PixelPoint>,
+    ): BooleanArray? {
+        val center = polygon.map(frame::project)
+        val t = center.map { it.t }.average().toFloat()
+        val s = center.map { it.s }.average().toFloat()
+        val seed = frame.point(t, s)
+        val start = nearest(candidates, width, height, seed.x.roundToInt(), seed.y.roundToInt()) ?: return null
+        val visited = BooleanArray(candidates.size)
+        val result = BooleanArray(candidates.size)
+        val queue = java.util.ArrayDeque<Int>()
+        queue += start
+        visited[start] = true
+        while (queue.isNotEmpty()) {
+            val index = queue.removeFirst()
+            if (!candidates[index]) continue
+            result[index] = true
+            val x = index % width
+            val y = index / width
+            for (dy in -1..1) for (dx in -1..1) {
+                if (dx == 0 && dy == 0) continue
+                val nx = x + dx
+                val ny = y + dy
+                if (nx !in 0 until width || ny !in 0 until height) continue
+                val next = ny * width + nx
+                if (!visited[next] && candidates[next]) {
+                    visited[next] = true
+                    queue += next
                 }
             }
-            if (valid >= CUTICLE_MIN_VALID_SAMPLES) {
-                val score = sum / valid
-                if (score > bestScore) {
-                    bestScore = score
-                    bestT = t
+        }
+        return result.takeIf { it.any(Boolean::not) }
+    }
+
+    private fun nearest(mask: BooleanArray, width: Int, height: Int, x: Int, y: Int): Int? {
+        val cx = x.coerceIn(0, width - 1)
+        val cy = y.coerceIn(0, height - 1)
+        if (mask[cy * width + cx]) return cy * width + cx
+        for (radius in 1..SEED_RADIUS) {
+            for (dy in -radius..radius) for (dx in -radius..radius) {
+                val nx = cx + dx
+                val ny = cy + dy
+                if (nx in 0 until width && ny in 0 until height && mask[ny * width + nx]) return ny * width + nx
+            }
+        }
+        return null
+    }
+
+    private fun boundarySamples(
+        component: BooleanArray,
+        width: Int,
+        height: Int,
+        frame: Frame,
+        minT: Float,
+        maxT: Float,
+    ): List<BoundarySample> {
+        val output = ArrayList<BoundarySample>()
+        val step = max(1f, (maxT - minT) / MAX_SAMPLES)
+        var t = minT
+        while (t <= maxT) {
+            var lo = Float.POSITIVE_INFINITY
+            var hi = Float.NEGATIVE_INFINITY
+            for (y in 0 until height) for (x in 0 until width) {
+                if (!component[y * width + x]) continue
+                val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
+                if (abs(p.t - t) <= SAMPLE_TOLERANCE) {
+                    lo = min(lo, p.s)
+                    hi = max(hi, p.s)
                 }
             }
-            t += CUTICLE_STEP
+            if (lo.isFinite() && hi.isFinite()) output += BoundarySample(t, lo, hi)
+            t += step
         }
-        return if (bestT.isFinite() && bestScore >= MIN_CUTICLE_EVIDENCE) bestT else null
+        return output
     }
 
-    private fun buildContour(
-        frame: AxisFrame,
-        tValues: FloatArray,
-        left: FloatArray,
-        right: FloatArray,
-        cuticleT: Float,
-        halfWidth: Float,
-        geometric: List<PixelPoint>,
-    ): List<PixelPoint>? {
-        if (tValues.isEmpty()) return null
-        val cuticleIndex = tValues.indexOfFirst { it >= cuticleT }.let { if (it < 0) 0 else it }
-        val points = ArrayList<PixelPoint>(tValues.size * 2 + 4)
-
-        val leftBase = left[cuticleIndex]
-        val rightBase = right[cuticleIndex]
-        val cuticleLeft = frame.point(cuticleT, leftBase)
-        val cuticleRight = frame.point(cuticleT, rightBase)
-        points += cuticleLeft
-        for (i in cuticleIndex until tValues.size) {
-            points += frame.point(tValues[i], left[i])
-        }
-        for (i in tValues.lastIndex downTo cuticleIndex) {
-            points += frame.point(tValues[i], right[i])
-        }
-        points += cuticleRight
-
-        val distinct = points.distinct()
-        if (distinct.size < MIN_CONTOUR_POINTS) return null
-        val area = polygonArea(distinct)
-        val geometricArea = abs(polygonArea(geometric))
-        if (area < MIN_AREA || area < geometricArea * MIN_AREA_RATIO) return null
-        if (abs(leftBase) > halfWidth * MAX_BASE_WIDTH_FACTOR ||
-            abs(rightBase) > halfWidth * MAX_BASE_WIDTH_FACTOR
-        ) return null
-        return smooth(distinct)
-    }
-
-    private fun isCoherent(
-        candidate: List<PixelPoint>,
-        geometric: List<PixelPoint>,
-        frame: AxisFrame,
-        halfWidth: Float,
-    ): Boolean {
-        if (candidate.size < MIN_CONTOUR_POINTS) return false
-        val candidateArea = abs(polygonArea(candidate))
+    private fun coherent(candidate: List<PixelPoint>, geometric: List<PixelPoint>, frame: Frame, halfWidth: Float): Boolean {
+        if (candidate.size < MIN_POLYGON_POINTS) return false
+        val area = abs(polygonArea(candidate))
         val geometricArea = abs(polygonArea(geometric)).coerceAtLeast(1f)
-        if (candidateArea !in geometricArea * MIN_AREA_RATIO..geometricArea * MAX_AREA_RATIO) return false
-
-        val candidateBounds = candidate.map { frame.project(it) }
-        val geometricBounds = geometric.map { frame.project(it) }
-        val candidateMinT = candidateBounds.minOf { it.first }
-        val candidateMaxT = candidateBounds.maxOf { it.first }
-        val geometricMinT = geometricBounds.minOf { it.first }
-        val geometricMaxT = geometricBounds.maxOf { it.first }
-        if (candidateMinT < geometricMinT - halfWidth * MAX_AXIS_DRIFT_FACTOR) return false
-        if (candidateMaxT > geometricMaxT + halfWidth * MAX_AXIS_DRIFT_FACTOR) return false
-        return true
+        if (area < geometricArea * MIN_AREA_RATIO || area > geometricArea * MAX_AREA_RATIO) return false
+        val candidateProjection = candidate.map(frame::project)
+        val geometricProjection = geometric.map(frame::project)
+        val minT = geometricProjection.minOf { it.t }
+        val maxT = geometricProjection.maxOf { it.t }
+        if (candidateProjection.minOf { it.t } < minT - halfWidth * AXIS_DRIFT) return false
+        if (candidateProjection.maxOf { it.t } > maxT + halfWidth * AXIS_DRIFT) return false
+        return candidateProjection.maxOf { abs(it.s) } <= halfWidth * MAX_WIDTH_FACTOR
     }
 
-    private fun clampContour(points: List<PixelPoint>, width: Int, height: Int): List<PixelPoint> =
-        points.map {
-            PixelPoint(
-                x = it.x.coerceIn(0.5f, width - 0.5f),
-                y = it.y.coerceIn(0.5f, height - 0.5f),
-            )
-        }
-
-    private fun smooth(points: List<PixelPoint>): List<PixelPoint> {
-        if (points.size < 5) return points
-        return points.indices.map { i ->
-            val prev = points[(i - 1 + points.size) % points.size]
-            val current = points[i]
-            val next = points[(i + 1) % points.size]
-            PixelPoint(
-                current.x * SMOOTH_CURRENT + (prev.x + next.x) * SMOOTH_NEIGHBOR,
-                current.y * SMOOTH_CURRENT + (prev.y + next.y) * SMOOTH_NEIGHBOR,
-            )
-        }
-    }
-
-    private fun sampleFeature(
-        pixels: IntArray,
-        width: Int,
-        height: Int,
-        point: PixelPoint,
-    ): Feature? {
-        val x = point.x.roundToInt()
-        val y = point.y.roundToInt()
-        if (x !in 0 until width || y !in 0 until height) return null
-        val color = pixels[y * width + x]
-        val r = (color shr 16) and 0xFF
-        val g = (color shr 8) and 0xFF
-        val b = color and 0xFF
-        val max = max(r, max(g, b)).toFloat()
-        val min = min(r, min(g, b)).toFloat()
-        val luma = (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255f
-        val saturation = if (max <= 0f) 0f else (max - min) / max
-        return Feature(luma, saturation, r, g, b)
-    }
-
-    private fun colorDistance(a: Feature, b: Feature): Float {
-        val dl = abs(a.luma - b.luma)
-        val ds = abs(a.saturation - b.saturation)
-        val dr = abs(a.r - b.r) / 255f
-        val dg = abs(a.g - b.g) / 255f
-        val db = abs(a.b - b.b) / 255f
-        return dl * LUMA_WEIGHT + ds * SATURATION_WEIGHT + (dr + dg + db) / 3f * RGB_WEIGHT
-    }
-
-    private fun rasterizePolygon(poly: List<PixelPoint>, width: Int, height: Int, out: ByteArray) {
-        if (poly.size < 3) return
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                if (pointInPolygon(x + 0.5f, y + 0.5f, poly)) out[y * width + x] = 255.toByte()
-            }
-        }
-    }
-
-    private fun pointInPolygon(x: Float, y: Float, poly: List<PixelPoint>): Boolean {
-        var inside = false
-        var j = poly.lastIndex
-        for (i in poly.indices) {
-            val a = poly[i]
-            val b = poly[j]
-            val denominator = (b.y - a.y).takeIf { abs(it) > EPSILON } ?: EPSILON
-            if (((a.y > y) != (b.y > y)) && x < (b.x - a.x) * (y - a.y) / denominator + a.x) {
-                inside = !inside
-            }
-            j = i
-        }
-        return inside
-    }
-
-    private fun feather(src: ByteArray, width: Int, height: Int): ByteArray {
-        val out = src.copyOf()
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = y * width + x
-                if ((src[index].toInt() and 0xFF) != 0) continue
-                var neighbor = false
-                for (dy in -1..1) {
-                    for (dx in -1..1) {
-                        val nx = x + dx
-                        val ny = y + dy
-                        if (nx in 0 until width && ny in 0 until height &&
-                            (src[ny * width + nx].toInt() and 0xFF) != 0
-                        ) {
-                            neighbor = true
-                        }
-                    }
+    private fun rasterize(polygon: List<PixelPoint>, width: Int, height: Int): ByteArray {
+        val output = ByteArray(width * height)
+        val minY = polygon.minOf { it.y }.roundToInt().coerceIn(0, height - 1)
+        val maxY = polygon.maxOf { it.y }.roundToInt().coerceIn(0, height - 1)
+        for (y in minY..maxY) {
+            val intersections = ArrayList<Float>()
+            for (i in polygon.indices) {
+                val a = polygon[i]
+                val b = polygon[(i + 1) % polygon.size]
+                if ((a.y <= y + HALF_PIXEL && b.y > y + HALF_PIXEL) ||
+                    (b.y <= y + HALF_PIXEL && a.y > y + HALF_PIXEL)
+                ) {
+                    val f = (y + HALF_PIXEL - a.y) / (b.y - a.y)
+                    intersections += a.x + (b.x - a.x) * f
                 }
-                if (neighbor) out[index] = FEATHER_ALPHA.toByte()
+            }
+            intersections.sort()
+            var i = 0
+            while (i + 1 < intersections.size) {
+                val left = intersections[i].roundToInt().coerceIn(0, width - 1)
+                val right = intersections[i + 1].roundToInt().coerceIn(0, width - 1)
+                for (x in min(left, right)..max(left, right)) output[y * width + x] = SOLID_ALPHA.toByte()
+                i += 2
             }
         }
-        return out
+        return output
     }
 
-    private fun polygonArea(points: List<PixelPoint>): Float {
-        var sum = 0f
-        for (i in points.indices) {
+    private fun featureAt(pixels: IntArray, width: Int, height: Int, x: Int, y: Int): Feature {
+        val safeX = x.coerceIn(0, width - 1)
+        val safeY = y.coerceIn(0, height - 1)
+        val color = pixels[safeY * width + safeX]
+        return Feature(
+            ((color shr 16) and 0xFF) / 255f,
+            ((color shr 8) and 0xFF) / 255f,
+            (color and 0xFF) / 255f,
+        )
+    }
+
+    private fun distance(a: Feature, b: Feature): Float =
+        (abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b)) / 3f
+
+    private fun polygonArea(points: List<PixelPoint>): Float =
+        points.indices.fold(0f) { sum, i ->
             val a = points[i]
             val b = points[(i + 1) % points.size]
-            sum += a.x * b.y - b.x * a.y
-        }
-        return sum * 0.5f
-    }
-
-    private fun distanceSquared(a: PixelPoint, b: PixelPoint): Float {
-        val dx = a.x - b.x
-        val dy = a.y - b.y
-        return dx * dx + dy * dy
-    }
-
-    private data class Axis(val base: PixelPoint, val tip: PixelPoint)
-
-    private data class Feature(
-        val luma: Float,
-        val saturation: Float,
-        val r: Int,
-        val g: Int,
-        val b: Int,
-    )
-
-    private class AxisFrame(base: PixelPoint, tip: PixelPoint) {
-        private val dx = tip.x - base.x
-        private val dy = tip.y - base.y
-        private val length = sqrt(dx * dx + dy * dy).coerceAtLeast(0.001f)
-        private val ux = dx / length
-        private val uy = dy / length
-        private val vx = -uy
-        private val vy = ux
-        private val origin = base
-
-        fun t(point: PixelPoint): Float =
-            (point.x - origin.x) * ux + (point.y - origin.y) * uy
-
-        fun project(point: PixelPoint): Pair<Float, Float> =
-            t(point) to ((point.x - origin.x) * vx + (point.y - origin.y) * vy)
-
-        fun point(t: Float, s: Float): PixelPoint =
-            PixelPoint(
-                x = origin.x + ux * t + vx * s,
-                y = origin.y + uy * t + vy * s,
-            )
-    }
+            sum + a.x * b.y - b.x * a.y
+        } * HALF
 
     private companion object {
-        const val MIN_CROP_SIZE = 8
-        const val MIN_AXIS_SPAN = 6f
+        const val MIN_SIZE = 8
+        const val MIN_POLYGON_POINTS = 4
+        const val MIN_AXIS_LENGTH = 6f
         const val MIN_HALF_WIDTH = 4f
         const val MAX_HALF_WIDTH = 55f
-        const val LONGITUDINAL_SAMPLES = 25
-        const val MIN_LONGITUDINAL_SAMPLES = 8
-        const val SAMPLE_START = 0.04f
-        const val SAMPLE_END = 0.05f
-        const val BOUNDARY_SHIFT_FRACTION = 0.55f
-        const val MIN_BOUNDARY_SHIFT = 4f
-        const val MAX_BOUNDARY_SHIFT = 20f
-        const val CANDIDATE_STEP = 1.5f
-        const val MAX_STEP_CHANGE = 5f
-        const val NEAR_SAMPLE = 1.5f
-        const val FAR_SAMPLE = 4f
-        const val COLOR_SCALE = 1f
-        const val EVIDENCE_WEIGHT = 1.0f
-        const val PRIOR_WEIGHT = 0.08f
-        const val SMOOTHNESS_WEIGHT = 0.16f
-        const val EDGE_WEIGHT = 0.70f
-        const val REGIONAL_WEIGHT = 0.30f
-        const val MIN_PATH_EVIDENCE = 0.035f
-        const val CUTICLE_MIN_T = 0.02f
-        const val CUTICLE_MAX_T = 0.34f
-        const val CUTICLE_STEP = 1.5f
-        const val CUTICLE_NEAR = 2.5f
-        const val CUTICLE_LATERAL_SAMPLES = 11
-        const val CUTICLE_LATERAL_SPAN = 0.72f
-        const val CUTICLE_MIN_VALID_SAMPLES = 7
-        const val MIN_CUTICLE_EVIDENCE = 0.035f
-        const val MIN_CONTOUR_POINTS = 12
-        const val MIN_AREA = 12f
-        const val MIN_AREA_RATIO = 0.45f
-        const val MAX_AREA_RATIO = 1.55f
-        const val MAX_BASE_WIDTH_FACTOR = 1.35f
-        const val MAX_AXIS_DRIFT_FACTOR = 0.45f
-        const val LUMA_WEIGHT = 0.45f
-        const val SATURATION_WEIGHT = 0.20f
-        const val RGB_WEIGHT = 0.35f
-        const val SMOOTH_CURRENT = 0.72f
-        const val SMOOTH_NEIGHBOR = 0.14f
-        const val SOLID_ALPHA = 128
-        const val FEATHER_ALPHA = 72
-        const val MIN_FILLED_PIXELS = 8
-        const val EPSILON = 1e-5f
+        const val MAX_SEARCH_HALF_WIDTH = 55f
+        const val SEARCH_WIDTH_FACTOR = 1.8f
+        const val SEARCH_WIDTH_MARGIN = 6f
+        const val SKIN_RING_FACTOR = 0.8f
+        const val SAMPLE_STRIDE = 3
+        const val MIN_SPREAD = 0.008f
+        const val SPREAD_FACTOR = 2.2f
+        const val MIN_COLOR_DISTANCE = 0.04f
+        const val SEED_RADIUS = 16
+        const val MIN_COMPONENT_PIXELS = 12
+        const val MIN_SAMPLES = 4
+        const val MAX_SAMPLES = 48f
+        const val SAMPLE_TOLERANCE = 0.8f
+        const val INSET = 0.6f
+        const val MIN_AREA_RATIO = 0.08f
+        const val MAX_AREA_RATIO = 7f
+        const val AXIS_DRIFT = 0.15f
+        const val MAX_WIDTH_FACTOR = 1.9f
+        const val SOLID_ALPHA = 255
+        const val ALPHA_MASK = 255
+        const val HALF = 0.5f
+        const val HALF_PIXEL = 0.5f
+        const val EPSILON = 1e-4f
+        val DEFAULT_SKIN = Feature(0.33f, 0.33f, 0.34f)
+        const val DEFAULT_SPREAD = 0.15f
     }
 }
