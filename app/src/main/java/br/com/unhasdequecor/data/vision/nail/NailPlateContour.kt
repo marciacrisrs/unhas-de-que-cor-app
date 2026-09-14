@@ -3,27 +3,21 @@ package br.com.unhasdequecor.data.vision.nail
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import kotlin.math.hypot
 
-/** Builds a smooth, rounded plate contour from calibrated anatomical anchors. */
+/** Builds a calibrated six-point plate contour; densify is applied only when needed. */
 object NailPlateContour {
     fun build(plate: NailPlateCalibration.PlateGeometry): List<PixelPoint> {
         val e = NailPlateCalibration.almondExtents(plate)
-        val tip = PixelPoint(e.tipX, e.tipY)
-        val cuticle = PixelPoint(e.cuticleX, e.cuticleY)
-        val rightTip = offset(e.tipX, e.tipY, e.px, e.py, e.tipHalfW)
-        val rightMid = offset(e.midX, e.midY, e.px, e.py, e.midHalfW)
-        val rightCuticle = offset(e.cuticleX, e.cuticleY, e.px, e.py, e.cuticleHalfW)
-        val leftCuticle = offset(e.cuticleX, e.cuticleY, e.px, e.py, -e.cuticleHalfW)
-        val leftMid = offset(e.midX, e.midY, e.px, e.py, -e.midHalfW)
-        val leftTip = offset(e.tipX, e.tipY, e.px, e.py, -e.tipHalfW)
-        val contour = ArrayList<PixelPoint>(SIDE_SAMPLES * 2 + CAP_SAMPLES + CUTICLE_SAMPLES)
-        addQuadratic(contour, rightTip, tip, leftTip, CAP_SAMPLES)
-        addQuadratic(contour, leftTip, leftMid, leftCuticle, SIDE_SAMPLES)
-        addQuadratic(contour, leftCuticle, cuticle, rightCuticle, CUTICLE_SAMPLES)
-        addQuadratic(contour, rightCuticle, rightMid, rightTip, SIDE_SAMPLES)
-        return contour
+        return listOf(
+            offset(e.tipX, e.tipY, e.px, e.py, e.tipHalfW),
+            offset(e.midX, e.midY, e.px, e.py, e.midHalfW),
+            offset(e.cuticleX, e.cuticleY, e.px, e.py, e.cuticleHalfW),
+            offset(e.cuticleX, e.cuticleY, e.px, e.py, -e.cuticleHalfW),
+            offset(e.midX, e.midY, e.px, e.py, -e.midHalfW),
+            offset(e.tipX, e.tipY, e.px, e.py, -e.tipHalfW),
+        )
     }
 
-    /** Legacy six-point contour smoother retained for geometry safety checks. */
+    /** Densifies the calibrated contour for rasterization and rendering. */
     fun densify(polygon: List<PixelPoint>): List<PixelPoint> {
         if (polygon.size != SIX_POINTS) return polygon
         val tipCenter = midpoint(polygon[0], polygon[5])
