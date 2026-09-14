@@ -22,32 +22,35 @@ class NailBoundaryOptimizer(
 
         val values = problem.initial.copyOf()
         clampInPlace(values, problem.lowerBounds, problem.upperBounds)
-        val free = if (values.size > 2) values.copyOfRange(1, values.lastIndex) else FloatArray(0)
+        var learningRate = config.learningRate
         var previousEnergy = energy(values, problem)
         var iterations = 0
 
         while (iterations < config.maxIterations) {
+            val candidate = values.copyOf()
             val gradient = gradient(values, problem)
             var maxStep = 0f
             for (i in 1 until values.lastIndex) {
-                val step = (config.learningRate * gradient[i]).coerceIn(-config.maxStep, config.maxStep)
-                values[i] = (values[i] - step).coerceIn(problem.lowerBounds[i], problem.upperBounds[i])
+                val step = (learningRate * gradient[i]).coerceIn(-config.maxStep, config.maxStep)
+                candidate[i] = (candidate[i] - step)
+                    .coerceIn(problem.lowerBounds[i], problem.upperBounds[i])
                 maxStep = max(maxStep, abs(step))
             }
 
-            val currentEnergy = energy(values, problem)
-            if (currentEnergy > previousEnergy) {
-                config.learningRate *= config.backtrackFactor
-                if (config.learningRate < config.minLearningRate) {
-                    return Result(values, previousEnergy, iterations, converged = false)
+            val candidateEnergy = energy(candidate, problem)
+            if (candidateEnergy <= previousEnergy) {
+                for (i in values.indices) values[i] = candidate[i]
+                val energyDelta = previousEnergy - candidateEnergy
+                previousEnergy = candidateEnergy
+                iterations++
+                if (maxStep <= config.positionTolerance || energyDelta <= config.energyTolerance) {
+                    return Result(values, previousEnergy, iterations, converged = true)
                 }
             } else {
-                previousEnergy = currentEnergy
-            }
-
-            iterations++
-            if (maxStep <= config.positionTolerance || abs(previousEnergy - currentEnergy) <= config.energyTolerance) {
-                return Result(values, currentEnergy, iterations, converged = true)
+                learningRate *= config.backtrackFactor
+                if (learningRate < config.minLearningRate) {
+                    return Result(values, previousEnergy, iterations, converged = false)
+                }
             }
         }
 
@@ -139,7 +142,7 @@ class NailBoundaryOptimizer(
     data class Config(
         val firstDerivativeWeight: Float = 0.20f,
         val curvatureWeight: Float = 0.80f,
-        var learningRate: Float = 0.08f,
+        val learningRate: Float = 0.08f,
         val maxStep: Float = 0.50f,
         val maxIterations: Int = 250,
         val positionTolerance: Float = 0.001f,
