@@ -17,19 +17,11 @@ import javax.inject.Singleton
 @Singleton
 class NailRoiEstimator @Inject constructor() {
 
-    data class Estimation(
-        val rois: List<NailRoi>,
-        val rejected: List<Rejection>,
-    )
+    data class Estimation(val rois: List<NailRoi>, val rejected: List<Rejection>)
+    data class Rejection(val finger: Finger, val reason: String)
 
-    data class Rejection(
-        val finger: Finger,
-        val reason: String,
-    )
-
-    fun estimateAll(hand: HandLandmarks): List<NailRoi> {
-        return Finger.ALL.mapNotNull { finger -> estimate(hand, finger) }
-    }
+    fun estimateAll(hand: HandLandmarks): List<NailRoi> =
+        Finger.ALL.mapNotNull { finger -> estimate(hand, finger) }
 
     fun estimate(hand: HandLandmarks, finger: Finger): NailRoi? {
         val w = hand.imageWidth
@@ -38,7 +30,6 @@ class NailRoiEstimator @Inject constructor() {
         val pip = ImageCoordinates.toPixel(hand.point(finger.pipIndex), w, h)
         val dip = ImageCoordinates.toPixel(hand.point(finger.dipIndex), w, h)
         val tip = ImageCoordinates.toPixel(hand.point(finger.tipIndex), w, h)
-
         val plate = NailPlateCalibration.plateFromPixels(
             finger = finger,
             tipX = tip.x,
@@ -50,13 +41,11 @@ class NailRoiEstimator @Inject constructor() {
             mcpX = mcp.x,
             mcpY = mcp.y,
         )
-        // Paridade com mapper: dedo colapsado / ocluído não vira ROI “fantasma”.
         if (!NailPlateCalibration.isUsablePlate(plate)) return null
         val tipDip = ImageCoordinates.distancePx(tip, dip)
         val tipPip = ImageCoordinates.distancePx(tip, pip)
         val tipMcp = ImageCoordinates.distancePx(tip, mcp)
-        val polygon = NailPlateContour.build(plate)
-
+        val polygon = NailPlateContour.buildSixPoint(plate)
         val nailLen = plate.lengthPx
         val nailWidth = plate.widthPx
         val pad = max(nailWidth, nailLen) * PAD_SCALE + PAD_EXTRA
@@ -77,7 +66,6 @@ class NailRoiEstimator @Inject constructor() {
             bottom = (maxY + pad).toInt().coerceIn(1, h),
         )
         if (bounds.width() < MIN_ROI_SIZE || bounds.height() < MIN_ROI_SIZE) return null
-
         val geometricConfidence = geometricConfidence(
             tipDip = tipDip,
             tipPip = tipPip,
@@ -89,7 +77,6 @@ class NailRoiEstimator @Inject constructor() {
             facing = plate.facing,
             presence = hand.presenceScore,
         )
-
         return NailRoi(
             finger = finger,
             bounds = bounds,
@@ -104,15 +91,8 @@ class NailRoiEstimator @Inject constructor() {
     }
 
     private fun geometricConfidence(
-        tipDip: Float,
-        tipPip: Float,
-        tipMcp: Float,
-        nailLen: Float,
-        rawLengthPx: Float,
-        nailWidth: Float,
-        thumbMode: Boolean,
-        facing: Boolean,
-        presence: Float,
+        tipDip: Float, tipPip: Float, tipMcp: Float, nailLen: Float, rawLengthPx: Float,
+        nailWidth: Float, thumbMode: Boolean, facing: Boolean, presence: Float,
     ): Float {
         val axisOk = when {
             thumbMode -> tipMcp > NailPlateCalibration.MIN_AXIS_THUMB_PX
@@ -133,9 +113,8 @@ class NailRoiEstimator @Inject constructor() {
         }
         return (
             PRESENCE_WEIGHT * presence.coerceIn(0f, 1f) +
-                ASPECT_WEIGHT * aspectScore +
-                SIZE_WEIGHT * sizeScore
-            ).coerceIn(0f, 1f)
+                ASPECT_WEIGHT * aspectScore + SIZE_WEIGHT * sizeScore
+        ).coerceIn(0f, 1f)
     }
 
     private companion object {
@@ -159,8 +138,7 @@ class NailRoiEstimator @Inject constructor() {
 fun NailRoiEstimator.estimateAllWithDiagnostics(hand: HandLandmarks): NailRoiEstimator.Estimation {
     val rois = estimateAll(hand)
     val accepted = rois.mapTo(mutableSetOf()) { it.finger }
-    val rejected = Finger.ALL
-        .filterNot { it in accepted }
+    val rejected = Finger.ALL.filterNot { it in accepted }
         .map { NailRoiEstimator.Rejection(it, "plate_geometry_unusable") }
     return NailRoiEstimator.Estimation(rois = rois, rejected = rejected)
 }
