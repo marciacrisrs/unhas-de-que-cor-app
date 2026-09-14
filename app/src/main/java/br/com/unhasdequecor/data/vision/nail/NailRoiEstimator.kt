@@ -84,7 +84,7 @@ class NailRoiEstimator @Inject constructor() {
             right = (maxX + pad).toInt().coerceIn(1, w),
             bottom = (maxY + pad).toInt().coerceIn(1, h),
         )
-        if (bounds.width() < 4 || bounds.height() < 4) return null
+        if (bounds.width() < MIN_ROI_SIZE || bounds.height() < MIN_ROI_SIZE) return null
 
         val geometricConfidence = geometricConfidence(
             tipDip = tipDip,
@@ -127,17 +127,17 @@ class NailRoiEstimator @Inject constructor() {
             facing -> tipPip > NailPlateCalibration.MIN_AXIS_FACING_PX
             else -> tipDip > NailPlateCalibration.MIN_AXIS_OPEN_PX
         }
-        if (!axisOk) return 0.15f
+        if (!axisOk) return LOW_GEOMETRY_SCORE
         val aspect = nailLen / nailWidth.coerceAtLeast(1f)
         val aspectScore = when {
-            aspect in 1.15f..2.2f -> 1f
-            aspect in 0.9f..2.8f -> 0.75f
-            else -> 0.4f
+            aspect in IDEAL_ASPECT -> FULL_SCORE
+            aspect in ACCEPTABLE_ASPECT -> MID_SCORE
+            else -> LOW_SCORE
         }
         val sizeScore = when {
-            rawLengthPx in 16f..140f -> 1f
-            rawLengthPx in 10f..180f -> 0.65f
-            else -> 0.3f
+            rawLengthPx in IDEAL_LENGTH -> FULL_SCORE
+            rawLengthPx in ACCEPTABLE_LENGTH -> MID_SCORE
+            else -> LOW_SCORE
         }
         return (
             PRESENCE_WEIGHT * presence.coerceIn(0f, 1f) +
@@ -147,10 +147,19 @@ class NailRoiEstimator @Inject constructor() {
     }
 
     private companion object {
+        const val MIN_ROI_SIZE = 4
         const val PAD_SCALE = 0.22f
         const val PAD_EXTRA = 2f
         const val PRESENCE_WEIGHT = 0.30f
         const val ASPECT_WEIGHT = 0.40f
         const val SIZE_WEIGHT = 0.30f
+        const val LOW_GEOMETRY_SCORE = 0.15f
+        const val FULL_SCORE = 1f
+        const val MID_SCORE = 0.75f
+        const val LOW_SCORE = 0.4f
+        val IDEAL_ASPECT = 1.15f..2.2f
+        val ACCEPTABLE_ASPECT = 0.9f..2.8f
+        val IDEAL_LENGTH = 16f..140f
+        val ACCEPTABLE_LENGTH = 10f..180f
     }
 }
