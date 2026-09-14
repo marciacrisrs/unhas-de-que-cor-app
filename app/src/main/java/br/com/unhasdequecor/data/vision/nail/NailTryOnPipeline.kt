@@ -66,7 +66,12 @@ class NailTryOnPipeline @Inject constructor(
         val oriented = landmarkProcessor.detectLandmarksWithOrientationFallback(image)
         val mediaPipeMs = elapsedMs(mediaPipeStartNs)
         if (oriented == null) {
-            recordMetrics(frameStartNs, mediaPipeMs, 0f, 0f, stabilize, 0, DetectionFailureReason.Generic)
+            recordMetrics(MetricsRecordInput(
+                frameStartNs = frameStartNs,
+                mediaPipeMs = mediaPipeMs,
+                stabilized = stabilize,
+                failureReason = DetectionFailureReason.Generic,
+            ))
             return null
         }
 
@@ -77,7 +82,13 @@ class NailTryOnPipeline @Inject constructor(
         val lighting = ImageLightingSampler.sample(working)
         if (reliability == TryOnReliability.REJECTED) {
             val snapshot = rejectedSnapshot(working, landmarks, ownsWorking, lighting)
-            recordMetrics(frameStartNs, mediaPipeMs, 0f, 0f, stabilize, 0, snapshot.failureReason)
+            recordMetrics(MetricsRecordInput(
+                frameStartNs = frameStartNs,
+                mediaPipeMs = mediaPipeMs,
+                stabilized = stabilize,
+                failureReason = snapshot.failureReason,
+                rejectionBarrier = snapshot.rejectionBarrier,
+            ))
             return snapshot
         }
 
@@ -114,7 +125,7 @@ class NailTryOnPipeline @Inject constructor(
             rejectionBarrier = barrier,
             diagnostics = diagnostics,
         )
-        recordMetrics(
+        recordMetrics(MetricsRecordInput(
             frameStartNs = frameStartNs,
             mediaPipeMs = mediaPipeMs,
             segmentationMs = segmentationMs,
@@ -128,42 +139,44 @@ class NailTryOnPipeline @Inject constructor(
             segmentationRejected = segmented.droppedBySegmentation,
             guardRejected = segmented.droppedByGuard,
             confidenceRejected = segmented.droppedByNail,
-        )
+        ))
         return snapshot
     }
 
-    private fun recordMetrics(
-        frameStartNs: Long,
-        mediaPipeMs: Float,
-        segmentationMs: Float,
-        trackingMs: Float,
-        stabilized: Boolean,
-        nails: Int,
-        failureReason: DetectionFailureReason?,
-        rejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
-        diagnosticCount: Int = 0,
-        roiRejected: Int = 0,
-        segmentationRejected: Int = 0,
-        guardRejected: Int = 0,
-        confidenceRejected: Int = 0,
-    ) {
+    private data class MetricsRecordInput(
+        val frameStartNs: Long,
+        val mediaPipeMs: Float,
+        val segmentationMs: Float = 0f,
+        val trackingMs: Float = 0f,
+        val stabilized: Boolean,
+        val nails: Int = 0,
+        val failureReason: DetectionFailureReason? = null,
+        val rejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
+        val diagnosticCount: Int = 0,
+        val roiRejected: Int = 0,
+        val segmentationRejected: Int = 0,
+        val guardRejected: Int = 0,
+        val confidenceRejected: Int = 0,
+    )
+
+    private fun recordMetrics(input: MetricsRecordInput) {
         val report = tracker.lastPredictionReport
         pipelineMetrics.record(TryOnPipelineMetricsSample(
-            totalMs = elapsedMs(frameStartNs),
-            mediaPipeMs = mediaPipeMs,
-            segmentationMs = segmentationMs,
-            trackingMs = trackingMs,
-            stabilized = stabilized,
-            nailsDetected = nails,
+            totalMs = elapsedMs(input.frameStartNs),
+            mediaPipeMs = input.mediaPipeMs,
+            segmentationMs = input.segmentationMs,
+            trackingMs = input.trackingMs,
+            stabilized = input.stabilized,
+            nailsDetected = input.nails,
             predictionApplied = report.predictionApplied,
             predictionReason = report.predictionReason,
-            failureReason = failureReason,
-            rejectionBarrier = rejectionBarrier,
-            diagnosticCount = diagnosticCount,
-            roiRejected = roiRejected,
-            segmentationRejected = segmentationRejected,
-            guardRejected = guardRejected,
-            confidenceRejected = confidenceRejected,
+            failureReason = input.failureReason,
+            rejectionBarrier = input.rejectionBarrier,
+            diagnosticCount = input.diagnosticCount,
+            roiRejected = input.roiRejected,
+            segmentationRejected = input.segmentationRejected,
+            guardRejected = input.guardRejected,
+            confidenceRejected = input.confidenceRejected,
         ))
     }
 
