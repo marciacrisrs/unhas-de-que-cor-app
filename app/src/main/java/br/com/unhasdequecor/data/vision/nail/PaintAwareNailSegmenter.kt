@@ -50,7 +50,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val right = samples.asReversed().map { frame.point(it.t, it.maxS) }
         val contour = (left + right).map { PixelPoint(it.x, it.y) }
         val inset = insetTowardCenter(contour, width, height)
-        if (!shapeIsValid(inset, polygon, frame, geometricHalfWidth)) return null
+        if (!shapeIsValid(inset, polygon, frame, searchHalfWidth)) return null
 
         val alpha = rasterize(inset, width, height)
         if (alpha.count { (it.toInt() and ALPHA_MASK) >= SOLID_ALPHA } < MIN_COMPONENT_PIXELS) return null
@@ -235,7 +235,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         candidate: List<PixelPoint>,
         geometric: List<PixelPoint>,
         frame: Frame,
-        geometricHalfWidth: Float,
+        searchHalfWidth: Float,
     ): Boolean {
         if (candidate.size < MIN_POLYGON_POINTS) return false
         val area = abs(polygonArea(candidate))
@@ -247,9 +247,10 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val maxT = prior.maxOf { it.t }
         val candidateMinT = projected.minOf { it.t }
         val candidateMaxT = projected.maxOf { it.t }
-        if (candidateMinT < minT - AXIS_DRIFT) return false
-        if (candidateMaxT > maxT + AXIS_DRIFT) return false
-        return projected.maxOf { abs(it.s) } <= geometricHalfWidth * MAX_WIDTH_FACTOR + WIDTH_MARGIN
+        val axisMargin = max(AXIS_DRIFT_MIN, (maxT - minT) * AXIS_DRIFT_FACTOR)
+        if (candidateMinT < minT - axisMargin) return false
+        if (candidateMaxT > maxT + axisMargin) return false
+        return projected.maxOf { abs(it.s) } <= searchHalfWidth + WIDTH_MARGIN
     }
 
     private fun rasterize(polygon: List<PixelPoint>, width: Int, height: Int): ByteArray {
@@ -306,8 +307,8 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val MIN_HALF_WIDTH = 4f
         const val MAX_HALF_WIDTH = 55f
         const val MAX_SEARCH_HALF_WIDTH = 55f
-        const val SEARCH_WIDTH_FACTOR = 1.8f
-        const val SEARCH_WIDTH_MARGIN = 6f
+        const val SEARCH_WIDTH_FACTOR = 6.0f
+        const val SEARCH_WIDTH_MARGIN = 10f
         const val SKIN_RING_FACTOR = 0.8f
         const val SAMPLE_STRIDE = 3
         const val MIN_SPREAD = 0.008f
@@ -321,7 +322,8 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val PAINT_INSET_PX = 1.0f
         const val MIN_AREA_RATIO = 0.08f
         const val MAX_AREA_RATIO = 7f
-        const val AXIS_DRIFT = 4f
+        const val AXIS_DRIFT_MIN = 4f
+        const val AXIS_DRIFT_FACTOR = 0.4f
         const val MAX_WIDTH_FACTOR = 2.0f
         const val WIDTH_MARGIN = 2f
         const val SOLID_ALPHA = 255
