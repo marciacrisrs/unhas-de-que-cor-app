@@ -3,9 +3,12 @@ package br.com.unhasdequecor.data.vision.nail
 import br.com.unhasdequecor.data.vision.nail.ImageCoordinates.PixelPoint
 import kotlin.math.hypot
 
-/** Builds a calibrated six-point plate contour; densify is applied only when needed. */
+/** Builds a calibrated plate contour and exposes a compact six-point ROI polygon. */
 object NailPlateContour {
-    fun build(plate: NailPlateCalibration.PlateGeometry): List<PixelPoint> {
+    fun build(plate: NailPlateCalibration.PlateGeometry): List<PixelPoint> =
+        densify(buildSixPoint(plate))
+
+    fun buildSixPoint(plate: NailPlateCalibration.PlateGeometry): List<PixelPoint> {
         val e = NailPlateCalibration.almondExtents(plate)
         return listOf(
             offset(e.tipX, e.tipY, e.px, e.py, e.tipHalfW),
