@@ -114,7 +114,21 @@ class NailTryOnPipeline @Inject constructor(
             rejectionBarrier = barrier,
             diagnostics = diagnostics,
         )
-        recordMetrics(frameStartNs, mediaPipeMs, segmentationMs, trackingMs, stabilize, nails.size, failureReason)
+        recordMetrics(
+            frameStartNs = frameStartNs,
+            mediaPipeMs = mediaPipeMs,
+            segmentationMs = segmentationMs,
+            trackingMs = trackingMs,
+            stabilized = stabilize,
+            nails = nails.size,
+            failureReason = failureReason,
+            rejectionBarrier = barrier,
+            diagnosticCount = diagnostics.size,
+            roiRejected = segmented.droppedByRoi,
+            segmentationRejected = segmented.droppedBySegmentation,
+            guardRejected = segmented.droppedByGuard,
+            confidenceRejected = segmented.droppedByNail,
+        )
         return snapshot
     }
 
@@ -126,6 +140,12 @@ class NailTryOnPipeline @Inject constructor(
         stabilized: Boolean,
         nails: Int,
         failureReason: DetectionFailureReason?,
+        rejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
+        diagnosticCount: Int = 0,
+        roiRejected: Int = 0,
+        segmentationRejected: Int = 0,
+        guardRejected: Int = 0,
+        confidenceRejected: Int = 0,
     ) {
         val report = tracker.lastPredictionReport
         pipelineMetrics.record(TryOnPipelineMetricsSample(
@@ -138,6 +158,12 @@ class NailTryOnPipeline @Inject constructor(
             predictionApplied = report.predictionApplied,
             predictionReason = report.predictionReason,
             failureReason = failureReason,
+            rejectionBarrier = rejectionBarrier,
+            diagnosticCount = diagnosticCount,
+            roiRejected = roiRejected,
+            segmentationRejected = segmentationRejected,
+            guardRejected = guardRejected,
+            confidenceRejected = confidenceRejected,
         ))
     }
 
