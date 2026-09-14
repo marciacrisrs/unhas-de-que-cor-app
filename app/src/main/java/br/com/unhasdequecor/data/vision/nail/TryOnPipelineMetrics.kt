@@ -48,6 +48,7 @@ class TryOnPipelineMetrics @Inject constructor() {
         val predictionFrames = values.count { it.predictionApplied }
         val recoveryFrames = values.count { it.predictionReason == NailPredictionReason.RECOVERY }
         val rejectedFrames = values.count { it.failureReason != null }
+        val last = values.last()
 
         return TryOnPipelineMetricsSnapshot(
             sampleCount = values.size,
@@ -64,6 +65,9 @@ class TryOnPipelineMetrics @Inject constructor() {
             rejectedFrames = rejectedFrames,
             liveFrames = values.count { it.stabilized },
             stillFrames = values.count { !it.stabilized },
+            lastNailsDetected = last.nailsDetected,
+            lastFailureReason = last.failureReason,
+            lastRejectionBarrier = last.rejectionBarrier,
         )
     }
 
@@ -96,6 +100,7 @@ data class TryOnPipelineMetricsSample(
     val predictionApplied: Boolean,
     val predictionReason: NailPredictionReason,
     val failureReason: DetectionFailureReason?,
+    val rejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
 )
 
 data class TryOnPipelineMetricsSnapshot(
@@ -113,6 +118,9 @@ data class TryOnPipelineMetricsSnapshot(
     val rejectedFrames: Int,
     val liveFrames: Int,
     val stillFrames: Int,
+    val lastNailsDetected: Int = 0,
+    val lastFailureReason: DetectionFailureReason? = null,
+    val lastRejectionBarrier: RejectionBarrier = RejectionBarrier.NONE,
 ) {
     companion object {
         val EMPTY = TryOnPipelineMetricsSnapshot(
