@@ -13,12 +13,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Stroke
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import br.com.unhasdequecor.data.vision.HandLandmarks
 import br.com.unhasdequecor.data.vision.nail.DetectedNail
-import br.com.unhasdequecor.data.vision.nail.NailDiagnosticStage
 import br.com.unhasdequecor.data.vision.nail.NailMaskDiagnostic
 import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetrics
 import br.com.unhasdequecor.data.vision.nail.TryOnPipelineMetricsSnapshot
@@ -38,11 +36,9 @@ fun NailDebugOverlay(
             val imgH = landmarks?.imageHeight?.toFloat()?.coerceAtLeast(1f) ?: size.height
             val sx = size.width / imgW
             val sy = size.height / imgH
-
             landmarks?.points?.forEach { p ->
                 drawCircle(Color.Cyan.copy(alpha = 0.85f), 4f, Offset(p.x * size.width, p.y * size.height))
             }
-
             nails.forEach { nail ->
                 drawNailMask(nail, sx, sy)
                 val b = nail.roi.bounds
@@ -67,10 +63,7 @@ fun NailDebugOverlay(
                 }
             }
             diagnostics.sortedBy { it.finger.ordinal }.forEach { diagnostic ->
-                Text(
-                    text = diagnosticLine(diagnostic),
-                    color = Color.White,
-                )
+                Text(diagnosticLine(diagnostic), color = Color.White)
             }
         }
     }
