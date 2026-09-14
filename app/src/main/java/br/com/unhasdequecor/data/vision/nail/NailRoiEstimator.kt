@@ -27,16 +27,8 @@ class NailRoiEstimator @Inject constructor() {
         val reason: String,
     )
 
-    fun estimateAll(hand: HandLandmarks): List<NailRoi> = estimateAllWithDiagnostics(hand).rois
-
-    fun estimateAllWithDiagnostics(hand: HandLandmarks): Estimation {
-        val rejected = mutableListOf<Rejection>()
-        val rois = Finger.ALL.mapNotNull { finger ->
-            val roi = estimate(hand, finger)
-            if (roi == null) rejected += Rejection(finger, "plate_geometry_unusable")
-            roi
-        }
-        return Estimation(rois = rois, rejected = rejected)
+    fun estimateAll(hand: HandLandmarks): List<NailRoi> {
+        return Finger.ALL.mapNotNull { finger -> estimate(hand, finger) }
     }
 
     fun estimate(hand: HandLandmarks, finger: Finger): NailRoi? {
@@ -162,4 +154,13 @@ class NailRoiEstimator @Inject constructor() {
         val IDEAL_LENGTH = 16f..140f
         val ACCEPTABLE_LENGTH = 10f..180f
     }
+}
+
+fun NailRoiEstimator.estimateAllWithDiagnostics(hand: HandLandmarks): NailRoiEstimator.Estimation {
+    val rois = estimateAll(hand)
+    val accepted = rois.mapTo(mutableSetOf()) { it.finger }
+    val rejected = Finger.ALL
+        .filterNot { it in accepted }
+        .map { NailRoiEstimator.Rejection(it, "plate_geometry_unusable") }
+    return NailRoiEstimator.Estimation(rois = rois, rejected = rejected)
 }
