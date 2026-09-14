@@ -18,7 +18,6 @@ class AdaptiveNailSegmenterTest {
         val nail = argb(210, 194, 188)
         val pixels = IntArray(width * height) { skin }
 
-        // Larger visible plate than the intentionally undersized geometric prior.
         for (y in 30 until 92) {
             val halfWidth = when {
                 y < 38 -> 6
@@ -34,19 +33,19 @@ class AdaptiveNailSegmenterTest {
         val image = mockk<Bitmap>(relaxed = true) {
             every { this@mockk.width } returns width
             every { this@mockk.height } returns height
-            every {
-                getPixels(any(), any(), any(), any(), any(), any(), any())
-            } answers {
-                val dest = firstArg<IntArray>()
-                val destOffset = secondArg<Int>()
-                val stride = thirdArg<Int>()
-                val srcX = fourthArg<Int>()
-                val srcY = fifthArg<Int>()
-                val w = sixthArg<Int>()
-                val h = seventhArg<Int>()
+            every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
+                val args = invocation.args
+                val dest = args[0] as IntArray
+                val destOffset = args[1] as Int
+                val stride = args[2] as Int
+                val srcX = args[3] as Int
+                val srcY = args[4] as Int
+                val w = args[5] as Int
+                val h = args[6] as Int
                 for (row in 0 until h) {
                     for (col in 0 until w) {
-                        dest[destOffset + row * stride + col] = pixels[(srcY + row) * width + srcX + col]
+                        dest[destOffset + row * stride + col] =
+                            pixels[(srcY + row) * width + srcX + col]
                     }
                 }
             }
