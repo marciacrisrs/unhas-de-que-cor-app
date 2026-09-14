@@ -178,12 +178,29 @@ class NailTryOnPipeline @Inject constructor(
     )
 
     private fun segmentPaintableNails(working: Bitmap, landmarks: HandLandmarks): SegmentedNails {
-        val rois = roiEstimator.estimateAll(landmarks)
-        var droppedByRoi = 0
+        val estimation = roiEstimator.estimateAllWithDiagnostics(landmarks)
+        val rois = estimation.rois
+        var droppedByRoi = estimation.rejected.size
         var droppedByNail = 0
         var droppedBySegmentation = 0
         var droppedByGuard = 0
-        val diagnostics = mutableListOf<NailMaskDiagnostic>()
+        val diagnostics = estimation.rejected.map { rejection ->
+            NailMaskDiagnostic(
+                finger = rejection.finger,
+                roiWidthPx = 0f,
+                roiLengthPx = 0f,
+                filledRatio = 0f,
+                coverageRatio = 0f,
+                confidence = 0f,
+                hasBoundaryPolygon = false,
+                classification = MaskDiagnosticClassification.ROI_GEOMETRY,
+                stage = NailDiagnosticStage.ROI_REJECTED,
+                rejectionReason = rejection.reason,
+                geometricConfidence = 0f,
+                segmentationConfidence = 0f,
+                postGuardFilledRatio = 0f,
+            )
+        }.toMutableList()
         val detected = rois.mapNotNull { roi ->
             if (!DetectionConfidenceFloor.acceptsRoi(roi.geometricConfidence)) {
                 droppedByRoi += 1
