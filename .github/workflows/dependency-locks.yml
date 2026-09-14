@@ -1,0 +1,47 @@
+name: Dependency Locks
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    name: Generate dependency locks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Generate lockfiles
+        run: |
+          chmod +x gradlew
+          ./gradlew resolveAndLockAll --write-locks --stacktrace --no-daemon
+
+      - name: Commit generated lockfiles
+        run: |
+          if git diff --quiet --exit-code -- '**/gradle.lockfile' '**/buildscript-gradle.lockfile'; then
+            echo "Dependency lockfiles are already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '**/gradle.lockfile' '**/buildscript-gradle.lockfile'
+          git commit -m "build: update Gradle dependency locks"
+          git push
