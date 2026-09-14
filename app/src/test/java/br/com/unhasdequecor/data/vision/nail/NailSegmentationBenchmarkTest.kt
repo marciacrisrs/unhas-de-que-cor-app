@@ -1,9 +1,7 @@
 package br.com.unhasdequecor.data.vision.nail
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import com.google.common.truth.Truth.assertThat
+import org.junit.Test
 
 class NailSegmentationBenchmarkTest {
 
@@ -18,12 +16,12 @@ class NailSegmentationBenchmarkTest {
             height = 20,
         )
 
-        assertEquals(1f, score.intersectionOverUnion)
-        assertEquals(1f, score.precision)
-        assertEquals(1f, score.recall)
-        assertEquals(0f, score.boundaryErrorPx)
-        assertEquals(0f, score.falsePositiveRatio)
-        assertTrue(score.passesAccuracyGate)
+        assertThat(score.intersectionOverUnion).isEqualTo(1f)
+        assertThat(score.precision).isEqualTo(1f)
+        assertThat(score.recall).isEqualTo(1f)
+        assertThat(score.boundaryErrorPx).isEqualTo(0f)
+        assertThat(score.falsePositiveRatio).isEqualTo(0f)
+        assertThat(score.passesAccuracyGate).isTrue()
     }
 
     @Test
@@ -38,9 +36,9 @@ class NailSegmentationBenchmarkTest {
             height = 20,
         )
 
-        assertTrue(score.intersectionOverUnion < 0.85f)
-        assertTrue(score.boundaryErrorPx > 0f)
-        assertFalse(score.passesAccuracyGate)
+        assertThat(score.intersectionOverUnion).isLessThan(0.85f)
+        assertThat(score.boundaryErrorPx).isGreaterThan(0f)
+        assertThat(score.passesAccuracyGate).isFalse()
     }
 
     private fun mask(
