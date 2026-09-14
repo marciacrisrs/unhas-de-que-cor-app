@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.sonar)
+    id("org.cyclonedx.bom") version "3.3.0"
 }
 
 fun envOrProp(name: String, propName: String = name): String? =
