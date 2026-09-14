@@ -19,6 +19,7 @@ class NailMaskDiagnosticsTest {
             axisToTip = ImageCoordinates.PixelPoint(20f, 70f),
             widthPx = 20f,
             lengthPx = 60f,
+            rotationDegrees = 0f,
             geometricConfidence = 0.9f,
         )
         val mask = NailMask(
