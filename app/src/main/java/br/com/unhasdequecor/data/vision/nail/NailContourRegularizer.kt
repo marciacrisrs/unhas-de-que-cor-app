@@ -58,7 +58,9 @@ class NailContourRegularizer {
                 val leftExcess = lo - s
                 val rightExcess = s - hi
                 if (leftExcess > MAX_BOUNDARY_CORRECTION || rightExcess > MAX_BOUNDARY_CORRECTION) out[i] = 0
-            } else if (s in lo..hi && nearForeground(out, x, y, mask.width, mask.height)) {
+            } else if (isBoundaryNotch(out, x, y, mask.width, mask.height) ||
+                (s in lo..hi && nearForeground(out, x, y, mask.width, mask.height))
+            ) {
                 out[i] = 255.toByte()
             }
         }
@@ -94,11 +96,13 @@ class NailContourRegularizer {
         val radius = SMOOTH_RADIUS
         val sigma = 1.35f
         for (i in values.indices) {
-            var weighted = 0f; var weightSum = 0f
+            var weighted = 0f
+            var weightSum = 0f
             for (j in max(0, i - radius)..min(values.lastIndex, i + radius)) {
                 val d = (j - i).toFloat()
                 val weight = kotlin.math.exp(-(d * d) / (2f * sigma * sigma))
-                weighted += values[j] * weight; weightSum += weight
+                weighted += values[j] * weight
+                weightSum += weight
             }
             out[i] = weighted / weightSum
         }
@@ -122,6 +126,10 @@ class NailContourRegularizer {
     private fun nearForeground(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
         foregroundNeighborCount(alpha, x, y, w, h) >= MIN_FOREGROUND_NEIGHBORS
 
+    private fun isBoundaryNotch(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
+        (alpha[y * w + x].toInt() and 255) < ALPHA_THRESHOLD &&
+            foregroundNeighborCount(alpha, x, y, w, h) >= MIN_NOTCH_NEIGHBORS
+
     private fun isIsolatedSpike(alpha: ByteArray, x: Int, y: Int, w: Int, h: Int): Boolean =
         foregroundNeighborCount(alpha, x, y, w, h) <= MAX_SPIKE_NEIGHBORS
 
@@ -129,7 +137,8 @@ class NailContourRegularizer {
         var count = 0
         for (dy in -1..1) for (dx in -1..1) {
             if (dx == 0 && dy == 0) continue
-            val nx = x + dx; val ny = y + dy
+            val nx = x + dx
+            val ny = y + dy
             if (nx in 0 until w && ny in 0 until h && (alpha[ny * w + nx].toInt() and 255) >= ALPHA_THRESHOLD) count++
         }
         return count
@@ -143,20 +152,31 @@ class NailContourRegularizer {
         if (bins.size < 4) return null
         val stride = max(1, bins.size / MAX_POLYGON_POINTS)
         val out = ArrayList<ImageCoordinates.PixelPoint>(MAX_POLYGON_POINTS * 2)
-        for (i in bins.indices step stride) out += point(bins[i].toFloat() + 0.5f, left[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
+        for (i in bins.indices step stride) {
+            out += point(bins[i].toFloat() + 0.5f, left[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
+        }
         var i = bins.lastIndex
-        while (i >= 0) { out += point(bins[i].toFloat() + 0.5f, right[i], baseX, baseY, ux, uy, vx, vy, ox, oy); i -= stride }
+        while (i >= 0) {
+            out += point(bins[i].toFloat() + 0.5f, right[i], baseX, baseY, ux, uy, vx, vy, ox, oy)
+            i -= stride
+        }
         return out.takeIf { it.size >= 6 }
     }
 
-    private fun point(t: Float, s: Float, baseX: Float, baseY: Float, ux: Float, uy: Float, vx: Float, vy: Float, ox: Int, oy: Int): ImageCoordinates.PixelPoint =
-        ImageCoordinates.PixelPoint(baseX + t * ux + s * vx + ox, baseY + t * uy + s * vy + oy)
+    private fun point(
+        t: Float, s: Float, baseX: Float, baseY: Float,
+        ux: Float, uy: Float, vx: Float, vy: Float, ox: Int, oy: Int,
+    ): ImageCoordinates.PixelPoint = ImageCoordinates.PixelPoint(
+        baseX + t * ux + s * vx + ox,
+        baseY + t * uy + s * vy + oy,
+    )
 
     private companion object {
         const val ALPHA_THRESHOLD = 128
         const val SMOOTH_RADIUS = 3
         const val MAX_BOUNDARY_CORRECTION = 1.25f
         const val MIN_FOREGROUND_NEIGHBORS = 3
+        const val MIN_NOTCH_NEIGHBORS = 3
         const val MAX_SPIKE_NEIGHBORS = 2
         const val MAX_POLYGON_POINTS = 64
     }
