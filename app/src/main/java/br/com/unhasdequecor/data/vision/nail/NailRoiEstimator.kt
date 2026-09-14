@@ -17,8 +17,27 @@ import javax.inject.Singleton
 @Singleton
 class NailRoiEstimator @Inject constructor() {
 
-    fun estimateAll(hand: HandLandmarks): List<NailRoi> =
-        Finger.ALL.mapNotNull { finger -> estimate(hand, finger) }
+    data class Estimation(
+        val rois: List<NailRoi>,
+        val rejected: List<Rejection>,
+    )
+
+    data class Rejection(
+        val finger: Finger,
+        val reason: String,
+    )
+
+    fun estimateAll(hand: HandLandmarks): List<NailRoi> = estimateAllWithDiagnostics(hand).rois
+
+    fun estimateAllWithDiagnostics(hand: HandLandmarks): Estimation {
+        val rejected = mutableListOf<Rejection>()
+        val rois = Finger.ALL.mapNotNull { finger ->
+            val roi = estimate(hand, finger)
+            if (roi == null) rejected += Rejection(finger, "plate_geometry_unusable")
+            roi
+        }
+        return Estimation(rois = rois, rejected = rejected)
+    }
 
     fun estimate(hand: HandLandmarks, finger: Finger): NailRoi? {
         val w = hand.imageWidth
