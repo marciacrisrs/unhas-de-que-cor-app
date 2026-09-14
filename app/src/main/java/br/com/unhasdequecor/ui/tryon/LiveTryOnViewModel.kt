@@ -11,6 +11,7 @@ import br.com.unhasdequecor.data.vision.nail.DetectionConfidenceFloor
 import br.com.unhasdequecor.data.vision.nail.DetectionFailureReason
 import br.com.unhasdequecor.data.vision.nail.LiveTryOnClaimMapper
 import br.com.unhasdequecor.data.vision.nail.NailDetectionSnapshot
+import br.com.unhasdequecor.data.vision.nail.NailMaskDiagnostic
 import br.com.unhasdequecor.data.vision.nail.NailTryOnPipeline
 import br.com.unhasdequecor.data.vision.nail.TryOnPreviewClaim
 import br.com.unhasdequecor.data.vision.nail.TryOnReliability
@@ -30,6 +31,7 @@ data class LiveTryOnUiState(
     val claim: TryOnPreviewClaim = TryOnPreviewClaim.LOADING,
     val failureReason: DetectionFailureReason? = null,
     val nails: List<DetectedNail> = emptyList(),
+    val diagnostics: List<NailMaskDiagnostic> = emptyList(),
     val landmarks: HandLandmarks? = null,
     val showDebug: Boolean = false,
     val errorMessage: String? = null,
@@ -41,13 +43,11 @@ class LiveTryOnViewModel @Inject constructor(
     catalog: ColorCatalogRepository,
     private val pipeline: NailTryOnPipeline,
 ) : ViewModel() {
-
     private val processing = AtomicBoolean(false)
     private val sessionClosed = AtomicBoolean(false)
     private val sessionReleased = AtomicBoolean(false)
     private var displayedOverlay: Bitmap? = null
     private var retiringOverlay: Bitmap? = null
-
     private val _uiState = MutableStateFlow(LiveTryOnUiState())
     val uiState: StateFlow<LiveTryOnUiState> = _uiState.asStateFlow()
 
@@ -56,9 +56,7 @@ class LiveTryOnViewModel @Inject constructor(
         val colorId = savedStateHandle.get<String>(COLOR_ID_KEY).orEmpty()
         val color = catalog.getById(colorId)
         if (color == null) {
-            _uiState.value = LiveTryOnUiState(
-                errorMessage = "Não encontramos essa cor para o try-on ao vivo.",
-            )
+            _uiState.value = LiveTryOnUiState(errorMessage = "Não encontramos essa cor para o try-on ao vivo.")
         } else {
             _uiState.value = LiveTryOnUiState(
                 colorName = color.name,
@@ -69,10 +67,7 @@ class LiveTryOnViewModel @Inject constructor(
     }
 
     fun consumeFrame(frame: Bitmap) {
-        if (_uiState.value.errorMessage != null ||
-            sessionClosed.get() ||
-            !processing.compareAndSet(false, true)
-        ) {
+        if (_uiState.value.errorMessage != null || sessionClosed.get() || !processing.compareAndSet(false, true)) {
             recycleQuietly(frame)
             return
         }
@@ -84,9 +79,7 @@ class LiveTryOnViewModel @Inject constructor(
             interpret(frame)
         } finally {
             try {
-                if (sessionClosed.get()) {
-                    releaseSession()
-                }
+                if (sessionClosed.get()) releaseSession()
             } finally {
                 processing.set(false)
             }
@@ -95,22 +88,13 @@ class LiveTryOnViewModel @Inject constructor(
 
     fun onCameraUnavailable() {
         sessionClosed.set(true)
-        _uiState.update { current ->
-            current.copy(
-                errorMessage = current.errorMessage ?: CAMERA_UNAVAILABLE_MESSAGE,
-                overlay = null,
-            )
-        }
-        if (!processing.get()) {
-            releaseSession()
-        }
+        _uiState.update { current -> current.copy(errorMessage = current.errorMessage ?: CAMERA_UNAVAILABLE_MESSAGE, overlay = null) }
+        if (!processing.get()) releaseSession()
     }
 
     override fun onCleared() {
         sessionClosed.set(true)
-        if (!processing.get()) {
-            releaseSession()
-        }
+        if (!processing.get()) releaseSession()
         super.onCleared()
     }
 
@@ -132,9 +116,10 @@ class LiveTryOnViewModel @Inject constructor(
                 claim = TryOnPreviewClaim.NOT_DETECTED,
                 reason = snapshot?.failureReason ?: DetectionFailureReason.Generic,
                 nails = emptyList(),
+                diagnostics = snapshot?.diagnostics.orEmpty(),
                 landmarks = snapshot?.landmarks,
             )
-            releaseUnused(frame, snapshot, overlay = null)
+            releaseUnused(frame, snapshot, null)
             return
         }
         val preview = decision(snapshot)
@@ -144,9 +129,10 @@ class LiveTryOnViewModel @Inject constructor(
                 claim = preview.claim,
                 reason = preview.reason,
                 nails = emptyList(),
+                diagnostics = snapshot.diagnostics,
                 landmarks = snapshot.landmarks,
             )
-            releaseUnused(frame, snapshot, overlay = null)
+            releaseUnused(frame, snapshot, null)
             return
         }
         val result = pipeline.recolor(snapshot, _uiState.value.polishColor)
@@ -157,14 +143,13 @@ class LiveTryOnViewModel @Inject constructor(
             claim = painted.claim,
             reason = painted.reason,
             nails = result.nails,
+            diagnostics = result.diagnostics,
             landmarks = result.landmarks,
         )
         releaseUnused(frame, snapshot, overlay)
     }
 
-    private fun decision(
-        snapshot: NailDetectionSnapshot,
-    ) = LiveTryOnClaimMapper.decide(
+    private fun decision(snapshot: NailDetectionSnapshot) = LiveTryOnClaimMapper.decide(
         reliability = snapshot.reliability,
         paintableNailCount = DetectionConfidenceFloor.countPaintable(snapshot.nails),
         fullQualityNailCount = DetectionConfidenceFloor.countFullQuality(snapshot.nails),
@@ -177,6 +162,7 @@ class LiveTryOnViewModel @Inject constructor(
         claim: TryOnPreviewClaim,
         reason: DetectionFailureReason?,
         nails: List<DetectedNail>,
+        diagnostics: List<NailMaskDiagnostic>,
         landmarks: HandLandmarks?,
     ) {
         if (overlay !== displayedOverlay) {
@@ -190,36 +176,26 @@ class LiveTryOnViewModel @Inject constructor(
                 claim = claim,
                 failureReason = reason,
                 nails = nails,
+                diagnostics = diagnostics,
                 landmarks = landmarks,
                 showDebug = pipeline.debugEnabled,
             )
         }
     }
 
-    private fun releaseUnused(
-        frame: Bitmap,
-        snapshot: NailDetectionSnapshot?,
-        overlay: Bitmap?,
-    ) {
+    private fun releaseUnused(frame: Bitmap, snapshot: NailDetectionSnapshot?, overlay: Bitmap?) {
         val keep = setOfNotNull(overlay, displayedOverlay, retiringOverlay)
         val working = snapshot?.workingBitmap
-        if (snapshot?.ownsWorkingBitmap == true && working != null && working !in keep) {
-            recycleQuietly(working)
-        }
-        if (frame !in keep) {
-            recycleQuietly(frame)
-        }
+        if (snapshot?.ownsWorkingBitmap == true && working != null && working !in keep) recycleQuietly(working)
+        if (frame !in keep) recycleQuietly(frame)
     }
 
     private fun recycleQuietly(bitmap: Bitmap?) {
-        if (bitmap != null && !bitmap.isRecycled) {
-            bitmap.recycle()
-        }
+        if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
     }
 
     private companion object {
         const val COLOR_ID_KEY = "colorId"
-        const val CAMERA_UNAVAILABLE_MESSAGE =
-            "Não foi possível abrir a câmera para o try-on ao vivo."
+        const val CAMERA_UNAVAILABLE_MESSAGE = "Não foi possível abrir a câmera para o try-on ao vivo."
     }
 }
