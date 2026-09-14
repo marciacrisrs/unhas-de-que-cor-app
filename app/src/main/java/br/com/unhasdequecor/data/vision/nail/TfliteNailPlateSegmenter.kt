@@ -294,11 +294,44 @@ class TfliteNailPlateSegmenter @Inject constructor(
         originX: Int,
         originY: Int,
     ): ByteArray? {
+        // Natural nails can produce a weaker model response than painted nails.
+        // Start conservatively, then relax only when the strict mask contains no
+        // component. This keeps painted-nail precision while recovering low-
+        // contrast natural plates instead of reporting a false "no nail".
+        for (threshold in MODEL_THRESHOLDS) {
+            val selected = selectComponent(
+                alpha = alpha,
+                width = width,
+                height = height,
+                seed = seed,
+                originX = originX,
+                originY = originY,
+                threshold = threshold,
+            ) ?: continue
+            if (selected.size >= MIN_COMPONENT_PIXELS) {
+                val result = ByteArray(alpha.size)
+                for (index in selected) result[index] = alpha[index]
+                return result
+            }
+        }
+        return null
+    }
+
+    private fun selectComponent(
+        alpha: ByteArray,
+        width: Int,
+        height: Int,
+        seed: PixelPoint,
+        originX: Int,
+        originY: Int,
+        threshold: Int,
+    ): IntArray? {
         val binary = BooleanArray(alpha.size) {
-            (alpha[it].toInt() and 0xFF) >= MODEL_THRESHOLD
+            (alpha[it].toInt() and 0xFF) >= threshold
         }
         val seedX = (seed.x - originX).roundToInt().coerceIn(0, width - 1)
         val seedY = (seed.y - originY).roundToInt().coerceIn(0, height - 1)
+        val seedIndex = seedY * width + seedX
         val visited = BooleanArray(binary.size)
         val queue = IntArray(binary.size)
         var best: IntArray? = null
@@ -315,7 +348,7 @@ class TfliteNailPlateSegmenter @Inject constructor(
             while (componentHead < componentTail) {
                 val current = queue[componentHead++]
                 points += current
-                containsSeed = containsSeed || current == seedY * width + seedX
+                containsSeed = containsSeed || current == seedIndex
                 val x = current % width
                 val y = current / width
                 for (neighbor in neighbors(x, y, width, height)) {
@@ -330,12 +363,7 @@ class TfliteNailPlateSegmenter @Inject constructor(
                 bestContainsSeed = containsSeed
             }
         }
-
-        val selected = best ?: return null
-        if (selected.size < MIN_COMPONENT_PIXELS) return null
-        val result = ByteArray(alpha.size)
-        for (index in selected) result[index] = alpha[index]
-        return result
+        return best
     }
 
     private fun neighbors(x: Int, y: Int, width: Int, height: Int): IntArray {
@@ -365,7 +393,7 @@ class TfliteNailPlateSegmenter @Inject constructor(
         const val INFERENCE_THREADS = 2
         const val CHANNELS = 3
         const val MIN_SIZE = 12
-        const val MODEL_THRESHOLD = 128
+        val MODEL_THRESHOLDS = intArrayOf(128, 96, 64)
         const val MIN_COMPONENT_PIXELS = 12
         const val MAX_SEGMENT_CHANNELS = 4
     }
