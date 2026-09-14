@@ -32,7 +32,7 @@ object NailPlateCalibration {
     const val TIP_POINT_FACTOR = 0.58f
     const val SHORT_TIP_POINT_FACTOR = 0.64f
     const val SHORT_PLATE_ASPECT = 1.28f
-    const val CUTICLE_BACK = 1.02f
+    const val CUTICLE_BACK = 0.98f
     const val MID_FORWARD = 0.16f
 
     data class FingerScale(val widthScale: Float, val lengthScale: Float)
