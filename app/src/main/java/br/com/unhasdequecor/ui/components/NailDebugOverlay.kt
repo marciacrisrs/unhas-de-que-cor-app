@@ -112,6 +112,13 @@ fun NailDebugOverlay(
                         "fail ${metrics.rejectedFrames}",
                     color = Color.White,
                 )
+                if (metrics.lastFailureReason != null || metrics.lastNailsDetected == 0) {
+                    Text(
+                        text = "last nails ${metrics.lastNailsDetected} | " +
+                            "reason ${metrics.lastFailureReason?.name ?: "NONE"}",
+                        color = Color.White,
+                    )
+                }
             }
         }
     }
