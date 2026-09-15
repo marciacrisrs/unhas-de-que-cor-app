@@ -10,6 +10,9 @@ plugins {
     id("org.cyclonedx.bom") version "3.3.0"
 }
 
+group = "br.com.unhasdequecor"
+version = "1.0.13"
+
 fun envOrProp(name: String, propName: String = name): String? =
     System.getenv(name)?.takeIf { it.isNotBlank() }
         ?: (findProperty(propName) as String?)?.takeIf { it.isNotBlank() }
