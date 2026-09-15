@@ -19,9 +19,7 @@ allprojects {
 }
 
 configurations.matching { it.name == "cyclonedxBom" }.configureEach {
-    resolutionStrategy.dependencyLocking {
-        lockMode = LockMode.LENIENT
-    }
+    resolutionStrategy.deactivateDependencyLocking()
 }
 
 fun envOrProp(name: String, propName: String = name): String? =
