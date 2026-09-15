@@ -1,0 +1,77 @@
+name: Autonomous Merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: read
+
+jobs:
+  evaluate:
+    name: Evaluate autonomous merge
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          WORKFLOW_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then PR="$EVENT_PR"; else PR="$WORKFLOW_PR"; fi
+          if [[ -z "${PR:-}" ]]; then echo "No PR associated with this event."; echo "mergeable=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          DATA=$(gh api "repos/${{ github.repository }}/pulls/$PR")
+          STATE=$(jq -r '.state' <<<"$DATA"); DRAFT=$(jq -r '.draft' <<<"$DATA"); MERGEABLE=$(jq -r '.mergeable' <<<"$DATA")
+          if [[ "$STATE" != "open" || "$DRAFT" == "true" || "$MERGEABLE" == "false" ]]; then echo "mergeable=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/workflows/|\.github/|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
+          if (( ${#SENSITIVE[@]} > 0 )); then printf '%s\n' "${SENSITIVE[@]}"; echo "mergeable=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "mergeable=true" >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate CodeRabbit review
+        id: review
+        if: steps.pr.outputs.mergeable == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: |
+          set -euo pipefail
+          APPROVED=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --paginate --jq '[.[] | select(.user.login | test("coderabbit"; "i")) | .state] | last // ""')
+          [[ "$APPROVED" == "APPROVED" ]] || { echo "mergeable=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          echo "mergeable=true" >> "$GITHUB_OUTPUT"
+
+      - name: Verify required checks
+        if: steps.pr.outputs.mergeable == 'true' && steps.review.outputs.mergeable == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: |
+          set -euo pipefail
+          SHA=$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.head.sha')
+          FAILING=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?per_page=100" --paginate --jq '[.check_runs[] | select(.status != "completed" or (.conclusion != "success" and .conclusion != "skipped")) | .name] | .[]' || true)
+          if [[ -n "$FAILING" ]]; then echo "$FAILING"; exit 1; fi
+
+      - name: Approve PR
+        if: steps.pr.outputs.mergeable == 'true' && steps.review.outputs.mergeable == 'true' && success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: gh pr review "$PR" --repo "${{ github.repository }}" --approve --body "Autonomous approval: CodeRabbit approved and all checks passed."
+
+      - name: Enable auto-merge
+        if: steps.pr.outputs.mergeable == 'true' && steps.review.outputs.mergeable == 'true' && success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: gh pr merge "$PR" --repo "${{ github.repository }}" --auto --squash
