@@ -1,4 +1,5 @@
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import org.gradle.api.artifacts.dsl.LockMode
 
 plugins {
     alias(libs.plugins.android.application) apply false
@@ -13,7 +14,13 @@ plugins {
 allprojects {
     dependencyLocking {
         lockAllConfigurations()
-        lockMode = org.gradle.api.artifacts.dsl.LockMode.STRICT
+        lockMode = LockMode.STRICT
+    }
+}
+
+configurations.matching { it.name == "cyclonedxBom" }.configureEach {
+    resolutionStrategy.dependencyLocking {
+        lockMode = LockMode.LENIENT
     }
 }
 
@@ -65,6 +72,7 @@ tasks.register("resolveAndLockAll") {
             project.configurations
                 .filter { it.isCanBeResolved }
                 .filterNot { it.name.contains("AndroidTest", ignoreCase = true) }
+                .filterNot { it.name.contains("DependenciesMetadata", ignoreCase = true) }
                 .forEach { it.resolve() }
         }
     }
