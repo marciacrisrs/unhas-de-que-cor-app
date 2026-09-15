@@ -36,8 +36,18 @@ class EvidenceNailSegmenterTest {
             every { width } returns 120
             every { height } returns 140
             every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
-                val dest = firstArg<IntArray>()
-                System.arraycopy(pixels, 0, dest, 0, pixels.size)
+                val args = invocation.args
+                val dest = args[0] as IntArray
+                val offset = args[1] as Int
+                val stride = args[2] as Int
+                val srcX = args[3] as Int
+                val srcY = args[4] as Int
+                val w = args[5] as Int
+                val h = args[6] as Int
+                for (row in 0 until h) for (col in 0 until w) {
+                    dest[offset + row * stride + col] =
+                        pixels[(srcY + row) * rw + srcX + col]
+                }
             }
         }
 
