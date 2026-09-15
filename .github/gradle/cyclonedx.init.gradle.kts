@@ -1,3 +1,5 @@
+import org.cyclonedx.gradle.CyclonedxPlugin
+
 initscript {
     repositories {
         gradlePluginPortal()
@@ -8,5 +10,5 @@ initscript {
 }
 
 rootProject {
-    apply(plugin = "org.cyclonedx.bom")
+    apply<CyclonedxPlugin>()
 }
