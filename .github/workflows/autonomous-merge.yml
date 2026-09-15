@@ -42,11 +42,20 @@ jobs:
         run: |
           set -euo pipefail
           DATA=$(gh api "repos/${{ github.repository }}/pulls/$PR")
-          STATE=$(jq -r '.state' <<<"$DATA"); DRAFT=$(jq -r '.draft' <<<"$DATA"); MERGEABLE=$(jq -r '.mergeable' <<<"$DATA"); HEAD_SHA=$(jq -r '.head.sha' <<<"$DATA")
+          STATE=$(jq -r '.state' <<<"$DATA")
+          DRAFT=$(jq -r '.draft' <<<"$DATA")
+          MERGEABLE=$(jq -r '.mergeable' <<<"$DATA")
+          HEAD_SHA=$(jq -r '.head.sha' <<<"$DATA")
+          NODE_ID=$(jq -r '.node_id' <<<"$DATA")
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "node_id=$NODE_ID" >> "$GITHUB_OUTPUT"
           [[ "$STATE" == "open" && "$DRAFT" == "false" && "$MERGEABLE" != "false" ]]
-          mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/workflows/|\.github/(CODEOWNERS|coderabbit\.ya?ml)$|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
-          if (( ${#SENSITIVE[@]} > 0 )); then echo "Sensitive files changed; autonomous merge is disabled."; printf '%s\n' "${SENSITIVE[@]}"; exit 1; fi
+          mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
+          if (( ${#SENSITIVE[@]} > 0 )); then
+            echo "Sensitive files changed; autonomous merge is disabled."
+            printf '%s\n' "${SENSITIVE[@]}"
+            exit 1
+          fi
 
       - name: Verify CodeRabbit approval for current commit
         if: steps.inspect.outcome == 'success'
@@ -67,12 +76,22 @@ jobs:
           SHA: ${{ steps.inspect.outputs.head_sha }}
         run: |
           set -euo pipefail
+          TOTAL=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?per_page=100" --paginate --jq '[.check_runs[] | select(.name != "Evaluate autonomous merge") | select(.name | test("CodeRabbit"; "i") | not)] | length')
+          [[ "$TOTAL" -gt 0 ]] || { echo "No CI checks found for current commit."; exit 1; }
           FAILING=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?per_page=100" --paginate --jq '.check_runs[] | select(.name != "Evaluate autonomous merge") | select(.name | test("CodeRabbit"; "i") | not) | select(.status != "completed" or (.conclusion != "success" and .conclusion != "skipped")) | .name' || true)
-          if [[ -n "$FAILING" ]]; then echo "Blocking or incomplete checks:"; echo "$FAILING"; exit 1; fi
+          if [[ -n "$FAILING" ]]; then
+            echo "Blocking or incomplete checks:"
+            echo "$FAILING"
+            exit 1
+          fi
 
-      - name: Enable GitHub auto-merge
+      - name: Enable GitHub auto-merge only
         if: steps.inspect.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ steps.pr.outputs.pr }}
-        run: gh pr merge "$PR" --repo "${{ github.repository }}" --auto --squash
+          PR_NODE_ID: ${{ steps.inspect.outputs.node_id }}
+        run: |
+          set -euo pipefail
+          gh api graphql \
+            -f query='mutation($pr:ID!){enablePullRequestAutoMerge(input:{pullRequestId:$pr,mergeMethod:SQUASH}){pullRequest{autoMergeRequest{enabledAt}}}}' \
+            -F pr="$PR_NODE_ID"
