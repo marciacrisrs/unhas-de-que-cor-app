@@ -2,6 +2,7 @@ package br.com.unhasdequecor.data.vision.nail
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 
@@ -19,7 +20,7 @@ class NailContourRasterizer {
         val polygon = mask.boundaryPolygon
         if (polygon == null || polygon.size < MIN_POLYGON_POINTS) return mask
 
-        val contour = Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ALPHA_8)
+        val contour = Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(contour)
         val path = Path()
         polygon.forEachIndexed { index, point ->
@@ -32,7 +33,7 @@ class NailContourRasterizer {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
             isAntiAlias = true
-            alpha = FULL_ALPHA
+            color = Color.WHITE
         }
         canvas.drawPath(path, paint)
 
@@ -40,42 +41,69 @@ class NailContourRasterizer {
         contour.getPixels(rendered, 0, mask.width, 0, 0, mask.width, mask.height)
         contour.recycle()
 
-        val original = mask.alpha
-        val output = ByteArray(original.size)
-        for (y in 0 until mask.height) {
-            for (x in 0 until mask.width) {
-                val index = y * mask.width + x
-                val rasterAlpha = rendered[index] and ALPHA_MASK
-                if (rasterAlpha == 0) continue
-
-                val support = localSupport(original, x, y, mask.width, mask.height)
-                if (support == 0) continue
-
-                output[index] = minOf(rasterAlpha, support).toByte()
-            }
+        val output = mergeRasterWithSupport(
+            original = mask.alpha,
+            rasterArgb = rendered,
+            width = mask.width,
+            height = mask.height,
+        )
+        if (output.none { (it.toInt() and ALPHA_MASK) != 0 }) {
+            // Drawing or pixel unpack failed: keep the learned mask rather than
+            // dropping every nail in the try-on pipeline.
+            return mask
         }
-
         return mask.copy(alpha = output)
-    }
-
-    private fun localSupport(alpha: ByteArray, x: Int, y: Int, width: Int, height: Int): Int {
-        var strongest = 0
-        for (dy in -SUPPORT_RADIUS..SUPPORT_RADIUS) {
-            val ny = y + dy
-            if (ny !in 0 until height) continue
-            for (dx in -SUPPORT_RADIUS..SUPPORT_RADIUS) {
-                val nx = x + dx
-                if (nx !in 0 until width) continue
-                strongest = maxOf(strongest, alpha[ny * width + nx].toInt() and ALPHA_MASK)
-            }
-        }
-        return strongest
     }
 
     private companion object {
         const val MIN_POLYGON_POINTS = 6
-        const val SUPPORT_RADIUS = 1
-        const val FULL_ALPHA = 255
         const val ALPHA_MASK = 255
     }
 }
+
+/**
+ * [Bitmap.getPixels] returns packed ARGB. Alpha lives in the high byte; the
+ * low byte is blue. Reading `pixel and 0xFF` on an opaque black/white fill
+ * yields 0 and wipes the mask.
+ */
+internal fun packedArgbAlpha(pixel: Int): Int = (pixel ushr ALPHA_SHIFT) and ALPHA_BYTE_MASK
+
+internal fun mergeRasterWithSupport(
+    original: ByteArray,
+    rasterArgb: IntArray,
+    width: Int,
+    height: Int,
+): ByteArray {
+    val output = ByteArray(original.size)
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            val index = y * width + x
+            val rasterAlpha = packedArgbAlpha(rasterArgb[index])
+            if (rasterAlpha != 0) {
+                val support = localSupport(original, x, y, width, height)
+                if (support != 0) {
+                    output[index] = minOf(rasterAlpha, support).toByte()
+                }
+            }
+        }
+    }
+    return output
+}
+
+private fun localSupport(alpha: ByteArray, x: Int, y: Int, width: Int, height: Int): Int {
+    var strongest = 0
+    for (dy in -SUPPORT_RADIUS..SUPPORT_RADIUS) {
+        val ny = y + dy
+        if (ny !in 0 until height) continue
+        for (dx in -SUPPORT_RADIUS..SUPPORT_RADIUS) {
+            val nx = x + dx
+            if (nx !in 0 until width) continue
+            strongest = maxOf(strongest, alpha[ny * width + nx].toInt() and ALPHA_BYTE_MASK)
+        }
+    }
+    return strongest
+}
+
+private const val SUPPORT_RADIUS = 1
+private const val ALPHA_SHIFT = 24
+private const val ALPHA_BYTE_MASK = 255

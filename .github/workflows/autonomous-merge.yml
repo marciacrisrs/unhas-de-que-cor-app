@@ -1,0 +1,78 @@
+name: Autonomous Merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: read
+
+jobs:
+  evaluate:
+    name: Evaluate autonomous merge
+    if: >-
+      github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve pull request
+        id: pr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          WORKFLOW_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then PR="${WORKFLOW_PR:-}"; else PR="${EVENT_PR:-}"; fi
+          [[ -z "$PR" ]] && { echo "No pull request associated with this event."; exit 0; }
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect pull request
+        id: inspect
+        if: steps.pr.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: |
+          set -euo pipefail
+          DATA=$(gh api "repos/${{ github.repository }}/pulls/$PR")
+          STATE=$(jq -r '.state' <<<"$DATA"); DRAFT=$(jq -r '.draft' <<<"$DATA"); MERGEABLE=$(jq -r '.mergeable' <<<"$DATA"); HEAD_SHA=$(jq -r '.head.sha' <<<"$DATA")
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          [[ "$STATE" == "open" && "$DRAFT" == "false" && "$MERGEABLE" != "false" ]]
+          mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/workflows/|\.github/(CODEOWNERS|coderabbit\.ya?ml)$|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
+          if (( ${#SENSITIVE[@]} > 0 )); then echo "Sensitive files changed; autonomous merge is disabled."; printf '%s\n' "${SENSITIVE[@]}"; exit 1; fi
+
+      - name: Verify CodeRabbit approval for current commit
+        if: steps.inspect.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+          SHA: ${{ steps.inspect.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --paginate --jq --arg sha "$SHA" '[.[] | select(.user.login | test("coderabbit"; "i")) | select(.commit_id == $sha)] | sort_by(.submitted_at) | last | .state // ""')
+          echo "CodeRabbit review for $SHA: ${STATE:-none}"
+          [[ "$STATE" == "APPROVED" ]]
+
+      - name: Verify every completed check on current commit
+        if: steps.inspect.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.inspect.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          FAILING=$(gh api "repos/${{ github.repository }}/commits/$SHA/check-runs?per_page=100" --paginate --jq '.check_runs[] | select(.name != "Evaluate autonomous merge") | select(.name | test("CodeRabbit"; "i") | not) | select(.status != "completed" or (.conclusion != "success" and .conclusion != "skipped")) | .name' || true)
+          if [[ -n "$FAILING" ]]; then echo "Blocking or incomplete checks:"; echo "$FAILING"; exit 1; fi
+
+      - name: Enable GitHub auto-merge
+        if: steps.inspect.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.pr }}
+        run: gh pr merge "$PR" --repo "${{ github.repository }}" --auto --squash

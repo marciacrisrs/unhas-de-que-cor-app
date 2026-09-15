@@ -7,11 +7,14 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.sonar)
-    id("org.cyclonedx.bom") version "3.3.0"
 }
 
-group = "br.com.unhasdequecor"
-version = "1.0.13"
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+        lockMode = org.gradle.api.artifacts.dsl.LockMode.STRICT
+    }
+}
 
 fun envOrProp(name: String, propName: String = name): String? =
     System.getenv(name)?.takeIf { it.isNotBlank() }
@@ -51,22 +54,14 @@ project(":app") {
 
 tasks.register("resolveAndLockAll") {
     group = "dependency management"
-    description = "Resolves project dependency configurations and writes Gradle dependency lockfiles."
+    description = "Resolves all lockable configurations and writes Gradle dependency lockfiles."
     notCompatibleWithConfigurationCache("Resolves configurations dynamically to persist dependency locks")
     doFirst {
         require(gradle.startParameter.isWriteDependencyLocks) { "Run this task with --write-locks" }
     }
     doLast {
         allprojects.forEach { project ->
-            project.configurations
-                .filter { configuration ->
-                    configuration.isCanBeResolved &&
-                        !configuration.name.startsWith("_agp_internal_") &&
-                        !configuration.name.startsWith("ksp")
-                }
-                .forEach { configuration ->
-                    configuration.resolve()
-                }
+            project.configurations.filter { it.isCanBeResolved }.forEach { it.resolve() }
         }
     }
 }

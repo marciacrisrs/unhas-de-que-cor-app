@@ -39,7 +39,16 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
             geometricHalfWidth + SEARCH_WIDTH_MARGIN,
         ).coerceAtMost(MAX_SEARCH_HALF_WIDTH)
 
-        val skin = estimateSkin(pixels, width, height, frame, minT, maxT, searchHalfWidth)
+        val skin = estimateSkin(
+            pixels = pixels,
+            width = width,
+            height = height,
+            frame = frame,
+            minT = minT,
+            maxT = maxT,
+            geometricHalfWidth = geometricHalfWidth,
+            searchHalfWidth = searchHalfWidth,
+        )
         val candidate = classify(pixels, width, height, frame, minT, maxT, searchHalfWidth, skin)
         val component = seededComponent(candidate, width, height, frame, polygon) ?: return null
         if (component.count { it } < MIN_COMPONENT_PIXELS) return null
@@ -97,10 +106,18 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         frame: Frame,
         minT: Float,
         maxT: Float,
+        geometricHalfWidth: Float,
         searchHalfWidth: Float,
     ): SkinModel {
         val samples = ArrayList<Feature>()
-        val ring = searchHalfWidth * SKIN_RING_FACTOR
+        val availableHalfWidth = min(width, height) * HALF - HALF_PIXEL
+        val ring = min(
+            searchHalfWidth * SKIN_RING_FACTOR,
+            min(
+                availableHalfWidth,
+                geometricHalfWidth + SKIN_RING_MARGIN,
+            ),
+        )
         for (y in 1 until height - 1 step SAMPLE_STRIDE) {
             for (x in 1 until width - 1 step SAMPLE_STRIDE) {
                 val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
@@ -310,6 +327,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val SEARCH_WIDTH_FACTOR = 6.0f
         const val SEARCH_WIDTH_MARGIN = 10f
         const val SKIN_RING_FACTOR = 0.8f
+        const val SKIN_RING_MARGIN = 4f
         const val SAMPLE_STRIDE = 3
         const val MIN_SPREAD = 0.008f
         const val SPREAD_FACTOR = 2.2f
