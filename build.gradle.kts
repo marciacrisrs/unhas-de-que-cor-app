@@ -7,7 +7,22 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.sonar)
-    id("org.cyclonedx.bom") version "3.3.0"
+}
+
+// CycloneDX is an SBOM-only tool. Keep its plugin marker out of the normal
+// build configuration so dependency verification for application builds does
+// not depend on the SBOM toolchain.
+val isCycloneDxTask = gradle.startParameter.taskNames.any { it.contains("cyclonedx", ignoreCase = true) }
+if (isCycloneDxTask) {
+    buildscript {
+        repositories {
+            gradlePluginPortal()
+        }
+        dependencies {
+            classpath("org.cyclonedx.bom:org.cyclonedx.bom.gradle.plugin:3.3.0")
+        }
+    }
+    apply(plugin = "org.cyclonedx.bom")
 }
 
 allprojects {
