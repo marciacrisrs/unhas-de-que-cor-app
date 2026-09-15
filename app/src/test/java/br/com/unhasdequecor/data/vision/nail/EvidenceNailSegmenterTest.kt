@@ -14,11 +14,13 @@ class EvidenceNailSegmenterTest {
 
     @Test
     fun `recovers visible nail boundaries instead of returning the geometric rectangle`() {
-        val rw = 80
-        val rh = 100
+        val width = 120
+        val height = 140
+        val nailStartX = 26
+        val nailEndX = 54
         val skin = argb(188, 132, 112)
         val nail = argb(226, 207, 198)
-        val pixels = IntArray(rw * rh) { skin }
+        val pixels = IntArray(width * height) { skin }
 
         for (y in 22 until 78) {
             val halfWidth = when {
@@ -28,13 +30,13 @@ class EvidenceNailSegmenterTest {
                 else -> 11
             }
             for (x in 40 - halfWidth..40 + halfWidth) {
-                pixels[y * rw + x] = nail
+                pixels[y * width + x] = nail
             }
         }
 
         val image = mockk<Bitmap>(relaxed = true) {
-            every { width } returns 120
-            every { height } returns 140
+            every { this@mockk.width } returns width
+            every { this@mockk.height } returns height
             every { getPixels(any(), any(), any(), any(), any(), any(), any()) } answers {
                 val args = invocation.args
                 val dest = args[0] as IntArray
@@ -46,7 +48,7 @@ class EvidenceNailSegmenterTest {
                 val h = args[6] as Int
                 for (row in 0 until h) for (col in 0 until w) {
                     dest[offset + row * stride + col] =
-                        pixels[(srcY + row) * rw + srcX + col]
+                        pixels[(srcY + row) * width + srcX + col]
                 }
             }
         }
