@@ -56,13 +56,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run CI verification
-        run: ./gradlew verifyCi --stacktrace --no-configuration-cache
+        run: ./gradlew verifyCi --stacktrace --no-configuration-cache --write-locks
 
       - name: Sonar analysis
         if: ${{ env.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew sonar --stacktrace --no-configuration-cache
+        run: ./gradlew sonar --stacktrace --no-configuration-cache --write-locks
 
       - name: Upload coverage reports
         if: always()
@@ -148,7 +148,7 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
-          script: ./gradlew connectedDebugAndroidTest --stacktrace --no-daemon
+          script: ./gradlew connectedDebugAndroidTest --stacktrace --no-daemon --write-locks
 
       - name: Upload instrumented test reports
         if: always()
