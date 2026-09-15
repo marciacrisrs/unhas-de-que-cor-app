@@ -46,10 +46,13 @@ jobs:
           DRAFT=$(jq -r '.draft' <<<"$DATA")
           MERGEABLE=$(jq -r '.mergeable' <<<"$DATA")
           HEAD_SHA=$(jq -r '.head.sha' <<<"$DATA")
+          HEAD_REPO=$(jq -r '.head.repo.full_name // ""' <<<"$DATA")
+          BASE_REPO=$(jq -r '.base.repo.full_name // ""' <<<"$DATA")
           NODE_ID=$(jq -r '.node_id' <<<"$DATA")
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "node_id=$NODE_ID" >> "$GITHUB_OUTPUT"
           [[ "$STATE" == "open" && "$DRAFT" == "false" && "$MERGEABLE" != "false" ]]
+          [[ "$HEAD_REPO" == "$BASE_REPO" ]] || { echo "Autonomous merge is restricted to branches in the trusted base repository."; exit 1; }
           mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
           if (( ${#SENSITIVE[@]} > 0 )); then
             echo "Sensitive files changed; autonomous merge is disabled."
