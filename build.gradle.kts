@@ -9,22 +9,6 @@ plugins {
     alias(libs.plugins.sonar)
 }
 
-// CycloneDX is an SBOM-only tool. Keep its plugin marker out of the normal
-// build configuration so dependency verification for application builds does
-// not depend on the SBOM toolchain.
-val isCycloneDxTask = gradle.startParameter.taskNames.any { it.contains("cyclonedx", ignoreCase = true) }
-if (isCycloneDxTask) {
-    buildscript {
-        repositories {
-            gradlePluginPortal()
-        }
-        dependencies {
-            classpath("org.cyclonedx.bom:org.cyclonedx.bom.gradle.plugin:3.3.0")
-        }
-    }
-    apply(plugin = "org.cyclonedx.bom")
-}
-
 allprojects {
     dependencyLocking {
         lockAllConfigurations()
@@ -53,7 +37,7 @@ sonar {
         property("sonar.kotlin.detekt.reportPaths", "${appBuildDir}/reports/detekt/detekt.xml")
         property("sonar.junit.reportPaths", "${appBuildDir}/test-results/testDebugUnitTest")
         property("sonar.exclusions", listOf("**/build/**","**/R.class","**/R\$*.class","**/BuildConfig.*","**/Manifest*.*","**/*_Hilt*","**/Hilt_*.*","**/*_Factory*","**/*_MembersInjector*","**/di/**","**/tmp/**","**/*.webp","**/*.ttf","**/*.otf","**/*.task","**/*.png","**/*.jpg","**/*.jpeg").joinToString(","))
-        property("sonar.coverage.exclusions", listOf("**/di/**","**/ui/theme/**","**/*Activity*","**/*Application*","**/*Screen*","**/ui/components/Brand*","**/ui/components/AsyncContent*","**/ui/components/HistoryRow*","**/ui/components/NailPolishMark*","**/ui/components/ProgressSteps*","**/ui/components/HandTryOn*","**/ui/hand/HandReferenceContent*","**/ui/hand/HandReferenceEffects*","**/ui/hand/HandReferenceModels*","**/ui/hand/HandReferencePreview*","**/ui/hand/HandReferenceScaffold*","**/ui/hand/HandReferenceSheets*","**/ui/navigation/AppNavHost*","**/ui/navigation/AppBottomBar*","**/ui/navigation/BottomDestination*","**/data/vision/MediaPipe*","**/data/vision/HandInferenceVariants*","**/data/vision/HandInferenceVariant*","**/data/vision/nail/GeometricNailSegmenter*","**/data/vision/nail/DetectedNailPolishApplier*","**/data/vision/nail/NailTracker*","**/data/local/datastore/**","**/data/local/hand/**","**/data/local/db/dao/**","**/data/local/db/AppDatabase*","**/data/repository/HandReferenceRepositoryImpl*","**/data/repository/PreferencesRepositoryImpl*","**/data/repository/ColorCatalogRepositoryImpl*","**/BuildConfig.*").joinToString(","))
+        property("sonar.coverage.exclusions", listOf("**/di/**","**/ui/theme/**","**/*Activity*","**/*Application*","**/*Screen*","**/ui/components/Brand*","**/ui/components/AsyncContent*","**/ui/components/HistoryRow*","**/ui/components/NailPolishMark*","**/ui/components/ProgressSteps*","**/ui/components/HandTryOn*","**/ui/hand/HandReferenceContent*","**/ui/hand/HandReferenceEffects*","**/ui/hand/HandReferenceModels*","**/ui/hand/HandReferencePreview*","**/ui/hand/HandReferenceScaffold*","**/ui/hand/HandReferenceSheets*","**/ui/navigation/AppNavHost*","**/ui/navigation/AppBottomBar*","**/ui/navigation/BottomDestination*","**/data/vision/MediaPipe*","**/data/vision/HandInferenceVariants*","**/data/vision/HandInferenceVariant*","**/data/vision/nail/GeometricNailSegmenter*","**/data/vision/nail/DetectedNailPolishApplier*","**/data/vision/nail/NailTracker*","**/data/local/datastore/**","**/data/local/hand/**","**/data/local/db/dao/**","**/data/local/db/AppDatabase*","**/data/repository/HandReferenceRepositoryImpl*","**/data/repository/PreferencesRepositoryImpl*","**/data/repository/ColorCatalogRepositoryImpl*").joinToString(","))
     }
 }
 
