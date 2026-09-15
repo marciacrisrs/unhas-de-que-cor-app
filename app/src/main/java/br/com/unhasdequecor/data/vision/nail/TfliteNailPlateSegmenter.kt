@@ -37,14 +37,6 @@ class TfliteNailPlateSegmenter @Inject constructor(
         if (bounds.width() < MIN_SIZE || bounds.height() < MIN_SIZE) return null
         if (!validBounds(bounds, image)) return null
 
-        val model = getInterpreter() ?: return null
-        val input = model.getInputTensor(0)
-        val output = model.getOutputTensor(0)
-        val inputShape = input.shape()
-        if (inputShape.size != 4) return null
-
-        val inputHeight = inputShape[1]
-        val inputWidth = inputShape[2]
         val roiRect = Rect(bounds.left, bounds.top, bounds.right, bounds.bottom)
         val contextRect = expandedBounds(roiRect, image)
         val inputBitmap = Bitmap.createBitmap(
@@ -54,27 +46,14 @@ class TfliteNailPlateSegmenter @Inject constructor(
             contextRect.width(),
             contextRect.height(),
         )
-        val inputBuffer = encodeInput(
-            source = inputBitmap,
-            width = inputWidth,
-            height = inputHeight,
-            dataType = input.dataType(),
-            quantization = input.quantizationParams(),
-        )
-        val outputBuffer = ByteBuffer.allocateDirect(output.numBytes()).order(ByteOrder.nativeOrder())
-
-        synchronized(lock) {
-            inputBuffer.rewind()
-            outputBuffer.rewind()
-            model.run(inputBuffer, outputBuffer)
-        }
-
-        outputBuffer.rewind()
-        val probability = decodeOutput(outputBuffer, output) ?: run {
-            inputBitmap.recycle()
-            return null
-        }
-        inputBitmap.recycle()
+        val inference = try {
+            inferProbability(inputBitmap)
+        } finally {
+            if (!inputBitmap.isRecycled) inputBitmap.recycle()
+        } ?: return null
+        val probability = inference.probability
+        val inputWidth = inference.inputWidth
+        val inputHeight = inference.inputHeight
 
         // Keep the model probability field until projection. Nearest-neighbour
         // expansion was turning the low-resolution model boundary into visible
@@ -110,16 +89,68 @@ class TfliteNailPlateSegmenter @Inject constructor(
         return boundaryRefiner.refine(image, roi, seedMask)
     }
 
-    private fun getInterpreter(): Interpreter? {
+    /**
+     * Result still-try-on runs on `Dispatchers.Default` and Live frames run on
+     * the CameraX analyzer thread. Both share this singleton. TFLite's
+     * [Interpreter] is not thread-safe, so tensor metadata and [Interpreter.run]
+     * stay on the same lock. Reading `getOutputTensor` while another thread is
+     * inside `run()` is a native crash.
+     */
+    private fun inferProbability(inputBitmap: Bitmap): InferenceResult? {
+        val spec: ModelIoSpec
         synchronized(lock) {
-            interpreter?.let { return it }
-            return runCatching {
-                Interpreter(
-                    loadModel(),
-                    Interpreter.Options().apply { setNumThreads(INFERENCE_THREADS) },
-                ).also { interpreter = it }
-            }.getOrNull()
+            spec = snapshotModelIoLocked() ?: return null
         }
+        val inputBuffer = encodeInput(
+            source = inputBitmap,
+            width = spec.inputWidth,
+            height = spec.inputHeight,
+            dataType = spec.inputDataType,
+            quantization = spec.inputQuantization,
+        )
+        val outputBuffer = ByteBuffer.allocateDirect(spec.outputNumBytes).order(ByteOrder.nativeOrder())
+        synchronized(lock) {
+            val model = interpreterOrNullLocked() ?: return null
+            inputBuffer.rewind()
+            outputBuffer.rewind()
+            model.run(inputBuffer, outputBuffer)
+        }
+        outputBuffer.rewind()
+        val probability = decodeTfliteSegmentationOutput(
+            buffer = outputBuffer,
+            shape = spec.outputShape,
+            dataType = spec.outputDataType,
+            quantization = spec.outputQuantization,
+        ) ?: return null
+        return InferenceResult(probability, spec.inputWidth, spec.inputHeight)
+    }
+
+    private fun snapshotModelIoLocked(): ModelIoSpec? {
+        val model = interpreterOrNullLocked() ?: return null
+        val input = model.getInputTensor(0)
+        val output = model.getOutputTensor(0)
+        val inputShape = input.shape()
+        if (inputShape.size != 4) return null
+        return ModelIoSpec(
+            inputWidth = inputShape[2],
+            inputHeight = inputShape[1],
+            inputDataType = input.dataType(),
+            inputQuantization = input.quantizationParams(),
+            outputNumBytes = output.numBytes(),
+            outputShape = output.shape().copyOf(),
+            outputDataType = output.dataType(),
+            outputQuantization = output.quantizationParams(),
+        )
+    }
+
+    private fun interpreterOrNullLocked(): Interpreter? {
+        interpreter?.let { return it }
+        return runCatching {
+            Interpreter(
+                loadModel(),
+                Interpreter.Options().apply { setNumThreads(INFERENCE_THREADS) },
+            ).also { interpreter = it }
+        }.getOrNull()
     }
 
     private fun loadModel(): ByteBuffer {
@@ -165,75 +196,22 @@ class TfliteNailPlateSegmenter @Inject constructor(
         return buffer
     }
 
-    private fun decodeOutput(
-        buffer: ByteBuffer,
-        tensor: org.tensorflow.lite.Tensor,
-    ): FloatArray? {
-        val shape = tensor.shape()
-        if (shape.size != 4) return null
-        val channels: Int
-        val height: Int
-        val width: Int
-        if (shape[3] <= MAX_SEGMENT_CHANNELS) {
-            height = shape[1]
-            width = shape[2]
-            channels = shape[3]
-        } else if (shape[1] <= MAX_SEGMENT_CHANNELS) {
-            channels = shape[1]
-            height = shape[2]
-            width = shape[3]
-        } else {
-            return null
-        }
-        if (channels < 1) return null
+    private data class ModelIoSpec(
+        val inputWidth: Int,
+        val inputHeight: Int,
+        val inputDataType: DataType,
+        val inputQuantization: org.tensorflow.lite.Tensor.QuantizationParams,
+        val outputNumBytes: Int,
+        val outputShape: IntArray,
+        val outputDataType: DataType,
+        val outputQuantization: org.tensorflow.lite.Tensor.QuantizationParams,
+    )
 
-        val values = FloatArray(height * width)
-        val dataType = tensor.dataType()
-        val quantization = tensor.quantizationParams()
-        for (index in values.indices) {
-            val channelValues = FloatArray(channels)
-            for (channel in 0 until channels) {
-                channelValues[channel] = readValue(buffer, dataType, quantization)
-            }
-            values[index] = if (channels == 1) {
-                normalizeProbability(channelValues[0])
-            } else {
-                softmaxPositive(channelValues)
-            }
-        }
-        return values
-    }
-
-    private fun readValue(
-        buffer: ByteBuffer,
-        dataType: DataType,
-        quantization: org.tensorflow.lite.Tensor.QuantizationParams,
-    ): Float {
-        val raw = when (dataType) {
-            DataType.FLOAT32 -> buffer.float
-            DataType.UINT8 -> (buffer.get().toInt() and 0xFF).toFloat()
-            DataType.INT8 -> buffer.get().toFloat()
-            else -> return 0f
-        }
-        return when (dataType) {
-            DataType.FLOAT32 -> raw
-            DataType.UINT8, DataType.INT8 -> (raw - quantization.zeroPoint) * quantization.scale
-            else -> raw
-        }
-    }
-
-    private fun normalizeProbability(value: Float): Float = when {
-        value in 0f..1f -> value
-        else -> 1f / (1f + exp(-value))
-    }
-
-    private fun softmaxPositive(values: FloatArray): Float {
-        val maxValue = values.maxOrNull() ?: return 0f
-        var sum = 0f
-        for (value in values) sum += exp(value - maxValue)
-        val positive = exp(values.last() - maxValue)
-        return (positive / sum).coerceIn(0f, 1f)
-    }
+    private data class InferenceResult(
+        val probability: FloatArray,
+        val inputWidth: Int,
+        val inputHeight: Int,
+    )
 
     /**
      * Projects the learned probability field directly to the image context.
@@ -395,6 +373,81 @@ class TfliteNailPlateSegmenter @Inject constructor(
         const val MIN_SIZE = 12
         val MODEL_THRESHOLDS = intArrayOf(128, 96, 64)
         const val MIN_COMPONENT_PIXELS = 12
-        const val MAX_SEGMENT_CHANNELS = 4
     }
 }
+
+/**
+ * Decodes a copied TFLite output buffer. Callers must snapshot tensor metadata
+ * under the interpreter lock; this must not touch [Interpreter] itself.
+ */
+internal fun decodeTfliteSegmentationOutput(
+    buffer: ByteBuffer,
+    shape: IntArray,
+    dataType: DataType,
+    quantization: org.tensorflow.lite.Tensor.QuantizationParams,
+): FloatArray? {
+    if (shape.size != 4) return null
+    val channels: Int
+    val height: Int
+    val width: Int
+    if (shape[3] <= MAX_SEGMENT_CHANNELS) {
+        height = shape[1]
+        width = shape[2]
+        channels = shape[3]
+    } else if (shape[1] <= MAX_SEGMENT_CHANNELS) {
+        channels = shape[1]
+        height = shape[2]
+        width = shape[3]
+    } else {
+        return null
+    }
+    if (channels < 1) return null
+
+    val values = FloatArray(height * width)
+    for (index in values.indices) {
+        val channelValues = FloatArray(channels)
+        for (channel in 0 until channels) {
+            channelValues[channel] = readTfliteValue(buffer, dataType, quantization)
+        }
+        values[index] = if (channels == 1) {
+            normalizeTfliteProbability(channelValues[0])
+        } else {
+            softmaxPositiveChannel(channelValues)
+        }
+    }
+    return values
+}
+
+private fun readTfliteValue(
+    buffer: ByteBuffer,
+    dataType: DataType,
+    quantization: org.tensorflow.lite.Tensor.QuantizationParams,
+): Float {
+    val raw = when (dataType) {
+        DataType.FLOAT32 -> buffer.float
+        DataType.UINT8 -> (buffer.get().toInt() and 0xFF).toFloat()
+        DataType.INT8 -> buffer.get().toFloat()
+        else -> return 0f
+    }
+    return when (dataType) {
+        DataType.FLOAT32 -> raw
+        DataType.UINT8, DataType.INT8 -> (raw - quantization.zeroPoint) * quantization.scale
+        else -> raw
+    }
+}
+
+internal fun normalizeTfliteProbability(value: Float): Float = when {
+    value in 0f..1f -> value
+    else -> 1f / (1f + exp(-value))
+}
+
+internal fun softmaxPositiveChannel(values: FloatArray): Float {
+    val maxValue = values.maxOrNull() ?: return 0f
+    var sum = 0f
+    for (value in values) sum += exp(value - maxValue)
+    val positive = exp(values.last() - maxValue)
+    return (positive / sum).coerceIn(0f, 1f)
+}
+
+private const val MAX_SEGMENT_CHANNELS = 4
+
