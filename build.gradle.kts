@@ -10,15 +10,8 @@ plugins {
     id("org.cyclonedx.bom") version "3.3.0"
 }
 
-allprojects {
-    dependencyLocking {
-        // Lock only regular dependency configurations. AGP/KSP create internal
-        // configurations dynamically, and strict locking those configurations
-        // causes MissingLockStateException during normal builds and CycloneDX.
-        lockAllConfigurations()
-        lockMode = org.gradle.api.artifacts.dsl.LockMode.DEFAULT
-    }
-}
+group = "br.com.unhasdequecor"
+version = "1.0.13"
 
 fun envOrProp(name: String, propName: String = name): String? =
     System.getenv(name)?.takeIf { it.isNotBlank() }
@@ -69,8 +62,7 @@ tasks.register("resolveAndLockAll") {
                 .filter { configuration ->
                     configuration.isCanBeResolved &&
                         !configuration.name.startsWith("_agp_internal_") &&
-                        !configuration.name.startsWith("ksp") &&
-                        configuration.name != "debugUnitTestCompileClasspath"
+                        !configuration.name.startsWith("ksp")
                 }
                 .forEach { configuration ->
                     configuration.resolve()
