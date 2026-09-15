@@ -16,8 +16,6 @@ class EvidenceNailSegmenterTest {
     fun `recovers visible nail boundaries instead of returning the geometric rectangle`() {
         val width = 120
         val height = 140
-        val nailStartX = 26
-        val nailEndX = 54
         val skin = argb(188, 132, 112)
         val nail = argb(226, 207, 198)
         val pixels = IntArray(width * height) { skin }
