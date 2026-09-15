@@ -12,8 +12,11 @@ plugins {
 
 allprojects {
     dependencyLocking {
+        // Lock only regular dependency configurations. AGP/KSP create internal
+        // configurations dynamically, and strict locking those configurations
+        // causes MissingLockStateException during normal builds and CycloneDX.
         lockAllConfigurations()
-        lockMode = org.gradle.api.artifacts.dsl.LockMode.STRICT
+        lockMode = org.gradle.api.artifacts.dsl.LockMode.DEFAULT
     }
 }
 
@@ -38,7 +41,7 @@ sonar {
         property("sonar.kotlin.detekt.reportPaths", "${appBuildDir}/reports/detekt/detekt.xml")
         property("sonar.junit.reportPaths", "${appBuildDir}/test-results/testDebugUnitTest")
         property("sonar.exclusions", listOf("**/build/**","**/R.class","**/R\$*.class","**/BuildConfig.*","**/Manifest*.*","**/*_Hilt*","**/Hilt_*.*","**/*_Factory*","**/*_MembersInjector*","**/di/**","**/tmp/**","**/*.webp","**/*.ttf","**/*.otf","**/*.task","**/*.png","**/*.jpg","**/*.jpeg").joinToString(","))
-        property("sonar.coverage.exclusions", listOf("**/di/**","**/ui/theme/**","**/*Activity*","**/*Application*","**/*Screen*","**/ui/components/Brand*","**/ui/components/AsyncContent*","**/ui/components/HistoryRow*","**/ui/components/NailPolishMark*","**/ui/components/ProgressSteps*","**/ui/components/HandTryOn*","**/ui/hand/HandReferenceContent*","**/ui/hand/HandReferenceEffects*","**/ui/hand/HandReferenceModels*","**/ui/hand/HandReferencePreview*","**/ui/hand/HandReferenceScaffold*","**/ui/hand/HandReferenceSheets*","**/ui/navigation/AppNavHost*","**/ui/navigation/AppBottomBar*","**/ui/navigation/BottomDestination*","**/data/vision/MediaPipe*","**/data/vision/HandInferenceVariants*","**/data/vision/HandInferenceVariant*","**/data/vision/nail/GeometricNailSegmenter*","**/data/vision/nail/DetectedNailPolishApplier*","**/data/vision/nail/NailTracker*","**/data/local/datastore/**","**/data/local/hand/**","**/data/local/db/dao/**","**/data/local/db/AppDatabase*","**/data/repository/HandReferenceRepositoryImpl*","**/data/repository/PreferencesRepositoryImpl*","**/data/repository/ColorCatalogRepositoryImpl*","**/BuildConfig.*").joinToString(","))
+        property("sonar.coverage.exclusions", listOf("**/di/**","**/ui/theme/**","**/*Activity*","**/*Application*","**/*Screen*","**/ui/components/Brand*","**/ui/components/AsyncContent*","**/ui/components/HistoryRow*","**/ui/components/NailPolishMark*","**/ui/components/ProgressSteps*","**/ui/components/HandTryOn*","**/ui/hand/HandReferenceContent*","**/ui/hand/HandReferenceEffects*","**/ui/hand/HandReferenceModels*","**/ui/hand/HandReferencePreview*","**/ui/hand/HandReferenceScaffold*","**/ui/hand/HandReferenceSheets*","**/ui/navigation/AppNavHost*","**/ui/navigation/AppBottomBar*","**/ui/navigation/BottomDestination*","**/data/vision/MediaPipe*","**/data/vision/HandInferenceVariants*","**/data/vision/HandInferenceVariant*","**/data/vision/nail/GeometricNailSegmenter*","**/data/vision/nail/DetectedNailPolishApplier*","**/data/vision/nail/NailTracker*","**/data/local/datastore/**","**/data/local/hand/**","**/data/local/db/dao/**","**/data/local/db/AppDatabase*","**/data/repository/HandReferenceRepositoryImpl*","**/data/repository/PreferencesRepositoryImpl*","**/data/repository/ColorCatalogRepositoryImpl*").joinToString(","))
     }
 }
 
@@ -55,14 +58,23 @@ project(":app") {
 
 tasks.register("resolveAndLockAll") {
     group = "dependency management"
-    description = "Resolves all lockable configurations and writes Gradle dependency lockfiles."
+    description = "Resolves project dependency configurations and writes Gradle dependency lockfiles."
     notCompatibleWithConfigurationCache("Resolves configurations dynamically to persist dependency locks")
     doFirst {
         require(gradle.startParameter.isWriteDependencyLocks) { "Run this task with --write-locks" }
     }
     doLast {
         allprojects.forEach { project ->
-            project.configurations.filter { it.isCanBeResolved }.forEach { it.resolve() }
+            project.configurations
+                .filter { configuration ->
+                    configuration.isCanBeResolved &&
+                        !configuration.name.startsWith("_agp_internal_") &&
+                        !configuration.name.startsWith("ksp") &&
+                        configuration.name != "debugUnitTestCompileClasspath"
+                }
+                .forEach { configuration ->
+                    configuration.resolve()
+                }
         }
     }
 }
