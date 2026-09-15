@@ -31,14 +31,17 @@ jobs:
       - name: Bootstrap verification metadata
         run: ./gradlew --write-verification-metadata sha256 help --no-daemon
 
-      - name: Commit verification metadata
+      - name: Bootstrap dependency locks
+        run: ./gradlew resolveAndLockAll --write-locks --no-daemon --stacktrace
+
+      - name: Commit generated Gradle metadata
         run: |
-          if git diff --quiet -- gradle/verification-metadata.xml; then
-            echo "Verification metadata is already up to date."
+          if git diff --quiet -- gradle/verification-metadata.xml '**/gradle.lockfile' '**/buildscript-gradle.lockfile'; then
+            echo "Gradle verification metadata and dependency locks are already up to date."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gradle/verification-metadata.xml
-          git commit -m "build: verify CycloneDX plugin metadata"
+          git add gradle/verification-metadata.xml '**/gradle.lockfile' '**/buildscript-gradle.lockfile'
+          git commit -m "build: update Gradle verification metadata and locks"
           git push origin "HEAD:${GITHUB_REF_NAME}"
