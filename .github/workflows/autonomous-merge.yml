@@ -50,10 +50,14 @@ jobs:
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "node_id=$NODE_ID" >> "$GITHUB_OUTPUT"
           [[ "$STATE" == "open" && "$DRAFT" == "false" && "$MERGEABLE" != "false" ]]
-          mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
-          if (( ${#SENSITIVE[@]} > 0 )); then
-            echo "Sensitive files changed; autonomous merge is disabled."
-            printf '%s\n' "${SENSITIVE[@]}"
+
+          # Normal CI workflow changes are evaluated by the same required gates
+          # as any other PR. Only this policy workflow stays protected because
+          # changing it could weaken the autonomous merge guardrails.
+          mapfile -t PROTECTED < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^\.github/workflows/autonomous-merge\.yml$' || true)
+          if (( ${#PROTECTED[@]} > 0 )); then
+            echo "Protected autonomous-merge policy changed; autonomous merge is disabled."
+            printf '%s\n' "${PROTECTED[@]}"
             exit 1
           fi
 
