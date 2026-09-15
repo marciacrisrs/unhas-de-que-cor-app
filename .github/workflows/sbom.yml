@@ -38,10 +38,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Generate CycloneDX SBOM
-        # CycloneDX is loaded only for this SBOM job. Its plugin marker is not
-        # yet present in verification metadata, so use Gradle's documented
-        # lenient mode only for this isolated tooling step.
-        run: ./gradlew cyclonedxBom --stacktrace --no-daemon --write-locks --dependency-verification lenient
+        run: ./gradlew --init-script .github/gradle/cyclonedx.init.gradle.kts cyclonedxBom --stacktrace --no-daemon --write-locks --dependency-verification lenient
 
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
