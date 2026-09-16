@@ -339,7 +339,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val SAMPLE_TOLERANCE = 0.8f
         const val PAINT_INSET_PX = 1.0f
         const val MIN_AREA_RATIO = 0.08f
-        const val MAX_AREA_RATIO = 12f
+        const val MAX_AREA_RATIO = 7f
         const val AXIS_DRIFT_MIN = 4f
         const val AXIS_DRIFT_FACTOR = 0.4f
         const val MAX_WIDTH_FACTOR = 2.0f
