@@ -39,16 +39,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
             geometricHalfWidth + SEARCH_WIDTH_MARGIN,
         ).coerceAtMost(MAX_SEARCH_HALF_WIDTH)
 
-        val skin = estimateSkin(
-            pixels = pixels,
-            width = width,
-            height = height,
-            frame = frame,
-            minT = minT,
-            maxT = maxT,
-            geometricHalfWidth = geometricHalfWidth,
-            searchHalfWidth = searchHalfWidth,
-        )
+        val skin = estimateSkin(pixels, width, height, frame, minT, maxT, geometricHalfWidth, searchHalfWidth)
         val candidate = classify(pixels, width, height, frame, minT, maxT, searchHalfWidth, skin)
         val component = seededComponent(candidate, width, height, frame, polygon) ?: return null
         if (component.count { it } < MIN_COMPONENT_PIXELS) return null
@@ -111,13 +102,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
     ): SkinModel {
         val samples = ArrayList<Feature>()
         val availableHalfWidth = min(width, height) * HALF - HALF_PIXEL
-        val ring = min(
-            searchHalfWidth * SKIN_RING_FACTOR,
-            min(
-                availableHalfWidth,
-                geometricHalfWidth + SKIN_RING_MARGIN,
-            ),
-        )
+        val ring = min(searchHalfWidth * SKIN_RING_FACTOR, min(availableHalfWidth, geometricHalfWidth + SKIN_RING_MARGIN))
         for (y in 1 until height - 1 step SAMPLE_STRIDE) {
             for (x in 1 until width - 1 step SAMPLE_STRIDE) {
                 val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
@@ -248,12 +233,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         }
     }
 
-    private fun shapeIsValid(
-        candidate: List<PixelPoint>,
-        geometric: List<PixelPoint>,
-        frame: Frame,
-        searchHalfWidth: Float,
-    ): Boolean {
+    private fun shapeIsValid(candidate: List<PixelPoint>, geometric: List<PixelPoint>, frame: Frame, searchHalfWidth: Float): Boolean {
         if (candidate.size < MIN_POLYGON_POINTS) return false
         val area = abs(polygonArea(candidate))
         val geometricArea = abs(polygonArea(geometric)).coerceAtLeast(1f)
@@ -279,9 +259,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
             for (i in polygon.indices) {
                 val a = polygon[i]
                 val b = polygon[(i + 1) % polygon.size]
-                if ((a.y <= y + HALF_PIXEL && b.y > y + HALF_PIXEL) ||
-                    (b.y <= y + HALF_PIXEL && a.y > y + HALF_PIXEL)
-                ) {
+                if ((a.y <= y + HALF_PIXEL && b.y > y + HALF_PIXEL) || (b.y <= y + HALF_PIXEL && a.y > y + HALF_PIXEL)) {
                     val f = (y + HALF_PIXEL - a.y) / (b.y - a.y)
                     intersections += a.x + (b.x - a.x) * f
                 }
@@ -300,22 +278,16 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
 
     private fun featureAt(pixels: IntArray, width: Int, height: Int, x: Int, y: Int): Feature {
         val color = pixels[y.coerceIn(0, height - 1) * width + x.coerceIn(0, width - 1)]
-        return Feature(
-            ((color shr 16) and 0xFF) / 255f,
-            ((color shr 8) and 0xFF) / 255f,
-            (color and 0xFF) / 255f,
-        )
+        return Feature(((color shr 16) and 0xFF) / 255f, ((color shr 8) and 0xFF) / 255f, (color and 0xFF) / 255f)
     }
 
-    private fun distance(a: Feature, b: Feature): Float =
-        (abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b)) / 3f
+    private fun distance(a: Feature, b: Feature): Float = (abs(a.r - b.r) + abs(a.g - b.g) + abs(a.b - b.b)) / 3f
 
-    private fun polygonArea(points: List<PixelPoint>): Float =
-        points.indices.fold(0f) { sum, i ->
-            val a = points[i]
-            val b = points[(i + 1) % points.size]
-            sum + a.x * b.y - b.x * a.y
-        } * HALF
+    private fun polygonArea(points: List<PixelPoint>): Float = points.indices.fold(0f) { sum, i ->
+        val a = points[i]
+        val b = points[(i + 1) % points.size]
+        sum + a.x * b.y - b.x * a.y
+    } * HALF
 
     private companion object {
         const val MIN_SIZE = 8
@@ -339,7 +311,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val SAMPLE_TOLERANCE = 0.8f
         const val PAINT_INSET_PX = 1.0f
         const val MIN_AREA_RATIO = 0.08f
-        const val MAX_AREA_RATIO = 7f
+        const val MAX_AREA_RATIO = 12f
         const val AXIS_DRIFT_MIN = 4f
         const val AXIS_DRIFT_FACTOR = 0.4f
         const val MAX_WIDTH_FACTOR = 2.0f
@@ -350,7 +322,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val HALF_PIXEL = 0.5f
         const val SIDE_SAMPLE_STEP = 1f
         const val EPSILON = 1e-4f
-        val DEFAULT_SKIN = Feature(0.33f, 0.33f, 0.34f)
-        const val DEFAULT_SPREAD = 0.15f
+        val DEFAULT_SKIN = Feature(0.52f, 0.34f, 0.29f)
+        const val DEFAULT_SPREAD = 0.05f
     }
 }
