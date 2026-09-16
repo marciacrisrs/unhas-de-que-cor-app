@@ -112,9 +112,9 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         val samples = ArrayList<Feature>()
         val availableHalfWidth = min(width, height) * HALF - HALF_PIXEL
         val ring = min(
-            searchHalfWidth * SKIN_RING_FACTOR,
-            min(
-                availableHalfWidth,
+            availableHalfWidth,
+            max(
+                searchHalfWidth * SKIN_RING_FACTOR,
                 geometricHalfWidth + SKIN_RING_MARGIN,
             ),
         )
@@ -326,7 +326,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val MAX_SEARCH_HALF_WIDTH = 55f
         const val SEARCH_WIDTH_FACTOR = 6.0f
         const val SEARCH_WIDTH_MARGIN = 10f
-        const val SKIN_RING_FACTOR = 0.8f
+        const val SKIN_RING_FACTOR = 0.75f
         const val SKIN_RING_MARGIN = 4f
         const val SAMPLE_STRIDE = 3
         const val MIN_SPREAD = 0.008f
