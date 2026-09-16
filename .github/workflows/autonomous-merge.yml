@@ -56,7 +56,7 @@ jobs:
 
           FILES_JSON=$(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate)
 
-          if [[ "$ACTOR" == "dependabot[bot]" && "$TITLE" =~ ^build\\(deps\\) ]]; then
+          if [[ "$ACTOR" == "dependabot[bot]" && "$TITLE" =~ ^build\(deps\) ]]; then
             BAD=0
             FOUND=0
             mapfile -t FILES < <(jq -r '.[].filename' <<<"$FILES_JSON")
@@ -114,7 +114,7 @@ jobs:
           SHA: ${{ steps.inspect.outputs.head_sha }}
         run: |
           set -euo pipefail
-          STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --paginate --jq --arg sha "$SHA" '[.[] | select(.user.login | test("coderabbit"; "i")) | select(.commit_id == $sha)] | sort_by(.submitted_at) | last | .state // ""')
+          STATE=$(SHA="$SHA" gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --paginate --jq '[.[] | select(.user.login | test("coderabbit"; "i")) | select(.commit_id == env.SHA)] | sort_by(.submitted_at) | last | .state // ""')
           echo "CodeRabbit review for $SHA: ${STATE:-none}"
           [[ "$STATE" == "APPROVED" ]]
 
