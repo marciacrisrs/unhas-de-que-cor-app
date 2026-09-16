@@ -45,27 +45,76 @@ jobs:
           STATE=$(jq -r '.state' <<<"$DATA")
           DRAFT=$(jq -r '.draft' <<<"$DATA")
           MERGEABLE=$(jq -r '.mergeable' <<<"$DATA")
+          ACTOR=$(jq -r '.user.login' <<<"$DATA")
+          TITLE=$(jq -r '.title' <<<"$DATA")
           HEAD_SHA=$(jq -r '.head.sha' <<<"$DATA")
           NODE_ID=$(jq -r '.node_id' <<<"$DATA")
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "node_id=$NODE_ID" >> "$GITHUB_OUTPUT"
+          echo "dependabot_action_pr=false" >> "$GITHUB_OUTPUT"
           [[ "$STATE" == "open" && "$DRAFT" == "false" && "$MERGEABLE" != "false" ]]
-          mapfile -t SENSITIVE < <(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename' | grep -E '^(.github/|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
-          if (( ${#SENSITIVE[@]} > 0 )); then
-            echo "Sensitive files changed; autonomous merge is disabled."
-            printf '%s\n' "${SENSITIVE[@]}"
-            exit 1
+
+          FILES_JSON=$(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate)
+
+          if [[ "$ACTOR" == "dependabot[bot]" && "$TITLE" =~ ^build\(deps\) ]]; then
+            BAD=0
+            FOUND=0
+            mapfile -t FILES < <(jq -r '.[].filename' <<<"$FILES_JSON")
+
+            for FILE in "${FILES[@]}"; do
+              if [[ ! "$FILE" =~ ^\.github/workflows/.*\.ya?ml$ ]]; then
+                echo "::error::Dependabot action PR changed a non-workflow file: $FILE"
+                BAD=1
+                continue
+              fi
+
+              PATCH=$(jq -r --arg file "$FILE" '.[] | select(.filename == $file) | .patch // ""' <<<"$FILES_JSON")
+              [[ -n "$PATCH" ]] || { echo "::error::No patch available for $FILE"; BAD=1; continue; }
+
+              while IFS= read -r LINE; do
+                [[ "$LINE" =~ ^(\+\+\+|---|@@) ]] && continue
+                [[ "$LINE" =~ ^[+-] ]] || continue
+                if [[ ! "$LINE" =~ ^[+-][[:space:]]*uses:[[:space:]]*[^[:space:]@]+@[0-9a-fA-F]{40}([[:space:]]*#.*)?$ ]]; then
+                  echo "::error::Dependabot PR contains a non-action-reference change in $FILE: $LINE"
+                  BAD=1
+                else
+                  FOUND=1
+                fi
+              done <<< "$PATCH"
+
+              OLD_ACTIONS=$(grep -E '^-[[:space:]]*uses:' <<<"$PATCH" | sed -E 's/^[^u]*uses:[[:space:]]*([^@[:space:]]+)@.*/\1/' | sort || true)
+              NEW_ACTIONS=$(grep -E '^\+[[:space:]]*uses:' <<<"$PATCH" | sed -E 's/^[^u]*uses:[[:space:]]*([^@[:space:]]+)@.*/\1/' | sort || true)
+              if [[ "$OLD_ACTIONS" != "$NEW_ACTIONS" ]]; then
+                echo "::error::Dependabot action name changed in $FILE; only the pinned revision may change."
+                BAD=1
+              fi
+            done
+
+            if (( BAD != 0 || FOUND == 0 )); then
+              echo "Dependabot PR is not a pure GitHub Actions reference update; autonomous merge is disabled."
+              exit 1
+            fi
+
+            echo "dependabot_action_pr=true" >> "$GITHUB_OUTPUT"
+            echo "Validated Dependabot PR: workflow files contain only pinned GitHub Actions reference changes."
+          else
+            mapfile -t SENSITIVE < <(jq -r '.[].filename' <<<"$FILES_JSON" | grep -E '^(.github/|.*(Dockerfile|docker-compose|compose\.ya?ml)$)' || true)
+            if (( ${#SENSITIVE[@]} > 0 )); then
+              echo "Sensitive files changed; autonomous merge is disabled."
+              printf '%s\n' "${SENSITIVE[@]}"
+              exit 1
+            fi
           fi
 
       - name: Verify CodeRabbit approval for current commit
-        if: steps.inspect.outcome == 'success'
+        if: steps.inspect.outcome == 'success' && steps.inspect.outputs.dependabot_action_pr != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ steps.pr.outputs.pr }}
           SHA: ${{ steps.inspect.outputs.head_sha }}
         run: |
           set -euo pipefail
-          STATE=$(gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --paginate --jq --arg sha "$SHA" '[.[] | select(.user.login | test("coderabbit"; "i")) | select(.commit_id == $sha)] | sort_by(.submitted_at) | last | .state // ""')
+          STATE=$(SHA="$SHA" gh api "repos/${{ github.repository }}/pulls/$PR/reviews" --paginate --jq '[.[] | select(.user.login | test("coderabbit"; "i")) | select(.commit_id == env.SHA)] | sort_by(.submitted_at) | last | .state // ""')
           echo "CodeRabbit review for $SHA: ${STATE:-none}"
           [[ "$STATE" == "APPROVED" ]]
 
