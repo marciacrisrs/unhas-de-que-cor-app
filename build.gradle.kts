@@ -32,6 +32,9 @@ sonar {
         property("sonar.java.binaries", listOf(appBuildDir.resolve("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"), appBuildDir.resolve("intermediates/javac/debug/compileDebugJavaWithJavac/classes")).joinToString(","))
         property("sonar.java.test.binaries", appBuildDir.resolve("intermediates/javac/debugUnitTest/compileDebugUnitTestJavaWithJavac/classes").absolutePath)
         property("sonar.qualitygate.wait", envOrProp("SONAR_QUALITY_GATE_WAIT") ?: "true")
+        property("sonar.sources", "app/src/main/java,.github")
+        property("sonar.tests", "app/src/test/java,app/src/androidTest/java")
+        property("sonar.coverage.jacoco.xmlReportPaths", "${appBuildDir}/reports/jacoco/jacocoAppReport/jacocoAppReport.xml")
         property("sonar.androidLint.reportPaths", "${appBuildDir}/reports/lint-results-debug.xml")
         property("sonar.kotlin.detekt.reportPaths", "${appBuildDir}/reports/detekt/detekt.xml")
         property("sonar.junit.reportPaths", "${appBuildDir}/test-results/testDebugUnitTest")
@@ -42,13 +45,7 @@ sonar {
 
 project(":app") {
     sonar {
-        properties {
-            property("sonar.sources", "src/main/java")
-            property(
-                "sonar.coverage.jacoco.xmlReportPaths",
-                layout.buildDirectory.file("reports/jacoco/jacocoAppReport/jacocoAppReport.xml").get().asFile.absolutePath,
-            )
-        }
+        isSkipProject = true
     }
     afterEvaluate {
         tasks.named<JacocoReport>("jacocoAppReport") {
