@@ -292,6 +292,9 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         return projected.maxOf { abs(it.s) } <= searchHalfWidth + WIDTH_MARGIN
     }
 
+    private fun risesThrough(fromY: Float, toY: Float, scanY: Float): Boolean =
+        fromY <= scanY && toY > scanY
+
     private fun rasterize(polygon: List<PixelPoint>, width: Int, height: Int): ByteArray {
         val output = ByteArray(width * height)
         val minY = polygon.minOf { it.y }.roundToInt().coerceIn(0, height - 1)
@@ -301,10 +304,9 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
             for (i in polygon.indices) {
                 val a = polygon[i]
                 val b = polygon[(i + 1) % polygon.size]
-                if ((a.y <= y + HALF_PIXEL && b.y > y + HALF_PIXEL) ||
-                    (b.y <= y + HALF_PIXEL && a.y > y + HALF_PIXEL)
-                ) {
-                    val f = (y + HALF_PIXEL - a.y) / (b.y - a.y)
+                val scanY = y + HALF_PIXEL
+                if (risesThrough(a.y, b.y, scanY) || risesThrough(b.y, a.y, scanY)) {
+                    val f = (scanY - a.y) / (b.y - a.y)
                     intersections += a.x + (b.x - a.x) * f
                 }
             }
