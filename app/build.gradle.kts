@@ -223,6 +223,7 @@ val appCoverageIncludes = listOf(
     "**/br/com/unhasdequecor/data/vision/nail/DetectedNail*",
     "**/br/com/unhasdequecor/data/vision/nail/ImageCoordinates*",
     "**/br/com/unhasdequecor/data/vision/nail/NailColorApplier*",
+    "**/br/com/unhasdequecor/data/vision/nail/PaintAwareNailSegmenter*",
     "**/br/com/unhasdequecor/data/vision/nail/PolishMaskRecolorer*",
     "**/br/com/unhasdequecor/data/vision/nail/NailOverlayAnchors*",
     "**/br/com/unhasdequecor/data/vision/nail/NailLandmarkMapper*",

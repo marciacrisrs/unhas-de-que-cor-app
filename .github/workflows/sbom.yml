@@ -6,12 +6,11 @@ on:
       - master
   pull_request:
 
-permissions:
-  contents: read
-
 jobs:
   sbom:
     name: Generate SBOM
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
