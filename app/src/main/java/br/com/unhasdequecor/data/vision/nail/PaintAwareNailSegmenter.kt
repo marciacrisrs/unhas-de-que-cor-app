@@ -109,22 +109,10 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         geometricHalfWidth: Float,
         searchHalfWidth: Float,
     ): SkinModel {
-        val samples = ArrayList<Feature>()
         val availableHalfWidth = min(width, height) * HALF - HALF_PIXEL
-        val ring = min(
-            searchHalfWidth * SKIN_RING_FACTOR,
-            min(
-                availableHalfWidth,
-                geometricHalfWidth + SKIN_RING_MARGIN,
-            ),
-        )
-        for (y in 1 until height - 1 step SAMPLE_STRIDE) {
-            for (x in 1 until width - 1 step SAMPLE_STRIDE) {
-                val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
-                if (p.t !in minT..maxT || abs(p.s) < ring) continue
-                samples += featureAt(pixels, width, height, x, y)
-            }
-        }
+        val outerRing = min(searchHalfWidth * SKIN_RING_FACTOR, availableHalfWidth)
+        val tightRing = min(availableHalfWidth, geometricHalfWidth + SKIN_RING_MARGIN)
+        val samples = skinSamplesOutsidePlate(pixels, width, height, frame, minT, maxT, outerRing, tightRing)
         if (samples.isEmpty()) return SkinModel(DEFAULT_SKIN, DEFAULT_SPREAD)
         val mean = Feature(
             samples.sumOf { it.r.toDouble() }.toFloat() / samples.size,
@@ -133,6 +121,45 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         )
         val spread = samples.map { distance(it, mean) }.average().toFloat().coerceAtLeast(MIN_SPREAD)
         return SkinModel(mean, spread)
+    }
+
+    private fun skinSamplesOutsidePlate(
+        pixels: IntArray,
+        width: Int,
+        height: Int,
+        frame: Frame,
+        minT: Float,
+        maxT: Float,
+        outerRing: Float,
+        tightRing: Float,
+    ): List<Feature> {
+        var ring = outerRing
+        var samples = skinSamples(pixels, width, height, frame, minT, maxT, ring)
+        while (samples.size < MIN_SAMPLES && ring > tightRing) {
+            ring = max(tightRing, ring - 1f)
+            samples = skinSamples(pixels, width, height, frame, minT, maxT, ring)
+        }
+        return samples
+    }
+
+    private fun skinSamples(
+        pixels: IntArray,
+        width: Int,
+        height: Int,
+        frame: Frame,
+        minT: Float,
+        maxT: Float,
+        ring: Float,
+    ): List<Feature> {
+        val samples = ArrayList<Feature>()
+        for (y in 1 until height - 1 step SAMPLE_STRIDE) {
+            for (x in 1 until width - 1 step SAMPLE_STRIDE) {
+                val p = frame.project(PixelPoint(x + HALF_PIXEL, y + HALF_PIXEL))
+                if (p.t !in minT..maxT || abs(p.s) < ring) continue
+                samples += featureAt(pixels, width, height, x, y)
+            }
+        }
+        return samples
     }
 
     private fun classify(
@@ -339,7 +366,7 @@ class PaintAwareNailSegmenter @Inject constructor() : NailSegmenter {
         const val SAMPLE_TOLERANCE = 0.8f
         const val PAINT_INSET_PX = 1.0f
         const val MIN_AREA_RATIO = 0.08f
-        const val MAX_AREA_RATIO = 7f
+        const val MAX_AREA_RATIO = 12f
         const val AXIS_DRIFT_MIN = 4f
         const val AXIS_DRIFT_FACTOR = 0.4f
         const val MAX_WIDTH_FACTOR = 2.0f
