@@ -65,11 +65,13 @@ import br.com.unhasdequecor.data.vision.nail.TryOnPreviewLabels
 import br.com.unhasdequecor.data.vision.nail.UserTryOnRenderMode
 import br.com.unhasdequecor.data.vision.nail.UserTryOnRenderPlan
 import br.com.unhasdequecor.ui.theme.SoftSurfaceShape
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private data class TryOnPreviewData(
     val bitmap: Bitmap,
+    val ownsBitmap: Boolean,
     val anchors: List<NailOverlayAnchor>,
     val mode: TryOnMode,
     val nails: List<DetectedNail> = emptyList(),
@@ -159,7 +161,7 @@ private fun rememberPaintedPreview(
         return@produceState
     }
     value = withContext(Dispatchers.Default) {
-        paintPreview(assets, polishColor, pipeline)
+        paintPreviewSafely(assets, polishColor, pipeline)
     }
 }
 
@@ -175,7 +177,7 @@ private fun DisposeTryOnBaseAssets(base: TryOnBaseAssets?) {
 private fun DisposeTryOnPreview(preview: TryOnPreviewData?) {
     DisposableEffect(preview) {
         val held = preview
-        onDispose { recycleQuietly(held?.bitmap) }
+        onDispose { recycleIfOwned(held?.bitmap, held?.ownsBitmap == true) }
     }
 }
 
@@ -296,11 +298,8 @@ private fun TryOnPreviewContent(
 
 private fun previewAspect(preview: TryOnPreviewData?): Float {
     val bmp = preview?.bitmap ?: return NailLandmarkMapper.PREVIEW_ASPECT
-    return if (bmp.height > 0) {
-        bmp.width.toFloat() / bmp.height.toFloat()
-    } else {
-        NailLandmarkMapper.PREVIEW_ASPECT
-    }
+    if (bmp.isRecycled || bmp.height <= 0) return NailLandmarkMapper.PREVIEW_ASPECT
+    return bmp.width.toFloat() / bmp.height.toFloat()
 }
 
 private fun previewClaim(preview: TryOnPreviewData?): TryOnPreviewClaim = when (preview?.mode) {
@@ -344,8 +343,8 @@ private fun loadTryOnBaseAssets(
             noLandmarkReason = noLandmarkReason,
         ).also { decoded = null }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
-        recycleQuietly(decoded)
-        recycleQuietly(sampleMask)
+        recyclePreviewBitmapQuietly(decoded)
+        recyclePreviewBitmapQuietly(sampleMask)
         throw cancelled
     }
 }
@@ -356,11 +355,28 @@ private fun recycleTryOnBaseAssets(held: TryOnBaseAssets?) {
             snap.workingBitmap !== held.decoded &&
             !snap.workingBitmap.isRecycled
         ) {
-            recycleQuietly(snap.workingBitmap)
+            recyclePreviewBitmapQuietly(snap.workingBitmap)
         }
     }
-    recycleQuietly(held?.sampleMask)
-    recycleQuietly(held?.decoded)
+    recyclePreviewBitmapQuietly(held?.sampleMask)
+    recyclePreviewBitmapQuietly(held?.decoded)
+}
+
+private fun paintPreviewSafely(
+    assets: TryOnBaseAssets,
+    polishColor: Color,
+    pipeline: NailTryOnPipeline,
+): TryOnPreviewData? {
+    if (!tryOnAssetsUsable(assets.decoded, assets.snapshot?.workingBitmap)) return null
+    return try {
+        paintPreview(assets, polishColor, pipeline)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: IllegalStateException) {
+        // Leaving Result (or swapping the hand photo) recycles base assets while
+        // this Default-dispatcher paint is still in flight.
+        null
+    }
 }
 
 private fun paintPreview(
@@ -387,17 +403,19 @@ private fun paintSamplePreview(
         if (recolored != null) {
             return TryOnPreviewData(
                 bitmap = recolored,
+                ownsBitmap = true,
                 anchors = emptyList(),
                 mode = TryOnMode.MASK,
             )
         }
     }
-    val display = ownedPreviewBitmap(
+    val display = claimPreviewBitmap(
         candidate = assets.decoded,
         protected = listOf(assets.decoded),
     )
     return TryOnPreviewData(
-        bitmap = display,
+        bitmap = display.bitmap,
+        ownsBitmap = display.owned,
         anchors = emptyList(),
         mode = TryOnMode.APPROXIMATE,
     )
@@ -458,7 +476,7 @@ private fun paintUserNotDetected(
     fallbackReason: DetectionFailureReason? = null,
 ): TryOnPreviewData {
     val displaySource = snapshot?.workingBitmap ?: assets.decoded
-    val display = ownedPreviewBitmap(
+    val display = claimPreviewBitmap(
         candidate = displaySource,
         protected = listOfNotNull(snapshot?.workingBitmap, assets.decoded),
     )
@@ -466,7 +484,8 @@ private fun paintUserNotDetected(
         ?: fallbackReason
         ?: DetectionFailureReason.Generic
     return TryOnPreviewData(
-        bitmap = display,
+        bitmap = display.bitmap,
+        ownsBitmap = display.owned,
         anchors = emptyList(),
         mode = TryOnMode.NOT_DETECTED,
         nails = emptyList(),
@@ -486,12 +505,13 @@ private fun paintUserFull(
     // próprio recolor que estamos tentando avaliar. A foto original fica limpa
     // e o NailDebugOverlay mostra a NailMask efetiva, ROI, contorno e landmarks.
     if (pipeline.debugEnabled) {
-        val display = ownedPreviewBitmap(
+        val display = claimPreviewBitmap(
             candidate = snapshot.workingBitmap,
             protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
         )
         return TryOnPreviewData(
-            bitmap = display,
+            bitmap = display.bitmap,
+            ownsBitmap = display.owned,
             anchors = emptyList(),
             mode = TryOnMode.DETECTED,
             nails = snapshot.nails,
@@ -502,12 +522,13 @@ private fun paintUserFull(
     }
 
     val result = pipeline.recolor(snapshot, polishColor)
-    val painted = ownedPreviewBitmap(
+    val painted = claimPreviewBitmap(
         candidate = result.bitmap,
         protected = listOfNotNull(snapshot.workingBitmap, assets.decoded),
     )
     return TryOnPreviewData(
-        bitmap = painted,
+        bitmap = painted.bitmap,
+        ownsBitmap = painted.owned,
         anchors = emptyList(),
         mode = TryOnMode.DETECTED,
         nails = result.nails,
@@ -536,20 +557,6 @@ private fun paintUserApproximate(
         showDebug = pipeline.debugEnabled,
         fallbackReason = snapshot.failureReason,
     )
-}
-
-private fun ownedPreviewBitmap(
-    candidate: Bitmap,
-    protected: List<Bitmap>,
-): Bitmap {
-    if (protected.none { it === candidate }) return candidate
-    return candidate.copy(Bitmap.Config.ARGB_8888, false) ?: candidate
-}
-
-private fun recycleQuietly(bitmap: Bitmap?) {
-    if (bitmap != null && !bitmap.isRecycled) {
-        runCatching { bitmap.recycle() }
-    }
 }
 
 private fun DrawScope.drawPolishNail(
