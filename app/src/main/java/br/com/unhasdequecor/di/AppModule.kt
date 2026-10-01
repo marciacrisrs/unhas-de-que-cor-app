@@ -38,7 +38,7 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "unhas-de-que-cor.db")
+        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.FILE_NAME)
             .addMigrations(*DatabaseMigrations.ALL)
             .build()
 

@@ -15,4 +15,12 @@ import br.com.unhasdequecor.data.local.db.entity.HistoryEntity
 abstract class AppDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
     abstract fun favoriteDao(): FavoriteDao
+
+    companion object {
+        /**
+         * On-disk Room file under `databases/`. Backup XML must use this exact
+         * name — Auto Backup path matching is literal, not a slug of the app id.
+         */
+        const val FILE_NAME = "unhas-de-que-cor.db"
+    }
 }
