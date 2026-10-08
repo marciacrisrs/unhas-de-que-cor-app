@@ -1,5 +1,6 @@
 package br.com.unhasdequecor.ui.hand
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import br.com.unhasdequecor.domain.model.HandReference
 import br.com.unhasdequecor.domain.model.HandReferenceRejection
@@ -38,12 +39,15 @@ class HandReferenceViewModelTest {
         runBlocking { repository.ensureDefaultSample() }
     }
 
-    private fun viewModel(): HandReferenceViewModel = HandReferenceViewModel(
+    private fun viewModel(
+        savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    ): HandReferenceViewModel = HandReferenceViewModel(
         observeHandReference = ObserveHandReferenceUseCase(repository),
         saveHandReference = SaveHandReferenceUseCase(repository) { FIXED_NOW_MS },
         useSampleHandReference = UseSampleHandReferenceUseCase(repository) { FIXED_NOW_MS },
         clearHandReference = ClearHandReferenceUseCase(repository),
         repository = repository,
+        savedStateHandle = savedStateHandle,
     )
 
     @Test
@@ -260,6 +264,50 @@ class HandReferenceViewModelTest {
     }
 
     @Test
+    fun `camera result after process death still stages the capture from SavedStateHandle`() = runTest {
+        val handle = SavedStateHandle()
+        val first = viewModel(handle)
+        advanceUntilIdle()
+        first.createCameraCaptureFile()
+
+        val restored = viewModel(handle)
+        advanceUntilIdle()
+        restored.onCameraCaptureResult(success = true)
+        advanceUntilIdle()
+
+        assertThat(restored.uiState.value.pendingUserPreviewPath).isEqualTo(captureJpg)
+        assertThat(restored.uiState.value.message).isNull()
+        assertThat(handle.contains(PENDING_CAMERA_PATH_KEY)).isFalse()
+    }
+
+    @Test
+    fun `successful camera result without pending path shows an error instead of dropping silently`() = runTest {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.onCameraCaptureResult(success = true)
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
+        assertThat(viewModel.uiState.value.message).contains("Tente de novo")
+    }
+
+    @Test
+    fun `cancelled camera result does not stage or error`() = runTest {
+        val handle = SavedStateHandle()
+        val viewModel = viewModel(handle)
+        advanceUntilIdle()
+        viewModel.createCameraCaptureFile()
+
+        viewModel.onCameraCaptureResult(success = false)
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.pendingUserPreviewPath).isNull()
+        assertThat(viewModel.uiState.value.message).isNull()
+        assertThat(handle.contains(PENDING_CAMERA_PATH_KEY)).isFalse()
+    }
+
+    @Test
     fun `consumeNavigateHome clears home navigation flag`() = runTest {
         repository.nextOutcome = HandReferenceSaveOutcome.Saved(
             HandReference("/files/hand.jpg", 1L),
@@ -297,5 +345,6 @@ class HandReferenceViewModelTest {
 
     private companion object {
         const val FIXED_NOW_MS = 99L
+        const val PENDING_CAMERA_PATH_KEY = "pending_camera_capture_path"
     }
 }

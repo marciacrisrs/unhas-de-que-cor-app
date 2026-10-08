@@ -1,6 +1,7 @@
 package br.com.unhasdequecor.ui.hand
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.unhasdequecor.domain.model.HandReference
@@ -55,6 +56,7 @@ class HandReferenceViewModel @Inject constructor(
     private val useSampleHandReference: UseSampleHandReferenceUseCase,
     private val clearHandReference: ClearHandReferenceUseCase,
     private val repository: HandReferenceRepository,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HandReferenceUiState())
@@ -74,7 +76,27 @@ class HandReferenceViewModel @Inject constructor(
         }
     }
 
-    fun createCameraCaptureFile(): File = File(repository.createCameraCapturePath())
+    fun createCameraCaptureFile(): File {
+        val file = File(repository.createCameraCapturePath())
+        savedStateHandle[KEY_PENDING_CAMERA_PATH] = file.absolutePath
+        return file
+    }
+
+    /**
+     * TakePicture can restart the activity (rotation or process death while the
+     * camera app is open). The capture path must come from [SavedStateHandle],
+     * not Compose `remember` — otherwise success=true arrives with a lost file
+     * and the photo is dropped with no error.
+     */
+    fun onCameraCaptureResult(success: Boolean) {
+        val path = savedStateHandle.remove<String>(KEY_PENDING_CAMERA_PATH)
+        if (!success) return
+        if (path.isNullOrBlank()) {
+            _uiState.update { it.copy(message = CAMERA_CAPTURE_LOST_MESSAGE) }
+            return
+        }
+        importFromCameraCapture(File(path))
+    }
 
     fun openReplaceSheet() {
         _uiState.update {
@@ -339,5 +361,11 @@ class HandReferenceViewModel @Inject constructor(
         if (!persistInFlight.get()) {
             repository.clearStagingCacheNow()
         }
+    }
+
+    private companion object {
+        const val KEY_PENDING_CAMERA_PATH = "pending_camera_capture_path"
+        const val CAMERA_CAPTURE_LOST_MESSAGE =
+            "Não foi possível usar a foto. Tente de novo."
     }
 }

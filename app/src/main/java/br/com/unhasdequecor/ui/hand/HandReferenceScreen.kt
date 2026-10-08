@@ -34,7 +34,6 @@ fun HandReferenceScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var pendingCameraFile by remember { mutableStateOf<File?>(null) }
     var cameraPermissionDenied by remember { mutableStateOf(false) }
 
     BackHandler(enabled = state.isSaving) {
@@ -66,11 +65,7 @@ fun HandReferenceScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
     ) { success ->
-        val file = pendingCameraFile
-        pendingCameraFile = null
-        if (success && file != null) {
-            viewModel.importFromCameraCapture(file)
-        }
+        viewModel.onCameraCaptureResult(success)
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -78,7 +73,6 @@ fun HandReferenceScreen(
     ) { granted ->
         if (granted) {
             val file = viewModel.createCameraCaptureFile()
-            pendingCameraFile = file
             cameraLauncher.launch(
                 FileProvider.getUriForFile(
                     context,
@@ -98,7 +92,6 @@ fun HandReferenceScreen(
         ) == PackageManager.PERMISSION_GRANTED
         if (granted) {
             val file = viewModel.createCameraCaptureFile()
-            pendingCameraFile = file
             cameraLauncher.launch(
                 FileProvider.getUriForFile(
                     context,
